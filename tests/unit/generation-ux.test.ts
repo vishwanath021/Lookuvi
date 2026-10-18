@@ -39,6 +39,38 @@ describe("hair colour no-op", () => {
     expect(changed.unchanged).toBe(false);
     expect(changed.hairDelta).toBeGreaterThan(8);
   });
+
+  it("keeps a small crown dye and rejects an identical re-encode", async () => {
+    const width = 160;
+    const height = 220;
+    const raw = Buffer.alloc(width * height * 3);
+    for (let i = 0; i < raw.length; i += 3) {
+      raw[i] = 36;
+      raw[i + 1] = 24;
+      raw[i + 2] = 18;
+    }
+    const before = await sharp(raw, { raw: { width, height, channels: 3 } }).jpeg().toBuffer();
+    const again = await sharp(before).jpeg({ quality: 82 }).toBuffer();
+    const same = await hairChange(before, again);
+    expect(same.unchanged).toBe(true);
+    expect(same.changedFraction).toBeLessThan(0.01);
+
+    const dyed = Buffer.from(raw);
+    for (let y = 0; y < 18; y += 1) {
+      for (let x = 70; x < 98; x += 1) {
+        const p = (y * width + x) * 3;
+        dyed[p] = 170;
+        dyed[p + 1] = 36;
+        dyed[p + 2] = 48;
+      }
+    }
+    const after = await sharp(dyed, { raw: { width, height, channels: 3 } }).jpeg().toBuffer();
+    const changed = await hairChange(before, after);
+    expect(changed.hairDelta).toBeLessThan(8);
+    expect(changed.imageDelta).toBeLessThan(8);
+    expect(changed.changedFraction).toBeGreaterThanOrEqual(0.01);
+    expect(changed.unchanged).toBe(false);
+  });
 });
 
 describe("letterbox crop", () => {
