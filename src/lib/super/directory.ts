@@ -22,6 +22,7 @@ export type SalonRecord = {
   productTryOn: boolean;
   productQueue: boolean;
   productBridal: boolean;
+  productGroom: boolean;
   queueToday: number;
 };
 
@@ -85,6 +86,7 @@ export async function loadSalons(): Promise<SalonRecord[]> {
       productTryOn: tenant.productTryOn,
       productQueue: tenant.productQueue,
       productBridal: tenant.productBridal,
+      productGroom: tenant.productGroom,
       queueToday: today.get(tenant.id) || 0,
     };
   });

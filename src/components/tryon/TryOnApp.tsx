@@ -23,6 +23,7 @@ import { detectFaceLandmarks } from "@/lib/face/detect-client";
 import type { PlacementDebug } from "@/lib/face/pose";
 import { classifySkinPhoto } from "@/lib/hand-photo";
 import type { SalonConfig } from "@/lib/salon";
+import { guestSections, type GuestSection } from "@/lib/guest-sections";
 import { salonActionItems } from "@/lib/salon-actions";
 import { normalizeWhatsAppPhone } from "@/lib/whatsapp";
 
@@ -110,6 +111,21 @@ function useBridalPane(active: boolean) {
   return Pane;
 }
 
+function useGroomPane(active: boolean) {
+  const [Pane, setPane] = useState<ComponentType<BridalPaneProps> | null>(null);
+  useEffect(() => {
+    if (!active || Pane) return;
+    let live = true;
+    void import("@/components/tryon/GroomFlow").then((mod) => {
+      if (live) setPane(() => mod.GroomFlow);
+    });
+    return () => {
+      live = false;
+    };
+  }, [active, Pane]);
+  return Pane;
+}
+
 function sessionId() {
   return guestSessionId();
 }
@@ -127,6 +143,7 @@ export function TryOnApp({
   showQueue = false,
   showBridal = false,
   showEveryday = true,
+  showGroom = false,
 }: {
   config: SalonConfig;
   embed?: boolean;
@@ -141,11 +158,15 @@ export function TryOnApp({
   showQueue?: boolean;
   showBridal?: boolean;
   showEveryday?: boolean;
+  showGroom?: boolean;
 }) {
   const lang = config.defaultLang || "en";
-  const [section, setSection] = useState<"everyday" | "bridal">(showEveryday ? "everyday" : "bridal");
+  const sections = guestSections({ everyday: showEveryday, bridal: showBridal, groom: showGroom });
+  const [section, setSection] = useState<GuestSection>(sections[0] || "everyday");
   const bridalOn = section === "bridal" && showBridal;
+  const groomOn = section === "groom" && showGroom;
   const BridalPane = useBridalPane(bridalOn);
+  const GroomPane = useGroomPane(groomOn);
   const [sid, setSid] = useState("");
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
@@ -817,7 +838,7 @@ export function TryOnApp({
     { id: "beard", label: "Beard", name: t(lang, "beardChip"), on: config.toolBeard, icon: "beard" },
   ];
   const visibleTools = tools.filter((item) => item.on);
-  const actionItems = salonActionItems({ phone: Boolean(phone), showQueue, bridalOn });
+  const actionItems = salonActionItems({ phone: Boolean(phone), showQueue, bridalOn, groomOn });
   const showActionStrip = showQueue && actionItems.length > 0;
 
   const platformLogo = isPlatformLogo(config.logoUrl);
@@ -863,24 +884,23 @@ export function TryOnApp({
       ) : null}
       <ConsentSheet open={consent.open} onAgree={() => { track("consent_accepted", { lang }); void consent.agree(); }} onClose={consent.close} />
       <div data-scroll="salon" className="pb-16 pt-6">
-      {showBridal && showEveryday && (
-        <div className="mb-4 grid grid-cols-2 items-start gap-3">
-          <button type="button" className={`card min-h-24 p-3 text-left ${section === "everyday" ? "ring-2 ring-[var(--brand)]" : ""}`} aria-pressed={section === "everyday"} aria-label="Everyday" onClick={() => setSection("everyday")}>
-            <span className="block text-xs text-muted" aria-hidden="true">Hair, colour, brows</span>
-            <span className="block font-serif text-2xl leading-tight" aria-hidden="true">Everyday</span>
-          </button>
-          <div>
-            <button type="button" className={`card min-h-24 w-full p-3 text-left ${section === "bridal" ? "ring-2 ring-[var(--brand)]" : ""}`} aria-pressed={section === "bridal"} aria-label="Bridal" onClick={() => setSection("bridal")}>
-              <span className="block text-xs text-muted" aria-hidden="true">Hair, makeup, jewellery</span>
-              <span className="block font-serif text-2xl leading-tight" aria-hidden="true">Bridal</span>
-            </button>
-            {bridalOn && !BridalPane ? <p className="mt-2 text-sm text-muted">Opening bridal looks…</p> : null}
-          </div>
+      {sections.length > 1 ? (
+        <div className={`mb-4 grid items-start gap-3 ${sections.length > 2 ? "grid-cols-3" : "grid-cols-2"}`} data-guest-tabs="yes">
+          {sections.map((item) => (
+            <div key={item}>
+              <button type="button" className={`card min-h-24 w-full p-3 text-left ${section === item ? "ring-2 ring-[var(--brand)]" : ""}`} aria-pressed={section === item} aria-label={item === "everyday" ? "Everyday" : item === "bridal" ? "Bridal" : "Groom"} onClick={() => setSection(item)}>
+                <span className="block text-xs text-muted" aria-hidden="true">{item === "everyday" ? "Hair, colour, brows" : item === "bridal" ? "Hair, makeup, jewellery" : "Hair, beard, grooming"}</span>
+                <span className="block font-serif text-2xl leading-tight" aria-hidden="true">{item === "everyday" ? "Everyday" : item === "bridal" ? "Bridal" : "Groom"}</span>
+              </button>
+            </div>
+          ))}
         </div>
-      )}
-      {bridalOn && !showEveryday && !BridalPane ? <p className="mt-2 text-sm text-muted">Opening bridal looks…</p> : null}
+      ) : null}
+      {bridalOn && !BridalPane ? <p className="mt-2 text-sm text-muted">Opening bridal looks…</p> : null}
       {bridalOn && BridalPane ? <BridalPane config={config} /> : null}
-      {bridalOn ? null : <>
+      {groomOn && !GroomPane ? <p className="mt-2 text-sm text-muted">Opening groom looks…</p> : null}
+      {groomOn && GroomPane ? <GroomPane config={config} /> : null}
+      {bridalOn || groomOn ? null : <>
       <h2 className="page-title">{t(lang, "pageTitle")}</h2>
 
       {visibleTools.length > 1 && (

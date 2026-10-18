@@ -35,6 +35,8 @@ export function SettingsForm({
     anonDailyCap: number;
     memberDailyCap: number;
     requireLoginToBook: boolean;
+    productBridal: boolean;
+    productGroom: boolean;
     logoUrl: string | null;
   };
   canRemoveBranding: boolean;
@@ -154,6 +156,11 @@ export function SettingsForm({
         <label className="text-sm">Address<input className="field mt-1" value={form.address} onChange={(event) => set("address", event.target.value)} /></label>
         <label className="text-sm">Maps link<input className="field mt-1" value={form.mapsUrl} onChange={(event) => set("mapsUrl", event.target.value)} /></label>
         <label className="text-sm">City<input className="field mt-1" value={form.city} onChange={(event) => set("city", event.target.value)} /></label>
+        <fieldset className="grid gap-2 text-sm">
+          <legend className="font-medium">Looks on the customer screen</legend>
+          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Bridal" checked={form.productBridal} onChange={(event) => set("productBridal", event.target.checked)} /> Bridal. On by default. Off hides the Bridal tab.</label>
+          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Groom" checked={form.productGroom} onChange={(event) => set("productGroom", event.target.checked)} /> Groom. Off by default. On shows hair, beard, grooming, and his own clothes.</label>
+        </fieldset>
         {showTryOn ? <>
         <fieldset className="grid gap-2 text-sm">
           <legend className="font-medium">Tools on the try-on page</legend>
