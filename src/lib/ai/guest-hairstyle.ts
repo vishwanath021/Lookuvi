@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { appMediaUrl } from "@/lib/storage";
 import { cropLetterbox } from "@/lib/ai/letterbox";
 import { COLOUR_UNCHANGED_MESSAGE, hairChange } from "@/lib/ai/look-change";
+import { logInfo } from "@/lib/logger";
 import { buildBeardPrompt, buildBrowPrompt, buildColourPrompt, buildNailPrompt } from "@/lib/prompts";
 import { guestLimitMessage } from "@/lib/tools";
 
@@ -250,6 +251,12 @@ async function runGuestEdit(args: GuestEditArgs): Promise<NextResponse | null> {
   if (executed.ok && args.tool === "colour" && framed) {
     const change = await hairChange(args.jpeg, framed).catch(() => null);
     if (change?.unchanged) {
+      logInfo("[colour] rejected as unchanged", {
+        hairDelta: Number(change.hairDelta.toFixed(2)),
+        frameDelta: Number(change.imageDelta.toFixed(2)),
+        changedFraction: Number(change.changedFraction.toFixed(4)),
+        salonId: args.tenantId,
+      });
       await settleCredits(args.tenantId, creditRef, "REFUND");
       await failGenerationJob(args.jobId, { outcome: "unchanged", message: COLOUR_UNCHANGED_MESSAGE, callId: executed.callId });
       await prisma.tryOn.create({
