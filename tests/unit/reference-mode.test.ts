@@ -346,6 +346,7 @@ const salonConfig = {
   memberDailyCap: 6,
   requireLoginToBook: false,
   productBridal: false,
+  productGroom: false,
   bridalPackages: [],
   services: [],
   styles: [],

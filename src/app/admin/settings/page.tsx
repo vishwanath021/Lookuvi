@@ -53,6 +53,8 @@ export default async function SettingsPage() {
           anonDailyCap: tenant.anonDailyCap,
           memberDailyCap: tenant.memberDailyCap,
           requireLoginToBook: tenant.requireLoginToBook,
+          productBridal: tenant.productBridal,
+          productGroom: tenant.productGroom,
           logoUrl: tenant.logoUrl,
         }}
       />

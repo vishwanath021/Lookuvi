@@ -18,6 +18,7 @@ function applySalonPatch(row: SalonRecord, body: Record<string, unknown>): Salon
     ...(typeof body.productTryOn === "boolean" ? { productTryOn: body.productTryOn } : {}),
     ...(typeof body.productQueue === "boolean" ? { productQueue: body.productQueue } : {}),
     ...(typeof body.productBridal === "boolean" ? { productBridal: body.productBridal } : {}),
+    ...(typeof body.productGroom === "boolean" ? { productGroom: body.productGroom } : {}),
   };
 }
 
@@ -272,6 +273,15 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
                   />
                   Bridal
                   <span className="block text-xs text-muted">Guests can try a full bridal look and mehendi.</span>
+                </label>
+                <label className="flex min-h-11 items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selected.productGroom}
+                    onChange={(event) => void update(selected.id, { productGroom: event.target.checked })}
+                  />
+                  Groom
+                  <span className="block text-xs text-muted">Guests can try groom hair, beard, and their own clothes. Off by default.</span>
                 </label>
               </fieldset>
               <div className="mt-4 flex flex-wrap gap-2">

@@ -454,7 +454,7 @@ test("edge: a paused queue tells the guest to ask at the desk", async ({ page })
 
 test("edge: both products off hides the tools and says so", async ({ page }) => {
   const prisma = await salonDb();
-  await prisma.tenant.update({ where: { slug: "demo" }, data: { productTryOn: false, productQueue: false, productBridal: false } });
+  await prisma.tenant.update({ where: { slug: "demo" }, data: { productTryOn: false, productQueue: false, productBridal: false, productGroom: false } });
   await prisma.$disconnect();
   await page.goto("/s/demo");
   await expect(page.getByText("Try-on is not available.")).toBeVisible();
