@@ -30,7 +30,7 @@ async function jpeg(width: number, height: number, color: { r: number; g: number
 
 describe("your own look prompt", () => {
   it("labels each photo, keeps her face, and copies the items", () => {
-    const makeup = bridalMakeupById("makeup-classic-red");
+    const makeup = bridalMakeupById("makeup-soft-rose");
     expect(makeup).toBeTruthy();
     if (!makeup) return;
     const prompt = buildOwnLookPrompt(makeup, [
@@ -46,7 +46,8 @@ describe("your own look prompt", () => {
     const sareeAt = prompt.indexOf("Image 2 is her saree");
     expect(makeupAt).toBeGreaterThan(-1);
     expect(makeupAt).toBeLessThan(sareeAt);
-    expect(prompt).toContain("Apply clearly visible bridal makeup: Makeup: classic bridal red lip, even HD base, kohl, and a round red bindi. Photo-ready HD makeup with an even base that still looks like skin. Lip colour: Red. Eye makeup: soft brown shadow and defined liner, clearly visible.");
+    expect(prompt).toContain("Apply clearly visible bridal makeup: Makeup: soft-glam bridal with dewy skin, a nude-rose lip, and a little shimmer on the lids. Dewy finish with a healthy highlight on the cheekbones. Lip colour: Nude-Rose. Eye makeup: soft brown shadow and defined liner, clearly visible.");
+    expect(prompt).not.toMatch(/round red bindi|maroon matte/i);
     expect(prompt.indexOf("Eye makeup: soft brown shadow and defined liner, clearly visible.")).toBeLessThan(sareeAt);
     expect(prompt).toContain("Do not change face shape or features; makeup changes colour and finish only.");
     expect(prompt).toContain("Keep her natural skin tone and skin texture exactly; do not lighten, whiten or smooth the skin.");
@@ -62,7 +63,7 @@ describe("your own look prompt", () => {
   });
 
   it("does not invent clothes when she skipped every item", () => {
-    const makeup = bridalMakeupById("makeup-maroon");
+    const makeup = bridalMakeupById("makeup-nude-glow");
     expect(makeup).toBeTruthy();
     if (!makeup) return;
     const prompt = buildOwnLookPrompt(makeup, []);
@@ -72,13 +73,13 @@ describe("your own look prompt", () => {
   });
 
   it("keeps slot order so the image numbers stay stable", () => {
-    const planned = planOwnLook("makeup-nude-rose", ["earrings", "saree"]);
+    const planned = planOwnLook("makeup-soft-rose", ["earrings", "saree"]);
     expect(planned.ok).toBe(true);
     if (!planned.ok) return;
     expect(planned.plan.model).toBe(OWN_LOOK_MODEL);
     expect(planned.plan.quality).toBe("medium");
     expect(planned.plan.size).toBe("1024x1536");
-    const threeByFour = planOwnLook("makeup-nude-rose", ["saree"], OWN_LOOK_THREE_BY_FOUR);
+    const threeByFour = planOwnLook("makeup-soft-rose", ["saree"], OWN_LOOK_THREE_BY_FOUR);
     expect(threeByFour.ok).toBe(true);
     if (threeByFour.ok) {
       expect(threeByFour.plan.size).toBe("1024x1360");
@@ -98,8 +99,8 @@ describe("your own look prompt", () => {
 
   it("refuses an unknown makeup look and a repeated item", () => {
     expect(planOwnLook("not-a-card", []).ok).toBe(false);
-    expect(planOwnLook("makeup-classic-red", ["tiara"]).ok).toBe(false);
-    expect(planOwnLook("makeup-classic-red", ["saree", "saree"]).ok).toBe(false);
+    expect(planOwnLook("makeup-soft-rose", ["tiara"]).ok).toBe(false);
+    expect(planOwnLook("makeup-soft-rose", ["saree", "saree"]).ok).toBe(false);
     expect(OWN_LOOK_SLOTS).toHaveLength(9);
     expect(OWN_LOOK_MAX_IMAGES).toBe(10);
   });
@@ -158,7 +159,7 @@ describe("your own look cost and privacy", () => {
       await expect(generateOwnLook({
         selfie: await jpeg(200, 260, { r: 200, g: 160, b: 140 }),
         items: [{ id: "saree", bytes: await jpeg(200, 200, { r: 140, g: 20, b: 40 }) }],
-        makeupId: "makeup-classic-red",
+        makeupId: "makeup-soft-rose",
         tenantId: "tenant",
         requestId: "req-1",
         put,
@@ -185,7 +186,7 @@ describe("your own look cost and privacy", () => {
       const ok = await generateOwnLook({
         selfie,
         items: [{ id: "saree", bytes: saree }],
-        makeupId: "makeup-classic-red",
+        makeupId: "makeup-soft-rose",
         tenantId: "tenant/../x",
         requestId: "req 1",
         put: async (key, body) => { stored.set(key, body); },
@@ -214,7 +215,7 @@ describe("your own look cost and privacy", () => {
       await expect(generateOwnLook({
         selfie,
         items: [{ id: "blouse", bytes: saree }],
-        makeupId: "makeup-classic-red",
+        makeupId: "makeup-soft-rose",
         tenantId: "tenant",
         requestId: "req-2",
         put: async (key, body) => { stored.set(key, body); },
@@ -236,7 +237,7 @@ describe("your own look cost and privacy", () => {
         { id: "saree", bytes: await jpeg(900, 700, { r: 140, g: 20, b: 40 }) },
         { id: "bangles", bytes: await jpeg(1000, 800, { r: 180, g: 140, b: 40 }) },
       ],
-      makeupId: "makeup-classic-red",
+      makeupId: "makeup-soft-rose",
     });
     const face = await sharp(prepared.selfie).metadata();
     const saree = await sharp(prepared.items[0]?.jpeg).metadata();
@@ -253,7 +254,7 @@ describe("your own look cost and privacy", () => {
       const ok = await generateOwnLook({
         selfie: await jpeg(1600, 900, { r: 200, g: 160, b: 140 }),
         items: [],
-        makeupId: "makeup-classic-red",
+        makeupId: "makeup-soft-rose",
         tenantId: "tenant",
         requestId: "frame",
         put: async () => undefined,
@@ -277,7 +278,7 @@ describe("your own look cost and privacy", () => {
     const prepared = await prepareOwnLook({
       selfie: turned,
       items: [],
-      makeupId: "makeup-classic-red",
+      makeupId: "makeup-soft-rose",
     });
     expect(prepared.plan.size).toBe("1024x1360");
   });
@@ -311,7 +312,9 @@ describe("your own look screen", () => {
     expect(html).toContain("Live makeup");
     expect(html).toContain("Use photo");
     expect(html).toContain("Take photo");
-    expect(html).toContain("Classic Red");
+    expect(html).toContain("Soft rose");
+    expect(html).not.toContain("Temple &amp; Traditional");
+    expect(html).not.toContain("makeup-classic-red");
     expect(html).toContain("btn sheen");
     expect(html).not.toContain("Join queue");
     expect(html).not.toMatch(/gold/i);

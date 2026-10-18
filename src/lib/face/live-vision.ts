@@ -1,10 +1,15 @@
 /**
  * Shared on-device models for the live look.
- * IMAGE mode on a copied frame: VIDEO mode stays blank on the fake camera and some Android GPUs.
+ * The face landmarker runs in VIDEO mode with the GPU delegate, then CPU if the GPU build fails.
+ * Callers pass a 480p frame and a rising timestamp so each camera frame can be tracked.
  */
 
 import type { FaceLandmarker, ImageSegmenter } from "@mediapipe/tasks-vision";
 import { hushMediapipeInfo } from "@/lib/face/detect-client";
+import type { Pt } from "@/lib/face/makeup-paint";
+
+export const LIVE_FACE_MODE = "VIDEO" as const;
+export const LIVE_FACE_DELEGATE = "GPU" as const;
 
 export type LiveVision = {
   landmarker: FaceLandmarker;
@@ -21,7 +26,7 @@ export function loadLiveVision(): Promise<LiveVision | null> {
         const vision = await import("@mediapipe/tasks-vision");
         const files = await vision.FilesetResolver.forVisionTasks("/mediapipe/wasm");
         const face = {
-          runningMode: "IMAGE" as const,
+          runningMode: LIVE_FACE_MODE,
           numFaces: 1,
           minFaceDetectionConfidence: 0.3,
           minFacePresenceConfidence: 0.3,
@@ -35,7 +40,7 @@ export function loadLiveVision(): Promise<LiveVision | null> {
           });
         let landmarker: FaceLandmarker;
         try {
-          landmarker = await createFace("GPU");
+          landmarker = await createFace(LIVE_FACE_DELEGATE);
         } catch {
           landmarker = await createFace("CPU");
         }
@@ -66,6 +71,19 @@ export function loadLiveVision(): Promise<LiveVision | null> {
     })();
   }
   return pending;
+}
+
+let videoStamp = 0;
+
+/** VIDEO mode rejects a repeated timestamp. This clock only moves forward. */
+export function nextVideoStamp(now = typeof performance === "undefined" ? 0 : performance.now()) {
+  videoStamp = Math.max(videoStamp + 1, now);
+  return videoStamp;
+}
+
+export function detectLiveFace(landmarker: FaceLandmarker, frame: HTMLCanvasElement | HTMLVideoElement | HTMLImageElement, now?: number) {
+  const found = landmarker.detectForVideo(frame, nextVideoStamp(now)).faceLandmarks[0] as Pt[] | undefined;
+  return found && found.length > 454 ? found : undefined;
 }
 
 /** Downscale a camera or still so detection and the shader share one frame. */

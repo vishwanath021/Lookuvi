@@ -54,10 +54,11 @@ test("guest can pick an event and a look, refine it, try mehendi, save, compare,
   const looks = page.getByRole("list", { name: "Bridal looks" });
   await expect(looks.getByRole("listitem").first()).toContainText("Telugu Muhurtham Classic");
   await expect(looks.getByRole("listitem").nth(1)).toContainText("Telangana Gadwal Bride");
-  await expect(page.getByRole("group", { name: "Bridal looks style" }).getByRole("button", { name: "Temple & Traditional" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("group", { name: "Makeup style" }).getByRole("button", { name: "Temple & Traditional" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Trending", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("list", { name: "Makeup" }).getByRole("button", { name: "Classic Red" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("group", { name: "Bridal looks style" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Makeup style" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Hair style" })).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Makeup" }).locator("img")).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Makeup" }).getByRole("button", { name: "Soft rose" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Sleek low bun" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Textured side bun" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Volume updo with matha patti" })).toBeVisible();

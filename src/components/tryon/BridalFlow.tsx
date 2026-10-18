@@ -22,6 +22,7 @@ import {
   MEHENDI_STYLES,
   bridalEventById,
   bridalStylesFor,
+  visibleStylePills,
   cardsForStyle,
   defaultBridalStyle,
   looksForEvent,
@@ -121,7 +122,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   const [hairStyle, setHairStyle] = useState<BridalStyleId>(defaultBridalStyle(BRIDAL_HAIR));
   const [mehendiCategory, setMehendiCategory] = useState<BridalStyleId>(defaultBridalStyle(MEHENDI_CARDS));
   const [lookId, setLookId] = useState(looksForEvent("wedding")[0]?.id || "");
-  const [makeupId, setMakeupId] = useState("makeup-classic-red");
+  const [makeupId, setMakeupId] = useState("makeup-soft-rose");
   const [hairId, setHairId] = useState("");
   const [finishId, setFinishId] = useState("hd");
   const [lipId, setLipId] = useState("red");
@@ -483,12 +484,11 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
             </div>
           </div>
           <PhotoGrid step="look" label="2. The look" group="Bridal looks" styles={bridalStylesFor(eventLooks)} style={lookStyle} onStyle={chooseLookStyle} items={looks} value={chosen?.id || ""} onChange={setLookId} />
-          <PhotoGrid step="makeup" label="3. Makeup" group="Makeup" styles={bridalStylesFor(BRIDAL_MAKEUP)} style={makeupStyle} onStyle={chooseMakeupStyle} items={makeupCards} value={makeupId} onChange={pickMakeup} />
+          <PhotoGrid step="makeup" label="3. Makeup" group="Makeup" styles={bridalStylesFor(BRIDAL_MAKEUP)} style={makeupStyle} onStyle={chooseMakeupStyle} items={makeupCards} value={makeupId} onChange={pickMakeup} textOnly />
           <PhotoGrid step="hair" label="4. Hair" hint="Optional. Tap again to leave the look’s own hair." group="Hair" styles={bridalStylesFor(BRIDAL_HAIR)} style={hairStyle} onStyle={chooseHairStyle} items={hairCards} value={hairId} onChange={pickHair} />
-          <div data-step="selfie">
+          <div data-step="selfie" data-photo-cluster="yes">
             <p className="mb-2 text-sm font-medium">5. Your selfie</p>
-            <p className="mb-2 text-sm">Face the light. Keep your whole face inside the outline. No sunglasses.</p>
-            <div ref={faceBox} data-photo-box="face" className="relative mx-auto aspect-[3/4] max-h-[520px] w-full max-w-sm overflow-hidden rounded-2xl bg-[#F3E6D8]">
+            <div ref={faceBox} data-photo-box="face" className={live === "face" || face ? "relative mx-auto aspect-[3/4] max-h-[240px] w-full max-w-sm overflow-hidden rounded-2xl" : "photo-slot mx-auto w-full max-w-sm"}>
               {live === "face" ? (
                 <LiveStudio
                   videoRef={videoRef}
@@ -528,17 +528,12 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
                   {face ? <img src={face.url} alt="Your selfie" className="h-full w-full object-cover" /> : null}
                   {reveal && result?.kind === "look" ? <img src={reveal} alt="" className="gen-reveal absolute inset-0 h-full w-full object-cover" /> : null}
                   {busyKind === "look" ? <GeneratingLook tool="bridal" /> : null}
-                  {!busyKind && !reveal ? (
-                  <div className="pointer-events-none absolute inset-0 grid place-items-center" aria-hidden="true">
-                    <div className="h-[68%] w-[56%] rounded-[50%] border-2 border-white/90 shadow-sm" />
-                  </div>
-                  ) : null}
+                  {!face && !busyKind && !reveal ? <p>Face the light. No sunglasses.</p> : null}
                 </>
               )}
             </div>
-            {face || live === "face" ? null : <p className="mx-auto mt-3 max-w-sm text-center text-sm">Upload a selfie to see this look on you.</p>}
             {busyKind === "look" ? null : (
-            <div className="mt-3 grid gap-2">
+            <div className="mx-auto mt-2 grid w-full max-w-sm gap-2" data-photo-actions="yes">
               {live === "face" ? null : <button className={result ? "btn" : "btn sheen"} type="button" onClick={() => beginLive("face")}>Live makeup</button>}
               <button className="btn secondary" type="button" onClick={() => consent.gate(() => bridalFile.current?.click())}>Use photo</button>
               <input ref={bridalFile} className="sr-only" type="file" accept="image/*" data-photo="bridal" onChange={(event) => {
@@ -708,18 +703,26 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   );
 }
 
-function PhotoGrid({ step, label, hint, group, styles, style, onStyle, items, value, onChange }: { step: string; label: string; hint?: string; group: string; styles: { id: BridalStyleId; label: string }[]; style: BridalStyleId; onStyle: (id: BridalStyleId) => void; items: { id: string; name: string; image: boolean }[]; value: string; onChange: (id: string) => void }) {
+function PhotoGrid({ step, label, hint, group, styles, style, onStyle, items, value, onChange, textOnly = false }: { step: string; label: string; hint?: string; group: string; styles: { id: BridalStyleId; label: string }[]; style: BridalStyleId; onStyle: (id: BridalStyleId) => void; items: { id: string; name: string; image: boolean }[]; value: string; onChange: (id: string) => void; textOnly?: boolean }) {
+  const pills = visibleStylePills(styles);
   return (
     <div data-step={step}>
       <p className="mb-2 text-sm font-medium">{label}</p>
       {hint ? <p className="mb-2 text-sm text-muted">{hint}</p> : null}
-      {styles.length > 0 && (
+      {pills.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2" role="group" aria-label={`${group} style`}>
-          {styles.map((item) => (
+          {pills.map((item) => (
             <button key={item.id} className="chip" type="button" aria-pressed={style === item.id} onClick={() => onStyle(item.id)}>{item.label}</button>
           ))}
         </div>
       )}
+      {textOnly ? (
+        <div className="flex flex-wrap gap-2" role="list" aria-label={group}>
+          {items.map((item) => (
+            <button key={item.id} className="chip" type="button" aria-pressed={item.id === value} onClick={() => onChange(item.id)}>{item.name}</button>
+          ))}
+        </div>
+      ) : (
       <div className="grid grid-cols-2 gap-3" role="list" aria-label={group}>
         {items.map((item, index) => (
           <div key={item.id} role="listitem">
@@ -730,6 +733,7 @@ function PhotoGrid({ step, label, hint, group, styles, style, onStyle, items, va
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }

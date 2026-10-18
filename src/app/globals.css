@@ -133,6 +133,23 @@ textarea { min-height: 48px; }
   padding-bottom: 0.75rem;
   overflow-anchor: none;
 }
+.photo-slot {
+  display: grid;
+  min-height: 8.5rem;
+  max-height: 28dvh;
+  place-items: center;
+  border-radius: 1rem;
+  padding: 1rem;
+  text-align: center;
+  color: #3e304b;
+  background: linear-gradient(165deg, #f6f1fa 0%, #e7d8f2 46%, #cbb6df 100%);
+}
+.photo-slot p {
+  margin: 0;
+  max-width: 16rem;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
 .bridal-shimmer {
   background-color: #f3e6d8;
   background-image: linear-gradient(100deg, rgba(243, 230, 216, 0) 20%, rgba(255, 250, 245, 0.95) 45%, rgba(243, 230, 216, 0) 70%);
