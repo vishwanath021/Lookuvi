@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { quoteComparisonModel } from "@/lib/ai/compare-models";
 import { quoteOwnLook } from "@/lib/bridal-own";
 import { sunburstImageInputTokens, sunburstOutputTokens } from "@/lib/ai/sunburst-tokens";
-import { bufferedInr, costUsdFromUsage, exactInr, providerUsageLog } from "@/lib/ai/tiers";
+import { bufferedInr, costUsdFromUsage, exactInr, providerUsageLog, usdFromTokenCounts } from "@/lib/ai/tiers";
 
 /** Live Sunburst medium 1024×1360 edit: 397 text in, 2400 image in, 367 out. */
 const LIVE = { textTokens: 397, imageTokens: 2400, outputTokens: 367 };
@@ -68,18 +68,36 @@ describe("sunburst cost estimate", () => {
     expect(high.outputTokens).toBeGreaterThan(low.outputTokens);
   });
 
-  it("quotes a bridal own look on the same 1024x1360 schedule", () => {
-    const quoted = quoteOwnLook({
+  it("quotes a bridal own look from the real 6-item bill and scales with item count", () => {
+    const one = quoteOwnLook({
       prompt: "Image 1 is the bride.",
       size: "1024x1360",
       selfiePixels: 1024 * 1360,
       itemPixels: [512 * 512],
     });
-    expect(quoted.ok).toBe(true);
-    if (!quoted.ok) return;
-    expect(quoted.quote.imageInputTokens).toBe(2400);
-    expect(quoted.quote.outputTokens).toBe(381);
-    expect(Math.abs(quoted.quote.estimateUsd - LIVE_USD) / LIVE_USD).toBeLessThan(0.1);
-    expect(quoted.quote.estimateInr).toBe(bufferedInr(quoted.quote.estimateUsd));
+    const six = quoteOwnLook({
+      prompt: "Image 1 is the bride.",
+      size: "1024x1360",
+      selfiePixels: 1024 * 1360,
+      itemPixels: Array.from({ length: 6 }, () => 512 * 512),
+    });
+    const none = quoteOwnLook({
+      prompt: "Image 1 is the bride.",
+      size: "1024x1360",
+      selfiePixels: 1024 * 1360,
+      itemPixels: [],
+    });
+    expect(one.ok && six.ok && none.ok).toBe(true);
+    if (!one.ok || !six.ok || !none.ok) return;
+    expect(one.quote.textInputTokens).toBe(600);
+    expect(one.quote.imageInputTokens).toBe(1250 + 650);
+    expect(one.quote.outputTokens).toBe(370);
+    expect(one.quote.estimateUsd).toBe(usdFromTokenCounts("gpt-image-2.5-sunburst", { textIn: 600, imageIn: 1900, output: 370 }));
+    expect(six.quote.imageInputTokens).toBe(1250 + 6 * 650);
+    expect(six.quote.estimateUsd).toBe(0.0553);
+    expect(exactInr(six.quote.estimateUsd)).toBe(5.31);
+    expect(six.quote.estimateInr).toBe(bufferedInr(0.0553));
+    expect(six.quote.estimateUsd).toBeGreaterThan(one.quote.estimateUsd);
+    expect(one.quote.estimateUsd).toBeGreaterThan(none.quote.estimateUsd);
   });
 });

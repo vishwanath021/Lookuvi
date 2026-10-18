@@ -63,7 +63,7 @@ export const OWN_LOOK_SLOTS = [
     subtitle: "Jada billa / Vaddanam",
     noun: "hair accessories",
     optional: true,
-    place: "Place those hair accessories on the bun.",
+    place: "Place those hair accessories on the bun. If the photo shows a brooch and separate small hair clips, keep the clips separate from the brooch.",
   },
 ] as const;
 

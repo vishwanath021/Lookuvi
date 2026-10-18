@@ -44,10 +44,12 @@ describe("session preview cache", () => {
     expect(tryCounterLabel(0, 3)).toBe("Try 1 of 3");
     expect(tryCounterLabel(1, 3)).toBe("Try 2 of 3");
     expect(tryButton({ ready: true, sameAsResult: true, atLimit: false, cached: true })).toEqual({
-      label: "Change something to try again",
+      label: "Try now",
       enabled: false,
       note: "",
+      another: true,
     });
+    expect(tryButton({ ready: true, sameAsResult: false, atLimit: false, cached: false }).another).toBe(false);
     expect(tryButton({ ready: true, sameAsResult: false, atLimit: true, cached: false }).note).toBe(VISIT_CAP_MESSAGE);
   });
 });

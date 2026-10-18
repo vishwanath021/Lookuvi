@@ -31,7 +31,7 @@ test("bridal photo step, chips, one scrollbar, and live fps", async ({ page }, t
   const slot = page.locator("[data-photo-box='face']");
   await slot.scrollIntoViewIfNeeded();
   await expect(slot.getByText("Face the light. No sunglasses.")).toBeVisible();
-  const live = page.getByRole("button", { name: "Live makeup", exact: true });
+  const live = page.getByRole("button", { name: "Live capture", exact: true });
   const upload = page.getByRole("button", { name: "Upload", exact: true });
   await live.scrollIntoViewIfNeeded();
   await expect(live).toBeInViewport();
@@ -61,7 +61,7 @@ test("bridal photo step, chips, one scrollbar, and live fps", async ({ page }, t
   expect(await page.locator("header").evaluate((el) => Math.round(el.getBoundingClientRect().top))).toBe(0);
   await page.screenshot({ path: `${OUT}/after-${label}-scrolled.png` });
 
-  await openLive(page, "Live makeup");
+  await openLive(page, "Live capture");
   const canvas = page.locator("[data-makeup='live']");
   await expect(canvas).toHaveAttribute("data-makeup-state", "tracking", { timeout: 60_000 });
   await expect(canvas).toHaveAttribute("data-mode", "video");

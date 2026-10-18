@@ -25,6 +25,7 @@ import { classifySkinPhoto } from "@/lib/hand-photo";
 import type { SalonConfig } from "@/lib/salon";
 import { guestSections, type GuestSection } from "@/lib/guest-sections";
 import { salonActionItems } from "@/lib/salon-actions";
+import { downloadLookFile } from "@/lib/look-result";
 import { normalizeWhatsAppPhone } from "@/lib/whatsapp";
 
 function poseLine(label: string, value: number | string | null) {
@@ -817,16 +818,7 @@ export function TryOnApp({
 
   async function downloadLook() {
     if (!active) return;
-    const response = await fetch(active.after);
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${config.slug}-${active.styleName}.jpg`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
+    await downloadLookFile(active.after, `${config.slug}-${active.styleName}.jpg`);
     track("download", { style: active.styleId });
   }
 

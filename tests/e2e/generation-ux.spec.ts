@@ -39,7 +39,7 @@ test("the bridal photo shows the loading sweep, then a crossfade", async ({ page
   await expect(veil).toBeVisible();
   await expect(page.getByRole("button", { name: "Almost ready..." })).toHaveCount(0);
   await expect(page.getByText("Almost ready...")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Live makeup" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Live capture" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Use photo" })).toHaveCount(0);
   await expect(veil).toHaveAttribute("data-stage", "Reading your face shape");
   const photo = await box.boundingBox();

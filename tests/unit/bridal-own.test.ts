@@ -45,11 +45,15 @@ describe("your own look prompt", () => {
     expect(prompt).toContain("Image 3 is her necklace");
     expect(prompt).toContain("Copy that saree exactly");
     expect(prompt).toContain("Copy that necklace exactly");
-    const makeupAt = prompt.indexOf("Apply clearly visible bridal makeup:");
+    const makeupAt = prompt.indexOf("Apply subtle bridal makeup on her real skin:");
     const sareeAt = prompt.indexOf("Image 2 is her saree");
     expect(makeupAt).toBeGreaterThan(-1);
     expect(makeupAt).toBeLessThan(sareeAt);
-    expect(prompt).toContain("Apply clearly visible bridal makeup: Makeup: soft-glam bridal with dewy skin, a nude-rose lip, and a little shimmer on the lids. Dewy finish with a healthy highlight on the cheekbones. Lip colour: Nude-Rose. Eye makeup: soft brown shadow and defined liner, clearly visible.");
+    expect(prompt).toContain("Apply subtle bridal makeup on her real skin: Makeup: soft-glam bridal with dewy skin, a nude-rose lip, and a little shimmer on the lids. Dewy finish with a healthy highlight on the cheekbones. Lip colour: Nude-Rose. Eye makeup: soft brown shadow and defined liner, clearly visible. Keep the colour light on the skin she already has.");
+    expect(prompt).toContain("Keep her exact body shape and size. Do not slim or reshape her figure.");
+    expect(prompt).toContain("Keep her exact pose and the position of her hands.");
+    expect(prompt).toContain("Keep the same framing and crop, including her feet. Do not zoom in, and do not crop her feet out of the frame.");
+    expect(prompt).toContain("Change only the clothing and jewellery she photographed.");
     expect(prompt).not.toMatch(/round red bindi|maroon matte/i);
     expect(prompt.indexOf("Eye makeup: soft brown shadow and defined liner, clearly visible.")).toBeLessThan(sareeAt);
     expect(prompt).toContain("Do not change face shape or features; makeup changes colour and finish only.");
@@ -78,6 +82,8 @@ describe("your own look prompt", () => {
     expect(prompt).toContain("Image 3 is her forehead pendant");
     expect(prompt).toContain("Place the papidi billa on the hair parting and forehead.");
     expect(prompt).toContain("Keep her own bindi from the selfie.");
+    const clips = buildOwnLookPrompt(makeup, [{ id: "hair-accessories", noun: "hair accessories" }]);
+    expect(clips).toContain("If the photo shows a brooch and separate small hair clips, keep the clips separate from the brooch.");
     expect(prompt).toContain("Keep any sindoor at the hair parting and any bindi already in her photo.");
     expect(prompt).not.toContain("round bindi");
   });
@@ -172,6 +178,9 @@ describe("your own look cost and privacy", () => {
     expect(quoted.quote.model).toBe("gpt-image-2.5-sunburst");
     expect(quoted.quote.quality).toBe("medium");
     expect(quoted.quote.imageCount).toBe(9);
+    expect(quoted.quote.textInputTokens).toBe(600);
+    expect(quoted.quote.imageInputTokens).toBe(1250 + OWN_LOOK_SLOTS.length * 650);
+    expect(quoted.quote.outputTokens).toBe(370);
     expect(quoted.quote.size).toBe("1024x1360");
     expect(quoted.quote.estimateUsd).toBeGreaterThan(0);
     expect(quoted.quote.estimateInr).toBeLessThanOrEqual(30);
@@ -358,7 +367,8 @@ describe("your own look screen", () => {
     expect(html).not.toContain("Bangles");
     expect(html).not.toContain("Nose ring");
     expect(html).not.toContain("data-item=\"maang-tikka\"");
-    expect(html).toContain("Live makeup");
+    expect(html).toContain("Live capture");
+    expect(html).not.toContain("Live makeup");
     expect(html).toContain(">Upload<");
     expect(html).not.toContain("Use photo");
     expect(html).not.toContain("Take photo");

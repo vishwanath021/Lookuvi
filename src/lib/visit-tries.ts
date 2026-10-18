@@ -25,15 +25,15 @@ export function tryCounterLabel(used: number, allowance: number) {
 
 export function tryButton(args: { ready: boolean; sameAsResult: boolean; atLimit: boolean; cached: boolean }) {
   if (args.sameAsResult) {
-    return { label: "Change something to try again", enabled: false, note: "" };
+    return { label: "Try now", enabled: false, note: "", another: true };
   }
   if (args.cached && args.ready) {
-    return { label: "Try now", enabled: true, note: "" };
+    return { label: "Try now", enabled: true, note: "", another: false };
   }
   if (args.atLimit) {
-    return { label: "Try now", enabled: false, note: VISIT_CAP_MESSAGE };
+    return { label: "Try now", enabled: false, note: VISIT_CAP_MESSAGE, another: false };
   }
-  return { label: "Try now", enabled: args.ready, note: "" };
+  return { label: "Try now", enabled: args.ready, note: "", another: false };
 }
 
 /**

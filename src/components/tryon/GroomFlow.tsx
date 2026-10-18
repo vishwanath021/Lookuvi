@@ -6,6 +6,7 @@ import { BeforeAfter } from "@/components/tryon/BeforeAfter";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio } from "@/components/tryon/LiveStudio";
+import { LookResultActions, PhotoActions, ResultZoom } from "@/components/tryon/LookResultActions";
 import { LargeFrame, LiveTray, SelectionSummary, StepCard, StepRail, TryBar, scrollToStep } from "@/components/tryon/LookStepper";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import { WearTiles } from "@/components/tryon/WearTiles";
@@ -331,6 +332,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
 
       <div className={panel === "looks" ? "grid gap-4" : "hidden"} data-panel="looks">
           <StepRail
+            id="groom-steps"
             label="Groom steps"
             current="groom-hair"
             steps={[
@@ -368,20 +370,31 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
               onClose={stopLive}
               onShutter={captureLive}
               large
-              preview={result?.panel === "looks" && !busy && panel === "looks" ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
+              preview={result?.panel === "looks" && !busy && panel === "looks" ? (
+                <>
+                  <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" />
+                  <ResultZoom src={result.after} />
+                </>
+              ) : null}
             />
+            {result?.panel === "looks" && !busy && panel === "looks" ? (
+              <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} kind="groom" />
+            ) : null}
             <TryBar
               label={looksButton.label}
               enabled={looksButton.enabled}
               busy={busy}
               counter={counter}
               note={capNote(looksButton.note)}
+              another={looksButton.another}
+              onAnother={() => scrollToStep("groom-steps")}
               onClick={() => void generate("looks")}
             />
           </section>
         </div>
       <div data-own="flow" className={panel === "own" ? "grid gap-4" : "hidden"}>
           <StepRail
+            id="groom-own-steps"
             label="Own look steps"
             current="groom-clothes"
             steps={[
@@ -422,14 +435,24 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
               onClose={stopLive}
               onShutter={captureLive}
               large
-              preview={result?.panel === "own" && !busy && panel === "own" ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
+              preview={result?.panel === "own" && !busy && panel === "own" ? (
+                <>
+                  <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" />
+                  <ResultZoom src={result.after} />
+                </>
+              ) : null}
             />
+            {result?.panel === "own" && !busy && panel === "own" ? (
+              <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} kind="groom" />
+            ) : null}
             <TryBar
               label={ownButton.label}
               enabled={ownButton.enabled}
               busy={busy}
               counter={counter}
               note={capNote(ownButton.note)}
+              another={ownButton.another}
+              onAnother={() => scrollToStep("groom-own-steps")}
               onClick={() => void generate("own")}
             />
           </section>
@@ -526,10 +549,10 @@ function PhotoStep({
       )}
       {open && large ? <LiveTray ready={camReady} onShutter={() => void onShutter()} /> : null}
       {busy || open ? null : (
-        <div className="grid w-full max-w-[28rem] gap-2" data-photo-actions="yes">
+        <PhotoActions settled={Boolean(preview)} className="grid w-full max-w-[28rem] gap-2">
           <button className="btn sheen" type="button" onClick={onLive}>{faceTarget ? "Take selfie" : "Take photo"}</button>
           <button className="btn secondary" type="button" onClick={onUpload}>{faceTarget ? "Upload" : "Use photo"}</button>
-        </div>
+        </PhotoActions>
       )}
     </div>
   );
