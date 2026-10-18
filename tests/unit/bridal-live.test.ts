@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BRIDAL_HAIR, BRIDAL_LOOKS, BRIDAL_MAKEUP, MEHENDI_CARDS, bridalFinishById, bridalHairById, bridalLipById, bridalLookById, bridalMakeupById, bridalStylesFor, cardsForStyle, defaultBridalStyle, looksForEvent } from "@/data/bridal";
+import { BRIDAL_HAIR, BRIDAL_LOOKS, BRIDAL_MAKEUP, MEHENDI_CARDS, bridalFinishById, bridalHairById, bridalLipById, bridalLookById, bridalMakeupById, bridalStylesFor, cardsForStyle, defaultBridalStyle, looksForEvent, visibleStylePills } from "@/data/bridal";
 import { readBridalGenerateFields } from "@/lib/bridal-request";
 import { coverPoint, liveMakeupAllowed } from "@/lib/face/cover-point";
 import { buildFalEditBody } from "@/lib/ai/fal-models";
@@ -47,7 +47,7 @@ describe("bridal prompt shades", () => {
 
   it("adds a chosen hairstyle and makeup note without trusting a raw id", () => {
     const look = bridalLookById("gadwal-telangana");
-    const makeup = bridalMakeupById("makeup-classic-red");
+    const makeup = bridalMakeupById("makeup-soft-rose");
     const hair = bridalHairById("hair-sleek-low-bun");
     expect(looksForEvent("wedding")[1]?.name).toBe("Telangana Gadwal Bride");
     expect(look && makeup && hair).toBeTruthy();
@@ -62,21 +62,30 @@ describe("bridal prompt shades", () => {
     expect(prompt).toContain("exact face shape");
     expect(prompt).toContain("sindoor");
     expect(prompt).not.toMatch(/jasmine|marigold|poola|rose braid/i);
-    expect(prompt).toContain("classic bridal red lip");
-    expect(prompt).toContain("Lip colour: Red");
+    expect(prompt).toContain("nude-rose lip");
+    expect(prompt).toContain("dewy skin");
+    expect(prompt).toContain("Lip colour: Nude-Rose");
+    expect(makeup.prompt).not.toMatch(/round red bindi|maroon matte|nose ring|temple jewellery/i);
     expect(bridalHairById("not-a-style")).toBeNull();
     expect(bridalMakeupById("not-a-card")).toBeNull();
     expect(BRIDAL_HAIR.map((item) => item.name)).toEqual(["Sleek low bun", "Textured side bun", "Volume updo with matha patti"]);
     expect(BRIDAL_HAIR.every((item) => item.image === false)).toBe(true);
-    expect([...BRIDAL_LOOKS, ...BRIDAL_MAKEUP, ...MEHENDI_CARDS].every((item) => item.image)).toBe(true);
+    expect(BRIDAL_MAKEUP.every((item) => item.image === false && item.style === "trending")).toBe(true);
+    expect(BRIDAL_MAKEUP.map((item) => item.name)).toEqual(["Soft rose", "Nude glow", "Soft red", "Rose shimmer"]);
+    expect([...BRIDAL_LOOKS, ...MEHENDI_CARDS].every((item) => item.image)).toBe(true);
   });
 
-  it("keeps the supplied photos in Temple and hides an empty Trending chip", () => {
-    for (const item of [...BRIDAL_LOOKS, ...BRIDAL_MAKEUP, ...BRIDAL_HAIR, ...MEHENDI_CARDS]) {
+  it("keeps outfit photos in Temple and hides a category row that has only one chip", () => {
+    for (const item of [...BRIDAL_LOOKS, ...BRIDAL_HAIR, ...MEHENDI_CARDS]) {
       expect(item.style).toBe("temple");
     }
     expect(bridalStylesFor(BRIDAL_LOOKS).map((style) => style.label)).toEqual(["Temple & Traditional"]);
-    expect(defaultBridalStyle(BRIDAL_MAKEUP)).toBe("temple");
+    expect(visibleStylePills(bridalStylesFor(BRIDAL_LOOKS))).toEqual([]);
+    expect(visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP))).toEqual([]);
+    expect(visibleStylePills(bridalStylesFor(BRIDAL_HAIR))).toEqual([]);
+    expect(visibleStylePills([{ id: "a" }, { id: "b" }])).toHaveLength(2);
+    expect(defaultBridalStyle(BRIDAL_MAKEUP)).toBe("trending");
+    expect(cardsForStyle(BRIDAL_MAKEUP, "trending").map((item) => item.id)).toEqual(BRIDAL_MAKEUP.map((item) => item.id));
     expect(cardsForStyle(BRIDAL_LOOKS, "trending").map((look) => look.id)).toEqual(BRIDAL_LOOKS.map((look) => look.id));
     expect(cardsForStyle(BRIDAL_HAIR, "temple")).toHaveLength(3);
   });

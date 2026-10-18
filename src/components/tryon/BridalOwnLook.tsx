@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { BeforeAfter } from "@/components/tryon/BeforeAfter";
-import { BridalLookCard } from "@/components/tryon/BridalLookCard";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio } from "@/components/tryon/LiveStudio";
@@ -12,6 +11,7 @@ import { OWN_LOOK_SLOTS, type OwnLookSlotId } from "@/data/bridal-own";
 import {
   BRIDAL_MAKEUP,
   bridalStylesFor,
+  visibleStylePills,
   cardsForStyle,
   defaultBridalStyle,
   type BridalStyleId,
@@ -32,7 +32,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
   const [face, setFace] = useState<Shot | null>(null);
   const [items, setItems] = useState<Partial<Record<OwnLookSlotId, Shot>>>({});
   const [makeupStyle, setMakeupStyle] = useState<BridalStyleId>(defaultBridalStyle(BRIDAL_MAKEUP));
-  const [makeupId, setMakeupId] = useState("makeup-classic-red");
+  const [makeupId, setMakeupId] = useState("makeup-soft-rose");
   const [live, setLive] = useState<Target | null>(null);
   const [camReady, setCamReady] = useState(false);
   const [camError, setCamError] = useState("");
@@ -277,19 +277,16 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
 
       <div data-step="makeup">
         <p className="mb-2 text-sm font-medium">3. Makeup</p>
-        <div className="mb-2 flex flex-wrap gap-2" role="group" aria-label="Makeup style">
-          {bridalStylesFor(BRIDAL_MAKEUP).map((item) => (
-            <button key={item.id} className="chip" type="button" aria-pressed={makeupStyle === item.id} onClick={() => chooseMakeupStyle(item.id)}>{item.label}</button>
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-3" role="list" aria-label="Makeup">
-          {makeupCards.map((item, index) => (
-            <div key={item.id} role="listitem">
-              <button type="button" aria-pressed={item.id === makeupId} className={`w-full overflow-hidden rounded-[14px] border bg-[#F3E6D8] text-left shadow-sm ${item.id === makeupId ? "border-[var(--brand)] ring-2 ring-[var(--brand)]" : "border-line"}`} onClick={() => setMakeupId(item.id)}>
-                <BridalLookCard id={item.id} name={item.name} image={item.image} priority={index < 2} />
-                <span className="block bg-white px-2 py-2 text-sm font-medium leading-snug">{item.name}</span>
-              </button>
-            </div>
+        {visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP)).length > 0 ? (
+          <div className="mb-2 flex flex-wrap gap-2" role="group" aria-label="Makeup style">
+            {visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP)).map((item) => (
+              <button key={item.id} className="chip" type="button" aria-pressed={makeupStyle === item.id} onClick={() => chooseMakeupStyle(item.id)}>{item.label}</button>
+            ))}
+          </div>
+        ) : null}
+        <div className="flex flex-wrap gap-2" role="list" aria-label="Makeup">
+          {makeupCards.map((item) => (
+            <button key={item.id} className="chip" type="button" aria-pressed={item.id === makeupId} onClick={() => setMakeupId(item.id)}>{item.name}</button>
           ))}
         </div>
       </div>

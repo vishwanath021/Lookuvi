@@ -301,7 +301,6 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
                     onUpload={() => openFile(slot.id)}
                     onClose={stopLive}
                     onShutter={captureLive}
-                    outline={false}
                   />
                 </div>
               ))}
@@ -355,7 +354,6 @@ function PhotoStep({
   onUpload,
   onClose,
   onShutter,
-  outline = true,
 }: {
   title: string;
   target: Target;
@@ -372,21 +370,21 @@ function PhotoStep({
   onUpload: () => void;
   onClose: () => void;
   onShutter: () => void;
-  outline?: boolean;
 }) {
   const open = live === target;
+  const faceTarget = target === "face" || target === "own-face";
+  const filled = open || Boolean(shot) || Boolean(reveal);
   const loading: ReactNode = busy ? <GeneratingLook tool={target === "face" ? "groom" : "groom-own"} blur={false} /> : null;
   return (
-    <div>
+    <div data-photo-cluster="yes">
       {title ? <p className="mb-2 text-sm font-medium">{title}</p> : null}
-      {title ? <p className="mb-2 text-sm">Face the light. Keep your whole face inside the outline. No sunglasses.</p> : null}
-      <div ref={boxRef} data-photo-box={target} className="relative mx-auto aspect-[3/4] max-h-[520px] w-full max-w-sm overflow-hidden rounded-2xl bg-[#F3E6D8]">
+      <div ref={boxRef} data-photo-box={target} className={filled ? "relative mx-auto aspect-[3/4] max-h-[240px] w-full max-w-sm overflow-hidden rounded-2xl" : "photo-slot mx-auto w-full max-w-sm"}>
         {open ? (
           <LiveStudio
             videoRef={videoRef}
             ready={camReady}
-            facing={target === "face" || target === "own-face" ? "user" : "environment"}
-            guide={target === "face" || target === "own-face" ? "face" : "hand"}
+            facing={faceTarget ? "user" : "environment"}
+            guide={faceTarget ? "face" : "hand"}
             zoom={zoom}
             onZoom={onZoom}
             onBack={onClose}
@@ -400,26 +398,16 @@ function PhotoStep({
             {shot ? <img src={shot.url} alt={title || target} className="h-full w-full object-cover" /> : null}
             {reveal ? <img src={reveal} alt="" className="gen-reveal absolute inset-0 h-full w-full object-cover" /> : null}
             {loading}
-            {outline && !shot && !busy ? (
-              <div className="pointer-events-none absolute inset-0 grid place-items-center" aria-hidden="true">
-                <div className="h-[68%] w-[56%] rounded-[50%] border-2 border-white/90 shadow-sm" />
-              </div>
-            ) : null}
-            {!shot && !busy ? (
-              <div className="absolute inset-0 grid content-center justify-items-center gap-3 px-6">
-                <button className="btn sheen min-w-44" type="button" onClick={onLive}>{target === "face" || target === "own-face" ? "Take photo" : "Take photo"}</button>
-                <button className="btn secondary min-w-44" type="button" onClick={onUpload}>Use photo</button>
-              </div>
-            ) : null}
+            {!shot && !busy && !reveal ? <p>{faceTarget ? "Face the light. No sunglasses." : "A clear photo of the piece."}</p> : null}
           </>
         )}
       </div>
-      {shot && !busy && !open ? (
-        <div className="mx-auto mt-3 grid max-w-sm gap-2">
+      {busy || open ? null : (
+        <div className="mx-auto mt-2 grid w-full max-w-sm gap-2" data-photo-actions="yes">
           <button className="btn sheen" type="button" onClick={onLive}>Take photo</button>
           <button className="btn secondary" type="button" onClick={onUpload}>Use photo</button>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

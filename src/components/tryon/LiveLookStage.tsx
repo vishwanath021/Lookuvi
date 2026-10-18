@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { EYE_L, EYE_R, lookSamples, smoothLandmarks, type Pt } from "@/lib/face/makeup-paint";
+import { EYE_L, EYE_R, lookSamples, type Pt } from "@/lib/face/makeup-paint";
 import type { LookAudience } from "@/lib/face/makeup-blend";
 import { createLiveGl, type LiveGl, type LiveLookOptions } from "@/lib/face/live-gl";
 import { buildHairMask } from "@/lib/face/hair-mask";
-import { copySource, loadLiveVision, type LiveVision } from "@/lib/face/live-vision";
+import { copySource, detectLiveFace, loadLiveVision, type LiveVision } from "@/lib/face/live-vision";
+import { createOneEuroFilter } from "@/lib/face/one-euro";
 import { liveMakeupAllowed } from "@/lib/face/cover-point";
 import { LIVE_FULL_EDGE, LIVE_SEG_INTERVAL, nextLiveBudget } from "@/lib/face/live-budget";
 
@@ -140,8 +141,9 @@ export function LiveLookStage({
       onPhaseRef.current?.("fallback");
       return;
     }
-    const handle = { stop: false, raf: 0 };
+    const handle = { stop: false, raf: 0, videoFrame: 0 };
     const sample = document.createElement("canvas");
+    const euro = createOneEuroFilter();
     let smoothed: Pt[] | null = null;
     let mask: Uint8Array | null = null;
     let maskW = 0;
@@ -150,12 +152,13 @@ export function LiveLookStage({
     let segInterval = LIVE_SEG_INTERVAL;
     let segOn = true;
     let frame = 0;
+    let detectMs = 16;
     let saw = false;
     let lastStamp = 0;
     const deltas: number[] = [];
 
-    const paint = (shot: HTMLCanvasElement, points: Pt[] | null) => {
-      renderer.resize(shot.width, shot.height);
+    const paint = (shot: HTMLCanvasElement | HTMLVideoElement | HTMLImageElement, width: number, height: number, points: Pt[] | null) => {
+      renderer.resize(width, height);
       const options = optionsRef.current;
       const masked = Boolean(segOn && mask);
       try {
@@ -216,8 +219,8 @@ export function LiveLookStage({
         }
         const started = performance.now();
         try {
-          const next = vision.landmarker.detect(shot).faceLandmarks[0] as Pt[] | undefined;
-          if (next && next.length > 454) smoothed = next;
+          const next = detectLiveFace(vision.landmarker, shot, started);
+          if (next) smoothed = next;
         } catch {
           mark("fallback");
           return;
@@ -232,7 +235,7 @@ export function LiveLookStage({
         } catch {
           segOn = false;
         }
-        paint(shot, smoothed);
+        paint(shot, shot.width, shot.height, smoothed);
         canvas.dataset.fps = String(Math.max(1, Math.round(1000 / Math.max(1, performance.now() - started))));
         canvas.dataset.seg = segOn && mask ? "on" : "off";
         canvas.dataset.edge = String(edge);
@@ -253,31 +256,44 @@ export function LiveLookStage({
         return;
       }
       mark("watching");
+      const schedule = () => {
+        if (handle.stop || !video) return;
+        if (typeof video.requestVideoFrameCallback === "function") {
+          handle.videoFrame = video.requestVideoFrameCallback(() => tick(performance.now()));
+          return;
+        }
+        handle.raf = requestAnimationFrame((now) => tick(now));
+      };
       const tick = (now: number) => {
         if (handle.stop) return;
-        handle.raf = requestAnimationFrame(tick);
-        if (!video || video.readyState < 2) return;
-        const shot = copySource(video, sample, edge);
-        if (!shot) return;
-        paint(shot, smoothed);
+        schedule();
+        if (!video || video.readyState < 2 || !video.videoWidth) return;
+        paint(video, video.videoWidth, video.videoHeight, smoothed);
         frame += 1;
-        const slot = frame % 6;
-        if (slot === 0) {
-          try {
-            const next = vision.landmarker.detect(shot).faceLandmarks[0] as Pt[] | undefined;
-            if (next && next.length > 454) {
-              smoothed = smoothLandmarks(smoothed, next, 0.45);
-              if (!saw) {
-                saw = true;
-                mark("tracking");
+        const stride = Math.max(1, Math.ceil(detectMs / 28));
+        let shot: HTMLCanvasElement | null = null;
+        if (frame % stride === 0) {
+          shot = copySource(video, sample, edge);
+          if (shot) {
+            const started = performance.now();
+            try {
+              const next = detectLiveFace(vision.landmarker, shot, started);
+              if (next) {
+                smoothed = euro(next, performance.now());
+                if (!saw) {
+                  saw = true;
+                  mark("tracking");
+                }
               }
+            } catch {
+              mark("fallback");
+              handle.stop = true;
+              return;
             }
-          } catch {
-            mark("fallback");
-            handle.stop = true;
-            return;
+            detectMs = Math.max(8, performance.now() - started);
           }
-        } else if (frame % segInterval === 3 && segOn && vision.segmenter) {
+        }
+        if (shot && optionsRef.current.hair && frame % segInterval === 0 && segOn && vision.segmenter) {
           try {
             const read = readMask(vision, shot, smoothed);
             if (read) {
@@ -290,13 +306,19 @@ export function LiveLookStage({
           }
         }
         noteBudget(now);
+        canvas.dataset.mode = "video";
+        canvas.dataset.detectMs = String(Math.round(detectMs));
+        canvas.dataset.callback = typeof video.requestVideoFrameCallback === "function" ? "video-frame" : "animation-frame";
       };
-      handle.raf = requestAnimationFrame(tick);
+      schedule();
     });
 
     return () => {
       handle.stop = true;
       cancelAnimationFrame(handle.raf);
+      if (video && handle.videoFrame && typeof video.cancelVideoFrameCallback === "function") {
+        video.cancelVideoFrameCallback(handle.videoFrame);
+      }
       renderer.destroy();
     };
   }, [image, video]);

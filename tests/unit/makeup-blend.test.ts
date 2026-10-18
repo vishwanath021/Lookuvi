@@ -104,13 +104,14 @@ describe("bridal live intensity", () => {
   it("raises lip, blush, brow, and kajal while everyday stays subtle", () => {
     expect(livePreset(false)).toEqual(EVERYDAY_LIVE);
     expect(livePreset(undefined)).toEqual(EVERYDAY_LIVE);
-    expect(BRIDAL_LIVE.lipMix).toBeCloseTo(0.7, 5);
-    expect(BRIDAL_LIVE.blushPeak).toBeCloseTo(0.28, 5);
+    expect(BRIDAL_LIVE.lipMix).toBeCloseTo(0.42, 5);
+    expect(BRIDAL_LIVE.lipMix).toBeLessThan(0.5);
+    expect(BRIDAL_LIVE.blushPeak).toBeCloseTo(0.2, 5);
     expect(BRIDAL_LIVE.browMix).toBeGreaterThan(EVERYDAY_LIVE.browMix);
     expect(BRIDAL_LIVE.kajalMix).toBeGreaterThan(EVERYDAY_LIVE.kajalMix);
     expect(BRIDAL_LIVE.wing).toBeGreaterThan(EVERYDAY_LIVE.wing);
     expect(EVERYDAY_LIVE.blushPeak).toBeCloseTo(0.18, 5);
-    expect(EVERYDAY_LIVE.lipMix).toBeCloseTo(0.55, 5);
+    expect(EVERYDAY_LIVE.lipMix).toBeCloseTo(0.38, 5);
   });
 
   it("leaves the eye opening empty even at the bridal stroke width", () => {

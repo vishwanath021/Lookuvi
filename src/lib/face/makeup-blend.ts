@@ -8,7 +8,7 @@ export const BLUSH_PEAK_ALPHA = 0.18;
 
 /** Everyday live look. The eye-whites check uses these numbers. */
 export const EVERYDAY_LIVE = {
-  lipMix: 0.55,
+  lipMix: 0.38,
   blushPeak: BLUSH_PEAK_ALPHA,
   browMix: 0.25,
   kajalMix: 0.6,
@@ -20,8 +20,8 @@ export const EVERYDAY_LIVE = {
 
 /** Bridal live look. Stronger colour, still outside the eye opening. */
 export const BRIDAL_LIVE = {
-  lipMix: 0.7,
-  blushPeak: 0.28,
+  lipMix: 0.42,
+  blushPeak: 0.2,
   browMix: 0.48,
   kajalMix: 0.85,
   kajalIod: 0.045,

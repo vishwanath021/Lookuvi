@@ -135,42 +135,46 @@ export const BRIDAL_LOOKS: BridalLook[] = [
   },
 ];
 
+/**
+ * Soft-glam bridal makeup. No modern photo set is shipped, so `image` stays false
+ * and the step renders text chips instead of the old temple portraits.
+ */
 export const BRIDAL_MAKEUP: BridalMakeup[] = [
   {
-    id: "makeup-classic-red",
-    name: "Classic Red",
-    style: "temple",
-    image: true,
-    lipId: "red",
-    finishId: "hd",
-    prompt: "Makeup: classic bridal red lip, even HD base, kohl, and a round red bindi.",
-  },
-  {
-    id: "makeup-maroon",
-    name: "Maroon Matte",
-    style: "temple",
-    image: true,
-    lipId: "maroon",
-    finishId: "matte",
-    prompt: "Makeup: maroon matte lip, matte skin, and a defined eye.",
-  },
-  {
-    id: "makeup-nude-rose",
-    name: "Nude-Rose Dewy",
-    style: "temple",
-    image: true,
+    id: "makeup-soft-rose",
+    name: "Soft rose",
+    style: "trending",
+    image: false,
     lipId: "nude-rose",
     finishId: "dewy",
-    prompt: "Makeup: nude-rose lip, dewy skin, and a soft glow.",
+    prompt: "Makeup: soft-glam bridal with dewy skin, a nude-rose lip, and a little shimmer on the lids.",
   },
   {
-    id: "makeup-reception-glam",
-    name: "Reception Glam",
-    style: "temple",
-    image: true,
-    lipId: "berry",
+    id: "makeup-nude-glow",
+    name: "Nude glow",
+    style: "trending",
+    image: false,
+    lipId: "nude",
+    finishId: "dewy",
+    prompt: "Makeup: natural bridal with dewy skin, a nude lip, soft blush, and subtle shimmer.",
+  },
+  {
+    id: "makeup-soft-red",
+    name: "Soft red",
+    style: "trending",
+    image: false,
+    lipId: "red",
+    finishId: "hd",
+    prompt: "Makeup: a soft red lip, light coverage, and a hint of shimmer. Keep the skin texture.",
+  },
+  {
+    id: "makeup-rose-shimmer",
+    name: "Rose shimmer",
+    style: "trending",
+    image: false,
+    lipId: "pink",
     finishId: "glam",
-    prompt: "Makeup: reception glam with a gold smoky eye, lashes, and a deep berry lip.",
+    prompt: "Makeup: soft glam with rose lips, dewy skin, and subtle lid shimmer.",
   },
 ];
 
@@ -271,7 +275,7 @@ export function bridalLipById(id: string) {
   return BRIDAL_LIPS.find((lip) => lip.id === id) ?? BRIDAL_LIPS[0];
 }
 
-/** A known makeup card, or null when the id was not one of the four. */
+/** A known makeup card, or null when the id is not one of the soft-glam looks. */
 export function bridalMakeupById(id: string) {
   return BRIDAL_MAKEUP.find((item) => item.id === id) ?? null;
 }
@@ -287,6 +291,11 @@ export function mehendiCardById(id: string) {
 /** Styles that have their own cards. An empty Trending set is omitted so its chip stays hidden. */
 export function bridalStylesFor(items: { style: BridalStyleId }[]) {
   return BRIDAL_STYLES.filter((style) => items.some((item) => item.style === style.id));
+}
+
+/** A lone category chip is noise. Show the row only when the guest can switch. */
+export function visibleStylePills<T>(styles: readonly T[]): T[] {
+  return styles.length > 1 ? [...styles] : [];
 }
 
 /** Trending when that set exists, otherwise Temple & Traditional. */

@@ -844,8 +844,8 @@ export function TryOnApp({
   const platformLogo = isPlatformLogo(config.logoUrl);
 
   return (
-    <div data-salon-mode={salonMode ? "yes" : "no"} className={embed ? "flex h-dvh max-h-dvh flex-col overflow-hidden" : "mx-auto flex h-dvh max-h-dvh max-w-6xl flex-col overflow-hidden px-4"}>
-      <header className={`salon-bar header-metal z-20 shrink-0 px-4 ${embed ? "" : "-mx-4"}`}>
+    <div data-salon-mode={salonMode ? "yes" : "no"} className={embed ? "flex min-h-dvh flex-col" : "mx-auto flex min-h-dvh max-w-6xl flex-col px-4"}>
+      <header className={`salon-bar header-metal sticky top-0 z-30 px-4 ${embed ? "" : "-mx-4"}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white">
@@ -883,7 +883,7 @@ export function TryOnApp({
         />
       ) : null}
       <ConsentSheet open={consent.open} onAgree={() => { track("consent_accepted", { lang }); void consent.agree(); }} onClose={consent.close} />
-      <div data-scroll="salon" className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-16 pt-6">
+      <div data-scroll="salon" className="pb-16 pt-6">
       {sections.length > 1 ? (
         <div className={`mb-4 grid items-start gap-3 ${sections.length > 2 ? "grid-cols-3" : "grid-cols-2"}`} data-guest-tabs="yes">
           {sections.map((item) => (

@@ -112,6 +112,10 @@ describe("groom screen and switches", () => {
     expect(html).toContain("Take photo");
     expect(html).toContain("Use photo");
     expect(html).toContain("btn sheen");
+    expect(html).toContain("photo-slot");
+    expect(html).toContain("data-photo-actions=\"yes\"");
+    expect(html).toContain("Face the light. No sunglasses.");
+    expect(html).not.toContain("max-h-[520px]");
     expect(html).not.toContain("Photo coming");
     expect(html).not.toContain("data-pills=\"category\"");
     expect(html).not.toContain("overflow-y-auto");

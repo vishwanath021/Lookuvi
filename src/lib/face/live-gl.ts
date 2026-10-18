@@ -329,10 +329,10 @@ void main() {
 
   if (u_lipOn > 0.5 && outer && !inner && hairW < 0.25 && eye < 0.5) {
     float dist = min(polyEdge(p, u_outer, 20), polyEdge(p, u_inner, 20));
-    float feather = smoothstep(0.0, px * 1.5, dist);
+    float feather = smoothstep(0.0, px * 6.0, dist);
     vec3 soft = softLight(base, u_lip);
     vec3 mul = base * u_lip;
-    color = mix(color, mix(soft, mul, 0.5), u_lipMix * feather);
+    color = mix(color, mix(soft, mul, 0.35), u_lipMix * feather);
   }
 
   outColor = vec4(color, 1.0);
