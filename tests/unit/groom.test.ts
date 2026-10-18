@@ -108,11 +108,14 @@ describe("groom screen and switches", () => {
     for (const item of [...GROOM_HAIR, ...GROOM_BEARDS, ...GROOM_GROOMING]) expect(html).toContain(item.name);
     for (const slot of GROOM_OWN_SLOTS) expect(html).toContain(slot.label);
     expect(html).toContain("Your own look");
-    expect(html).toContain("Take a close-up of each piece on its own");
-    expect(html).toContain("Take photo");
-    expect(html).toContain("Use photo");
+    expect(html).toContain("Add what you&#x27;ll wear");
+    expect(html).toContain("Close-up, one item per photo");
+    expect(html).toContain("data-wear=\"grid\"");
+    expect(html).not.toContain("Take a close-up of each piece");
+    expect(html).not.toContain("Close-up of the piece");
+    expect(html).not.toContain("Use photo");
     expect(html).toContain("btn sheen");
-    expect(html).toContain("photo-slot");
+    expect(html).not.toContain("photo-slot");
     expect(html).toContain("data-photo-actions=\"yes\"");
     expect(html).toContain("Face the light. No sunglasses.");
     expect(html).not.toContain("max-h-[520px]");

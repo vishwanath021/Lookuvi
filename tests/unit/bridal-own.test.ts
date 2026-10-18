@@ -340,18 +340,18 @@ describe("your own look screen", () => {
       expect(html).toContain(slot.label);
       expect(html).toContain(`data-item="${slot.id}"`);
     }
-    expect(html).toContain("Take a close-up of each piece on its own");
-    expect(html).toContain("Close-up of the saree, on its own.");
+    expect(html).toContain("Add what you&#x27;ll wear");
+    expect(html).toContain("Close-up, one item per photo");
+    expect(html).not.toContain("Close-up of the");
+    expect(html).not.toContain("Take a close-up of each piece");
     expect(html).toContain("Jhumkas");
     expect(html).toContain("Champaswaralu");
     expect(html).toContain("Papidi billa / Maang tikka");
-    expect(html).toContain("Long haram (optional)");
-    expect(html).toContain("Jada billa / Vaddanam, optional");
-    expect(html).toContain("data-own-items=\"grid\"");
-    expect(html).toContain("grid-cols-1");
-    expect(html).toContain("md:grid-cols-2");
-    expect(html).toContain("data-item-card=\"compact\"");
-    expect(html).toContain("data-item-placeholder=\"saree\"");
+    expect(html).toContain("Jada billa / Vaddanam");
+    expect(html).toContain("data-wear=\"grid\"");
+    expect(html).toContain("wear-grid");
+    expect(html).toContain("wear-optional");
+    expect(html).not.toContain("data-item-card");
     expect(html).not.toContain("photo-slot");
     expect(html).not.toContain("Bangles");
     expect(html).not.toContain("Nose ring");
@@ -359,7 +359,8 @@ describe("your own look screen", () => {
     expect(html).toContain("Live makeup");
     expect(html).toContain(">Upload<");
     expect(html).not.toContain("Use photo");
-    expect(html).toContain("Take photo");
+    expect(html).not.toContain("Take photo");
+    expect(html).not.toContain("Upload from gallery");
     expect(html).toContain("Soft rose");
     expect(html).not.toContain("Temple &amp; Traditional");
     expect(html).not.toContain("makeup-classic-red");
