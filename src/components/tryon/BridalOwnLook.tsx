@@ -286,37 +286,31 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
       </StepCard>
       <StepCard id="own-items" title="Your pieces" hint="Optional. Take a close-up of each piece on its own. These photos are deleted after the preview and are never published.">
         <p className="text-sm text-muted">Take a close-up of each piece on its own.</p>
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2" data-own-items="grid">
           {OWN_LOOK_SLOTS.map((slot) => (
-            <div key={slot.id} data-item={slot.id}>
-              <p className="mb-2 text-sm font-medium">{slot.label}</p>
-              <p className="mb-2 text-sm text-muted">Close-up of the piece, on its own.</p>
-              <PhotoBox
-                boxRef={(node) => { boxes.current[slot.id] = node; }}
-                name={slot.id}
-                alt={slot.label}
-                shot={items[slot.id]}
-                live={live === slot.id}
-                reveal=""
-                onLive={() => beginLive(slot.id)}
-                onUpload={() => openFile(slot.id)}
-                camera={live === slot.id ? (
-                  <LiveStudio
-                    videoRef={videoRef}
-                    ready={camReady}
-                    facing="environment"
-                    guide="hand"
-                    zoom={zoom}
-                    onZoom={setZoom}
-                    onBack={stopLive}
-                    onClose={stopLive}
-                    onShutter={captureLive}
-                    onRetake={() => beginLive(slot.id)}
-                  />
-                ) : null}
-                liveLabel="Take photo"
-              />
-            </div>
+            <ItemCard
+              key={slot.id}
+              slot={slot}
+              shot={items[slot.id]}
+              live={live === slot.id}
+              boxRef={(node) => { boxes.current[slot.id] = node; }}
+              onLive={() => beginLive(slot.id)}
+              onUpload={() => openFile(slot.id)}
+              camera={live === slot.id ? (
+                <LiveStudio
+                  videoRef={videoRef}
+                  ready={camReady}
+                  facing="environment"
+                  guide="hand"
+                  zoom={zoom}
+                  onZoom={setZoom}
+                  onBack={stopLive}
+                  onClose={stopLive}
+                  onShutter={captureLive}
+                  onRetake={() => beginLive(slot.id)}
+                />
+              ) : null}
+            />
           ))}
         </div>
       </StepCard>
@@ -383,6 +377,57 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
           void fileToShot(file).then((shot) => storeShot(target, shot));
         }}
       />
+    </div>
+  );
+}
+
+function ItemCard({
+  slot,
+  shot,
+  live,
+  boxRef,
+  onLive,
+  onUpload,
+  camera,
+}: {
+  slot: (typeof OWN_LOOK_SLOTS)[number];
+  shot?: Shot;
+  live: boolean;
+  boxRef: (node: HTMLDivElement | null) => void;
+  onLive: () => void;
+  onUpload: () => void;
+  camera: ReactNode;
+}) {
+  return (
+    <div data-item={slot.id} data-item-card="compact" className="card grid w-full gap-2 p-3">
+      {live ? null : (
+        <div className="min-w-0">
+          <p className="text-sm font-medium leading-tight">{slot.label}</p>
+          {slot.subtitle ? <p className="text-xs leading-tight text-muted">{slot.subtitle}</p> : null}
+          <p className="text-xs leading-snug text-muted">{slot.hint}</p>
+        </div>
+      )}
+      <div className={live ? "grid" : "flex items-center gap-2"}>
+        <div
+          ref={boxRef}
+          data-photo-box={slot.id}
+          className={live
+            ? "relative aspect-[3/4] max-h-72 w-full overflow-hidden rounded-xl bg-black"
+            : "relative h-14 w-14 shrink-0 overflow-hidden rounded-lg"}
+        >
+          {live ? camera : shot ? (
+            <img src={shot.url} alt={slot.label} className="h-full w-full object-cover" />
+          ) : (
+            <div className="h-full w-full bg-[linear-gradient(165deg,#f6f1fa_0%,#e7d8f2_46%,#cbb6df_100%)]" data-item-placeholder={slot.id} />
+          )}
+        </div>
+        {live ? null : (
+          <div className="flex min-w-0 flex-1 flex-wrap gap-2" data-photo-actions="yes">
+            <button className="btn sheen tight" type="button" onClick={onLive}>Take photo</button>
+            <button className="btn secondary tight" type="button" onClick={onUpload}>Upload</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

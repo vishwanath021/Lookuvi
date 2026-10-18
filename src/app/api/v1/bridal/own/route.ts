@@ -2,12 +2,12 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { OWN_LOOK_MAX_BYTES, OWN_LOOK_MODEL, OWN_LOOK_QUALITY, OWN_LOOK_SLOTS } from "@/data/bridal-own";
-import { generateOwnLook, OwnLookError, type OwnLookQuote } from "@/lib/bridal-own";
+import { generateOwnLook, ownLookCallLog, OwnLookError, type OwnLookQuote } from "@/lib/bridal-own";
 import { resolveOpenAIKey } from "@/lib/ai/credentials";
 import { BilledProviderError, UnbilledProviderError, UncertainBillingError, UnknownModelError } from "@/lib/ai/errors";
 import { postImageEdit } from "@/lib/ai/openai";
 import { beginPaidCall, finalizePaidCall, releasePaidCall } from "@/lib/ai/spend";
-import { costUsdFromUsage, type UsageNumbers } from "@/lib/ai/tiers";
+import { type UsageNumbers } from "@/lib/ai/tiers";
 import { guestPreviewHeaders } from "@/lib/ai/guest-response";
 import { CreditError, reserveCredits, settleCredits } from "@/lib/credits";
 import { ImageError, sanitizeSelfie } from "@/lib/images";
@@ -241,17 +241,18 @@ export async function POST(req: Request) {
     });
     const jpeg = await sharp(result.image, { failOn: "none" }).rotate().jpeg({ quality: 90 }).toBuffer();
     const latencyMs = Date.now() - started;
-    const actual = costUsdFromUsage(OWN_LOOK_MODEL, usage);
+    const priced = ownLookCallLog(usage);
+    const costUsd = priced.known ? priced.costUsd : result.quote.estimateUsd;
     await finalizePaidCall(callId, {
       model: OWN_LOOK_MODEL,
       billed: true,
       charged: true,
-      costUsd: actual ?? result.quote.estimateUsd,
+      costUsd,
       estimateInr: result.quote.estimateInr,
       usage,
       latencyMs,
       imageSize: result.quote.size,
-      costSource: actual != null ? "usage" : "estimate",
+      costSource: priced.known ? "usage" : "estimate",
     });
     logProviderCall({
       provider: "openai",
@@ -259,7 +260,10 @@ export async function POST(req: Request) {
       salonId: tenant.id,
       status: "ok",
       latencyMs,
-      costUsd: actual ?? result.quote.estimateUsd,
+      costUsd,
+      textCount: priced.textCount,
+      pictureIn: priced.pictureIn,
+      pictureOut: priced.pictureOut,
       requestId,
     });
     const tryOn = await prisma.tryOn.create({
@@ -291,13 +295,17 @@ export async function POST(req: Request) {
       const uncertain = error instanceof UncertainBillingError || error instanceof BilledProviderError;
       await releasePaidCall(callId, uncertain ? "UNCERTAIN" : "REFUNDED").catch(() => undefined);
     }
+    const failed = error instanceof BilledProviderError ? ownLookCallLog(error.usage) : ownLookCallLog(undefined);
     logProviderCall({
       provider: "openai",
       model: OWN_LOOK_MODEL,
       salonId: tenant.id,
       status: "error",
       latencyMs: Date.now() - started,
-      costUsd: 0,
+      costUsd: failed.known ? failed.costUsd : 0,
+      textCount: failed.textCount,
+      pictureIn: failed.pictureIn,
+      pictureOut: failed.pictureOut,
       requestId,
     });
     return NextResponse.json({ error: "PREVIEW", message: failMessage(error) }, { status: failStatus(error) });

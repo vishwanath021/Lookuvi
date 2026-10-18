@@ -1,15 +1,18 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { BridalOwnLook } from "@/components/tryon/BridalOwnLook";
+import { compareControl } from "@/components/tryon/BridalFlow";
 import { OWN_LOOK_ITEM_EDGE, OWN_LOOK_JEWELLERY_EDGE, OWN_LOOK_MAX_IMAGES, OWN_LOOK_MODEL, OWN_LOOK_SAREE_EDGE, OWN_LOOK_SLOTS, OWN_LOOK_THREE_BY_FOUR, ownLookItemEdge } from "@/data/bridal-own";
 import { bridalMakeupById } from "@/data/bridal";
 import {
   buildOwnLookPrompt,
   generateOwnLook,
   isPublicMediaKey,
+  ownLookCallLog,
   ownLookEstimateMeta,
   ownLookForm,
   ownLookFrameSize,
@@ -62,6 +65,23 @@ describe("your own look prompt", () => {
     expect(prompt).not.toMatch(/add jasmine|add marigold|gajra in the hair/i);
   });
 
+  it("places the ear chain and forehead pendant and keeps her bindi", () => {
+    const makeup = bridalMakeupById("makeup-soft-rose");
+    expect(makeup).toBeTruthy();
+    if (!makeup) return;
+    const prompt = buildOwnLookPrompt(makeup, [
+      { id: "ear-chain", noun: "ear chain" },
+      { id: "forehead-pendant", noun: "forehead pendant" },
+    ]);
+    expect(prompt).toContain("Image 2 is her ear chain");
+    expect(prompt).toContain("Place the champaswaralu chain from the top of the earring, arcing back into her hair.");
+    expect(prompt).toContain("Image 3 is her forehead pendant");
+    expect(prompt).toContain("Place the papidi billa on the hair parting and forehead.");
+    expect(prompt).toContain("Keep her own bindi from the selfie.");
+    expect(prompt).toContain("Keep any sindoor at the hair parting and any bindi already in her photo.");
+    expect(prompt).not.toContain("round bindi");
+  });
+
   it("does not invent clothes when she skipped every item", () => {
     const makeup = bridalMakeupById("makeup-nude-glow");
     expect(makeup).toBeTruthy();
@@ -101,8 +121,19 @@ describe("your own look prompt", () => {
     expect(planOwnLook("not-a-card", []).ok).toBe(false);
     expect(planOwnLook("makeup-soft-rose", ["tiara"]).ok).toBe(false);
     expect(planOwnLook("makeup-soft-rose", ["saree", "saree"]).ok).toBe(false);
-    expect(OWN_LOOK_SLOTS).toHaveLength(9);
-    expect(OWN_LOOK_MAX_IMAGES).toBe(10);
+    expect(planOwnLook("makeup-soft-rose", ["bangles"]).ok).toBe(false);
+    expect(planOwnLook("makeup-soft-rose", ["nose-ring"]).ok).toBe(false);
+    expect(OWN_LOOK_SLOTS.map((slot) => slot.id)).toEqual([
+      "saree",
+      "blouse",
+      "earrings",
+      "ear-chain",
+      "forehead-pendant",
+      "necklace",
+      "long-haram",
+      "hair-accessories",
+    ]);
+    expect(OWN_LOOK_MAX_IMAGES).toBe(9);
   });
 });
 
@@ -115,10 +146,11 @@ describe("your own look cost and privacy", () => {
     expect(ownLookItemEdge("saree")).toBe(OWN_LOOK_SAREE_EDGE);
     expect(ownLookItemEdge("necklace")).toBe(OWN_LOOK_JEWELLERY_EDGE);
     expect(ownLookItemEdge("earrings")).toBe(OWN_LOOK_JEWELLERY_EDGE);
-    expect(ownLookItemEdge("maang-tikka")).toBe(OWN_LOOK_JEWELLERY_EDGE);
-    expect(ownLookItemEdge("bangles")).toBe(OWN_LOOK_JEWELLERY_EDGE);
-    expect(ownLookItemEdge("nose-ring")).toBe(OWN_LOOK_JEWELLERY_EDGE);
+    expect(ownLookItemEdge("ear-chain")).toBe(OWN_LOOK_JEWELLERY_EDGE);
+    expect(ownLookItemEdge("forehead-pendant")).toBe(OWN_LOOK_JEWELLERY_EDGE);
+    expect(ownLookItemEdge("long-haram")).toBe(OWN_LOOK_JEWELLERY_EDGE);
     expect(ownLookItemEdge("blouse")).toBe(OWN_LOOK_ITEM_EDGE);
+    expect(ownLookItemEdge("hair-accessories")).toBe(OWN_LOOK_ITEM_EDGE);
     expect(Math.max(saree.width, saree.height)).toBeLessThanOrEqual(OWN_LOOK_SAREE_EDGE);
     expect(Math.max(necklace.width, necklace.height)).toBeLessThanOrEqual(OWN_LOOK_JEWELLERY_EDGE);
     expect(Math.max(blouse.width, blouse.height)).toBeLessThanOrEqual(OWN_LOOK_ITEM_EDGE);
@@ -139,7 +171,7 @@ describe("your own look cost and privacy", () => {
     if (!quoted.ok) return;
     expect(quoted.quote.model).toBe("gpt-image-2.5-sunburst");
     expect(quoted.quote.quality).toBe("medium");
-    expect(quoted.quote.imageCount).toBe(10);
+    expect(quoted.quote.imageCount).toBe(9);
     expect(quoted.quote.size).toBe("1024x1360");
     expect(quoted.quote.estimateUsd).toBeGreaterThan(0);
     expect(quoted.quote.estimateInr).toBeLessThanOrEqual(30);
@@ -235,20 +267,21 @@ describe("your own look cost and privacy", () => {
       selfie: await jpeg(768, 1024, { r: 200, g: 160, b: 140 }),
       items: [
         { id: "saree", bytes: await jpeg(900, 700, { r: 140, g: 20, b: 40 }) },
-        { id: "bangles", bytes: await jpeg(1000, 800, { r: 180, g: 140, b: 40 }) },
+        { id: "ear-chain", bytes: await jpeg(1000, 800, { r: 180, g: 140, b: 40 }) },
       ],
       makeupId: "makeup-soft-rose",
     });
     const face = await sharp(prepared.selfie).metadata();
     const saree = await sharp(prepared.items[0]?.jpeg).metadata();
-    const bangles = await sharp(prepared.items[1]?.jpeg).metadata();
+    const chain = await sharp(prepared.items[1]?.jpeg).metadata();
     expect(prepared.plan.size).toBe("1024x1360");
     expect(prepared.quote.size).toBe("1024x1360");
     expect(face.width).toBe(1024);
     expect(face.height).toBe(1360);
     expect(Math.max(saree.width || 0, saree.height || 0)).toBeLessThanOrEqual(OWN_LOOK_SAREE_EDGE);
-    expect(Math.max(bangles.width || 0, bangles.height || 0)).toBeLessThanOrEqual(OWN_LOOK_JEWELLERY_EDGE);
-    expect(prepared.plan.imageOrder).toEqual(["selfie.jpg", "saree.jpg", "bangles.jpg"]);
+    expect(Math.max(chain.width || 0, chain.height || 0)).toBeLessThanOrEqual(OWN_LOOK_JEWELLERY_EDGE);
+    expect(prepared.plan.imageOrder).toEqual(["selfie.jpg", "saree.jpg", "ear-chain.jpg"]);
+    expect(prepared.prompt).toContain("Place the champaswaralu chain from the top of the earring, arcing back into her hair.");
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     try {
       const ok = await generateOwnLook({
@@ -308,9 +341,24 @@ describe("your own look screen", () => {
       expect(html).toContain(`data-item="${slot.id}"`);
     }
     expect(html).toContain("Take a close-up of each piece on its own");
-    expect(html).toContain("Close-up of the piece, on its own.");
+    expect(html).toContain("Close-up of the saree, on its own.");
+    expect(html).toContain("Jhumkas");
+    expect(html).toContain("Champaswaralu");
+    expect(html).toContain("Papidi billa / Maang tikka");
+    expect(html).toContain("Long haram (optional)");
+    expect(html).toContain("Jada billa / Vaddanam, optional");
+    expect(html).toContain("data-own-items=\"grid\"");
+    expect(html).toContain("grid-cols-1");
+    expect(html).toContain("md:grid-cols-2");
+    expect(html).toContain("data-item-card=\"compact\"");
+    expect(html).toContain("data-item-placeholder=\"saree\"");
+    expect(html).not.toContain("photo-slot");
+    expect(html).not.toContain("Bangles");
+    expect(html).not.toContain("Nose ring");
+    expect(html).not.toContain("data-item=\"maang-tikka\"");
     expect(html).toContain("Live makeup");
-    expect(html).toContain("Use photo");
+    expect(html).toContain(">Upload<");
+    expect(html).not.toContain("Use photo");
     expect(html).toContain("Take photo");
     expect(html).toContain("Soft rose");
     expect(html).not.toContain("Temple &amp; Traditional");
@@ -320,5 +368,25 @@ describe("your own look screen", () => {
     expect(html).not.toMatch(/gold/i);
     expect(salonActionItems({ phone: true, showQueue: true, bridalOn: true })).toEqual(["book", "chat"]);
     expect(salonActionItems({ phone: true, showQueue: true, bridalOn: false })).toEqual(["book", "queue", "chat"]);
+    expect(compareControl(false)).toEqual({ label: "Compare", className: "btn secondary", pressed: false });
+    expect(compareControl(true)).toEqual({ label: "Hide compare", className: "btn sheen", pressed: true });
+    expect(html).not.toContain("Comparing");
+  });
+
+  it("logs the real OpenAI cost with image-input counts included", () => {
+    const usage = { textTokens: 397, imageTokens: 2400, outputTokens: 367, inputTokens: 2797 };
+    const priced = ownLookCallLog(usage);
+    expect(priced.known).toBe(true);
+    expect(priced.pictureIn).toBe(2400);
+    expect(priced.textCount).toBe(397);
+    expect(priced.pictureOut).toBe(367);
+    expect(priced.costUsd).toBeCloseTo((397 * 5 + 2400 * 8 + 367 * 30) / 1_000_000, 6);
+    const implied = ownLookCallLog({ textTokens: 397, inputTokens: 2797, outputTokens: 367 });
+    expect(implied.pictureIn).toBe(2400);
+    expect(implied.costUsd).toBeCloseTo(priced.costUsd, 6);
+    const route = readFileSync("src/app/api/v1/bridal/own/route.ts", "utf8");
+    expect(route).toContain("ownLookCallLog(usage)");
+    expect(route).toContain("pictureIn: priced.pictureIn");
+    expect(route).toContain("pictureIn: failed.pictureIn");
   });
 });

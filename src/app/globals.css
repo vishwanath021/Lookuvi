@@ -118,6 +118,11 @@ textarea { min-height: 48px; }
   box-shadow: none;
 }
 .btn.secondary::after { display: none; }
+.btn.tight {
+  min-height: 44px;
+  padding: 0.4rem 0.65rem;
+  font-size: 14px;
+}
 .btn.secondary:hover:not(:disabled),
 .btn.secondary:active:not(:disabled) {
   background: var(--selected);

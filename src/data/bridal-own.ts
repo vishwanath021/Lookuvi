@@ -1,15 +1,70 @@
 /** The bride's own clothes and jewellery. Each slot is optional. */
 
 export const OWN_LOOK_SLOTS = [
-  { id: "saree", label: "Saree", noun: "saree" },
-  { id: "blouse", label: "Blouse", noun: "blouse" },
-  { id: "necklace", label: "Necklace", noun: "necklace" },
-  { id: "earrings", label: "Earrings", noun: "earrings" },
-  { id: "maang-tikka", label: "Maang tikka", noun: "maang tikka" },
-  { id: "bangles", label: "Bangles", noun: "bangles" },
-  { id: "nose-ring", label: "Nose ring", noun: "nose ring" },
-  { id: "hair-accessories", label: "Hair accessories", noun: "hair accessories" },
-  { id: "other", label: "Other", noun: "other item" },
+  {
+    id: "saree",
+    label: "Saree",
+    subtitle: "",
+    hint: "Close-up of the saree, on its own.",
+    noun: "saree",
+    place: "Drape that saree on her as a bridal saree.",
+  },
+  {
+    id: "blouse",
+    label: "Blouse",
+    subtitle: "",
+    hint: "Close-up of the blouse, on its own.",
+    noun: "blouse",
+    place: "Put that blouse on her.",
+  },
+  {
+    id: "earrings",
+    label: "Earrings",
+    subtitle: "Jhumkas",
+    hint: "Close-up of the jhumkas, on their own.",
+    noun: "earrings",
+    place: "Hang those earrings from her earlobes.",
+  },
+  {
+    id: "ear-chain",
+    label: "Ear chain",
+    subtitle: "Champaswaralu",
+    hint: "Close-up of the chain, on its own. It runs from the earring up into the hair.",
+    noun: "ear chain",
+    place: "Place the champaswaralu chain from the top of the earring, arcing back into her hair.",
+  },
+  {
+    id: "forehead-pendant",
+    label: "Forehead pendant",
+    subtitle: "Papidi billa / Maang tikka",
+    hint: "Close-up of the pendant, on its own. It sits on the hair parting and forehead.",
+    noun: "forehead pendant",
+    place: "Place the papidi billa on the hair parting and forehead. Keep her own bindi from the selfie.",
+  },
+  {
+    id: "necklace",
+    label: "Necklace",
+    subtitle: "",
+    hint: "Close-up of the necklace, on its own.",
+    noun: "necklace",
+    place: "Place that necklace at her neck.",
+  },
+  {
+    id: "long-haram",
+    label: "Long haram (optional)",
+    subtitle: "",
+    hint: "Optional. Close-up of the long haram, on its own.",
+    noun: "long haram",
+    place: "Hang the long haram below the necklace.",
+  },
+  {
+    id: "hair-accessories",
+    label: "Hair accessories",
+    subtitle: "Jada billa / Vaddanam, optional",
+    hint: "Optional. Close-up of the hair jewellery, on its own.",
+    noun: "hair accessories",
+    place: "Place those hair accessories on the bun.",
+  },
 ] as const;
 
 export type OwnLookSlotId = (typeof OWN_LOOK_SLOTS)[number]["id"];
@@ -23,10 +78,10 @@ export const OWN_LOOK_THREE_BY_FOUR = "1024x1360" as const;
 export const OWN_LOOK_SAREE_EDGE = 512;
 /** Longest edge for a jewellery photo, so the piece stays readable. */
 export const OWN_LOOK_JEWELLERY_EDGE = 640;
-/** Longest edge for blouse, hair accessories, and other. */
+/** Longest edge for the blouse and hair accessories. */
 export const OWN_LOOK_ITEM_EDGE = 384;
 
-const JEWELLERY_SLOTS = new Set<OwnLookSlotId>(["necklace", "earrings", "maang-tikka", "bangles", "nose-ring"]);
+const JEWELLERY_SLOTS = new Set<OwnLookSlotId>(["earrings", "ear-chain", "forehead-pendant", "necklace", "long-haram"]);
 
 export function ownLookItemEdge(id: string) {
   if (id === "saree") return OWN_LOOK_SAREE_EDGE;
