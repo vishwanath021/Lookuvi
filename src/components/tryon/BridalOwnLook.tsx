@@ -6,6 +6,7 @@ import { BeforeAfter } from "@/components/tryon/BeforeAfter";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio } from "@/components/tryon/LiveStudio";
+import { LookResultActions, PhotoActions, ResultZoom } from "@/components/tryon/LookResultActions";
 import { LargeFrame, LiveTray, MakeupSwatches, SelectionSummary, StepCard, StepRail, TryBar, scrollToStep } from "@/components/tryon/LookStepper";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import { OWN_LOOK_SLOTS, type OwnLookSlotId } from "@/data/bridal-own";
@@ -309,6 +310,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
     <div data-own="flow" className="grid gap-4">
       <ConsentSheet open={consent.open} onAgree={() => void consent.agree()} onClose={consent.close} />
       <StepRail
+        id="own-steps"
         label="Your own look"
         current="own-makeup"
         steps={[
@@ -369,17 +371,27 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
             />
           ) : null}
           loading={busy ? <GeneratingLook tool="bridal-own" blur={false} /> : null}
-          liveLabel="Live makeup"
+          liveLabel="Live capture"
           trayReady={camReady}
           onShutter={() => void captureLive()}
-          preview={result && !busy ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
+          preview={result && !busy ? (
+            <>
+              <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" />
+              <ResultZoom src={result.after} />
+            </>
+          ) : null}
         />
+        {result && !busy ? (
+          <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} kind="bridal" />
+        ) : null}
         <TryBar
           label={ownButton.label}
           enabled={ownButton.enabled}
           busy={busy}
           counter={counter}
           note={capNote}
+          another={ownButton.another}
+          onAnother={() => scrollToStep("own-steps")}
           onClick={() => void generate()}
         />
         {camError ? <p className="text-sm" role="alert">{camError}</p> : null}
@@ -450,10 +462,10 @@ function PhotoBox({
       )}
       {live && large && onShutter ? <LiveTray ready={trayReady} onShutter={onShutter} /> : null}
       {loading || live ? null : (
-        <div className="mt-2 grid w-full max-w-[28rem] gap-2" data-photo-actions="yes">
+        <PhotoActions settled={Boolean(preview)} className="mt-2 grid w-full max-w-[28rem] gap-2">
           <button className="btn sheen" type="button" onClick={onLive}>{liveLabel}</button>
           <button className="btn secondary" type="button" onClick={onUpload}>{large ? "Upload" : "Use photo"}</button>
-        </div>
+        </PhotoActions>
       )}
     </div>
   );

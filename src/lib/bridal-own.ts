@@ -11,15 +11,25 @@ import {
   ownLookSlot,
   type OwnLookSlotId,
 } from "@/data/bridal-own";
-import { sunburstImageInputTokens, sunburstOutputTokens } from "@/lib/ai/sunburst-tokens";
+import { sunburstOutputTokens } from "@/lib/ai/sunburst-tokens";
 import { editFormFields, editSizeForAspect, planImageEdit, type EditSize, type PlannedEdit } from "@/lib/ai/edit-request";
 import { fitInsideCanvas, restoreFrame, type FrameTransform } from "@/lib/ai/frame";
 import { ImageError, sniffImage } from "@/lib/images";
 import { numberEnv } from "@/lib/env";
 import { bufferedInr, providerUsageLog, usdFromTokenCounts, type UsageNumbers } from "@/lib/ai/tiers";
 
-const TEXT_TOKEN_FLOOR = 400;
 const CATALOGUE_SIZES = ["1024x1024", "1024x1536", "1536x1024"] as const satisfies readonly EditSize[];
+
+/**
+ * Calibrated from a real 6-item bill of $0.0553 (₹5.31 at FX 96, no buffer).
+ * Text stays 600. The selfie is 1,250 image-input tokens.
+ * Each extra item photo adds 650 image-input tokens. Output stays 370.
+ * The rupee quote still adds the 8% buffer used by the rest of the app.
+ */
+const OWN_LOOK_TEXT_TOKENS = 600;
+const OWN_LOOK_SELFIE_IMAGE_TOKENS = 1250;
+const OWN_LOOK_ITEM_IMAGE_TOKENS = 650;
+const OWN_LOOK_OUTPUT_TOKENS = 370;
 
 export type OwnLookSize = EditSize | typeof OWN_LOOK_THREE_BY_FOUR;
 export type OwnLookPlan = Omit<PlannedEdit, "size"> & { size: OwnLookSize };
@@ -105,7 +115,7 @@ export function buildOwnLookPrompt(makeup: BridalMakeup, slots: { id: OwnLookSlo
     : "She did not add item photos. Apply only the makeup. Do not invent a saree, blouse, or jewellery.";
   return [
     "Image 1 is the bride's own selfie. Keep this exact person. Do not copy a face from any later image.",
-    `Apply clearly visible bridal makeup: ${lookDetails(makeup)}.`,
+    `Apply subtle bridal makeup on her real skin: ${lookDetails(makeup)}. Keep the colour light on the skin she already has.`,
     ...clothing,
     items,
     "Make one photo of her wearing that look.",
@@ -113,6 +123,10 @@ export function buildOwnLookPrompt(makeup: BridalMakeup, slots: { id: OwnLookSlo
     "Do not put flowers in her hair. No jasmine, marigold, gajra, or rose braid.",
     "Do not change face shape or features; makeup changes colour and finish only.",
     "Keep her natural skin tone and skin texture exactly; do not lighten, whiten or smooth the skin.",
+    "Keep her exact body shape and size. Do not slim or reshape her figure.",
+    "Keep her exact pose and the position of her hands.",
+    "Keep the same framing and crop, including her feet. Do not zoom in, and do not crop her feet out of the frame.",
+    "Change only the clothing and jewellery she photographed. Do not change her skin, body, pose, hands, or the crop of the photo.",
     "Keep any nose pin already in her photo.",
     "Keep any sindoor at the hair parting and any bindi already in her photo.",
     "Telugu bridal styling: silk drape and the jewellery from her own photos when she added them.",
@@ -197,10 +211,9 @@ export function quoteOwnLook(args: { prompt: string; selfiePixels: number; itemP
     return { ok: false, message: "Too many photos for one preview." };
   }
   const inputPixels = Math.max(1, args.selfiePixels) + args.itemPixels.reduce((sum, pixels) => sum + Math.max(1, pixels), 0);
-  const [frameWidth, frameHeight] = args.size.split("x").map((part) => Number(part));
-  const imageInputTokens = sunburstImageInputTokens(frameWidth, frameHeight);
-  const outputTokens = ownLookOutputTokens(args.size);
-  const textInputTokens = Math.max(TEXT_TOKEN_FLOOR, Math.ceil(args.prompt.length / 4));
+  const imageInputTokens = OWN_LOOK_SELFIE_IMAGE_TOKENS + args.itemPixels.length * OWN_LOOK_ITEM_IMAGE_TOKENS;
+  const outputTokens = OWN_LOOK_OUTPUT_TOKENS;
+  const textInputTokens = OWN_LOOK_TEXT_TOKENS;
   const estimateUsd = usdFromTokenCounts(OWN_LOOK_MODEL, { textIn: textInputTokens, imageIn: imageInputTokens, output: outputTokens });
   if (estimateUsd == null) {
     return { ok: false, message: `No token rates for ${OWN_LOOK_MODEL}. The request was not sent.` };

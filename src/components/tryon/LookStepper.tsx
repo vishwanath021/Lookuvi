@@ -76,9 +76,9 @@ export function scrollToStep(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-export function StepRail({ label, steps, current }: { label: string; steps: StepChip[]; current: string }) {
+export function StepRail({ id, label, steps, current }: { id?: string; label: string; steps: StepChip[]; current: string }) {
   return (
-    <nav className="step-rail" aria-label={label} data-step-rail="yes">
+    <nav id={id} className="step-rail" aria-label={label} data-step-rail="yes">
       {steps.map((step) => (
         <button
           key={step.id}
@@ -127,11 +127,33 @@ export function SelectionSummary({ rows }: { rows: { id: string; label: string; 
   );
 }
 
-export function TryBar({ label, enabled, busy, onClick, counter, note }: { label: string; enabled: boolean; busy: boolean; onClick: () => void; counter?: string; note?: string }) {
+export function TryBar({
+  label,
+  enabled,
+  busy,
+  onClick,
+  counter,
+  note,
+  another = false,
+  onAnother,
+}: {
+  label: string;
+  enabled: boolean;
+  busy: boolean;
+  onClick: () => void;
+  counter?: string;
+  note?: string;
+  another?: boolean;
+  onAnother?: () => void;
+}) {
   return (
     <div className="try-bar" data-action-bar="yes">
       {counter ? <p className="mb-1 text-center text-xs text-muted" data-try-count="yes">{counter}</p> : null}
-      <button className="btn sheen" type="button" disabled={!enabled || busy} onClick={onClick}>{label}</button>
+      {another ? (
+        <button className="btn secondary" type="button" onClick={onAnother}>Try another look</button>
+      ) : (
+        <button className="btn sheen" type="button" disabled={!enabled || busy} onClick={onClick}>{label}</button>
+      )}
       {note ? <p className="mt-1 text-center text-sm" role="status">{note}</p> : null}
     </div>
   );

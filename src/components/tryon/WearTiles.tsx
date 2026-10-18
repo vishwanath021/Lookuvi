@@ -7,6 +7,7 @@ export type WearSlot = {
   label: string;
   subtitle?: string;
   optional?: boolean;
+  more?: boolean;
 };
 
 type Shot = { url: string };
@@ -25,6 +26,7 @@ export function WearTiles({
   onRemove: (id: string) => void;
 }) {
   const [active, setActive] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const slotRef = useRef<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
@@ -53,36 +55,51 @@ export function WearTiles({
     onFile(id, file);
   }
 
+  const main = slots.filter((item) => !item.more);
+  const extra = slots.filter((item) => item.more);
+
+  function tile(item: WearSlot) {
+    const shot = shots[item.id];
+    return (
+      <div key={item.id} className="wear-tile" data-item={item.id} data-filled={shot ? "yes" : "no"}>
+        {shot ? <img src={shot.url} alt="" className="wear-photo" /> : null}
+        <button
+          className="wear-hit"
+          type="button"
+          aria-label={shot ? `Replace ${item.label}` : `Add ${item.label}`}
+          onClick={() => open(item.id)}
+        >
+          {shot ? null : (
+            <>
+              <WearIcon id={item.id} />
+              <span className="wear-name">{item.label}</span>
+              {item.subtitle ? <span className="wear-sub">{item.subtitle}</span> : null}
+            </>
+          )}
+        </button>
+        {shot ? <span className="wear-check" data-item-check={item.id} aria-hidden="true">✓</span> : null}
+        {shot ? (
+          <button className="wear-remove" type="button" aria-label={`Remove ${item.label}`} onClick={() => onRemove(item.id)}>×</button>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="wear-grid" data-wear="grid">
-        {slots.map((item) => {
-          const shot = shots[item.id];
-          return (
-            <div key={item.id} className="wear-tile" data-item={item.id} data-filled={shot ? "yes" : "no"}>
-              {shot ? <img src={shot.url} alt="" className="wear-photo" /> : null}
-              <button
-                className="wear-hit"
-                type="button"
-                aria-label={shot ? `Replace ${item.label}` : `Add ${item.label}`}
-                onClick={() => open(item.id)}
-              >
-                {shot ? null : (
-                  <>
-                    <WearIcon id={item.id} />
-                    <span className="wear-name">{item.label}</span>
-                    {item.subtitle ? <span className="wear-sub">{item.subtitle}</span> : null}
-                  </>
-                )}
-              </button>
-              {shot ? <span className="wear-check" data-item-check={item.id} aria-hidden="true">✓</span> : null}
-              {shot ? (
-                <button className="wear-remove" type="button" aria-label={`Remove ${item.label}`} onClick={() => onRemove(item.id)}>×</button>
-              ) : null}
-            </div>
-          );
-        })}
+        {main.map(tile)}
       </div>
+      {extra.length > 0 ? (
+        <div className="wear-more-block">
+          <button className="wear-more" type="button" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>
+            More pieces
+          </button>
+          <div className="wear-grid" data-wear="more" hidden={!moreOpen}>
+            {extra.map(tile)}
+          </div>
+        </div>
+      ) : null}
       {slot ? (
         <div className="wear-sheet" onClick={() => setActive(null)}>
           <div
@@ -156,6 +173,24 @@ function WearIcon({ id }: { id: string }) {
   }
   if (id === "hair-accessories") {
     return <svg {...pen}><circle cx="12" cy="11" r="3.4" /><path d="M8.2 13.2c-.8 2.6.6 5.2 3.8 6 3.2-.8 4.6-3.4 3.8-6" /><path d="M12 7.6V5" /></svg>;
+  }
+  if (id === "bangles") {
+    return <svg {...pen}><ellipse cx="8" cy="12" rx="3.2" ry="4.2" /><ellipse cx="16" cy="12" rx="3.2" ry="4.2" /></svg>;
+  }
+  if (id === "waist-belt") {
+    return <svg {...pen}><path d="M4 12c2.2-3 13.8-3 16 0" /><path d="M4 12c2.2 3 13.8 3 16 0" /><circle cx="12" cy="12" r="1.6" /></svg>;
+  }
+  if (id === "arm-band") {
+    return <svg {...pen}><path d="M8 5c2 4 2 10 0 14" /><path d="M8 8h8M8 16h7" /><circle cx="16" cy="12" r="1.4" /></svg>;
+  }
+  if (id === "braid-ornament") {
+    return <svg {...pen}><path d="M12 4v16" /><circle cx="12" cy="8" r="1.3" /><circle cx="12" cy="13" r="1.3" /><path d="M10 18h4" /></svg>;
+  }
+  if (id === "anklets") {
+    return <svg {...pen}><path d="M7 8v5M17 8v5" /><ellipse cx="7" cy="16" rx="2.4" ry="1.5" /><ellipse cx="17" cy="16" rx="2.4" ry="1.5" /></svg>;
+  }
+  if (id === "rings") {
+    return <svg {...pen}><circle cx="9" cy="12" r="2.2" /><circle cx="15" cy="12" r="2.2" /><path d="M9 9.8V7M15 9.8V7" /></svg>;
   }
   if (id === "sherwani") {
     return <svg {...pen}><path d="M8 5l4 2 4-2 2 2v13H6V7z" /><path d="M12 7v13" /></svg>;

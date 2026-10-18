@@ -43,7 +43,7 @@ test("stepper, swatches, and no preview before Try now", async ({ page }, testIn
   await expect(page.getByRole("button", { name: "Try now" })).toBeEnabled();
   await page.locator("[data-photo-box='face']").screenshot({ path: `${OUT}/bridal-360-photo.png` });
 
-  await openLive(page, "Live makeup");
+  await openLive(page, "Live capture");
   const tray = page.locator("[data-live-tray='yes']");
   await expect(tray).toBeVisible();
   const frame = await page.locator("[data-photo-box='face']").boundingBox();
@@ -80,7 +80,13 @@ test("a choice change after the result does not call the preview", async ({ page
   await page.locator("[data-photo='bridal']").setInputFiles("public/samples/portrait.jpg");
   await page.getByRole("button", { name: "Try now" }).click();
   await expect(page.getByRole("heading", { name: "Telugu Muhurtham Classic" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("button", { name: "Change something to try again" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Try another look" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Change something to try again" })).toHaveCount(0);
+  await expect(page.getByText("Try 2 of 3")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Share on WhatsApp" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Live capture" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Change photo" })).toBeVisible();
   const calls: string[] = [];
   page.on("request", (req) => {
     if (req.method() === "POST" && req.url().includes("/api/v1/tryon/generate")) calls.push(req.url());

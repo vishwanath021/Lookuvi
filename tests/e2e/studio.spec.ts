@@ -57,12 +57,12 @@ test("photo notice, countdown, live makeup, and metallic buttons", async ({ page
   await waitForCapture(page);
 
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
-  const makeup = page.getByRole("button", { name: "Live makeup", exact: true });
+  const makeup = page.getByRole("button", { name: "Live capture", exact: true });
   await expect(makeup).toBeVisible();
   const makeupMetal = await makeup.evaluate((el) => ({ image: getComputedStyle(el).backgroundImage, color: getComputedStyle(el).color }));
   expect(makeupMetal.image).toContain("gradient");
   expect(makeupMetal.color).toBe("rgb(255, 255, 255)");
-  await openLive(page, "Live makeup");
+  await openLive(page, "Live capture");
   await expect(page.locator("[data-studio='live']")).toBeVisible();
   await expect(page.locator("[data-makeup='live']")).toBeVisible();
   await expect(page.getByRole("button", { name: "Kajal" })).toBeVisible();
@@ -167,7 +167,7 @@ test("bridal catalogue, selfie copy, and header stay put", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Bridal", exact: true })).toBeVisible();
   await expect(page.locator("[data-photo-box='face']").getByText("Face the light. No sunglasses.")).toBeVisible();
   const slot = page.locator("[data-photo-box='face']");
-  const liveMakeup = page.getByRole("button", { name: "Live makeup", exact: true });
+  const liveMakeup = page.getByRole("button", { name: "Live capture", exact: true });
   const slotBox = await slot.boundingBox();
   const liveBox = await liveMakeup.boundingBox();
   expect(slotBox && liveBox && liveBox.y >= slotBox.y + slotBox.height - 4).toBeTruthy();

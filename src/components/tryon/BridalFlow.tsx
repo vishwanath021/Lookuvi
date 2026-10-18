@@ -8,7 +8,8 @@ import { BridalLookCard } from "@/components/tryon/BridalLookCard";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio } from "@/components/tryon/LiveStudio";
-import { LargeFrame, LiveTray, MakeupSwatches, SelectionSummary, StepCard, StepRail, TryBar } from "@/components/tryon/LookStepper";
+import { LookResultActions, PhotoActions, ResultZoom } from "@/components/tryon/LookResultActions";
+import { LargeFrame, LiveTray, MakeupSwatches, SelectionSummary, StepCard, StepRail, TryBar, scrollToStep } from "@/components/tryon/LookStepper";
 import { useVisitTries } from "@/components/tryon/useVisitTries";
 import { MakeupStage } from "@/components/tryon/MakeupStage";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
@@ -424,7 +425,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
         setCamReady(true);
       }).catch(() => {
         stopLive();
-        setCamError("Camera permission was denied. Allow the camera for this site from the address bar, then press Live makeup again.");
+        setCamError("Camera permission was denied. Allow the camera for this site from the address bar, then press Live capture again.");
       });
     });
   }
@@ -582,6 +583,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
       {panel === "looks" && (
         <div className="mt-4 grid gap-4">
           <StepRail
+            id="bridal-steps"
             label="Bridal steps"
             current="bridal-event"
             steps={[
@@ -646,7 +648,10 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
                   makeup={liveLook ? <MakeupStage video={camReady ? videoRef.current : null} lip={lipHex} kajal={kajal} lashes={lashes} blush={blushOn} brow={browOn} /> : null}
                 />
               ) : result?.kind === "look" && !busy ? (
-                <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" />
+                <>
+                  <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" />
+                  <ResultZoom src={result.after} />
+                </>
               ) : (
                 <>
                   {face ? <img src={face.url} alt="Your selfie" className="absolute inset-0 h-full w-full object-cover" /> : null}
@@ -671,21 +676,24 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
                 ) : null}
               </LiveTray>
             ) : busyKind === "look" ? null : (
-              <div className="grid w-full max-w-[28rem] gap-2" data-photo-actions="yes">
+              <PhotoActions settled={result?.kind === "look"} className="grid w-full max-w-[28rem] gap-2">
                 <button className="btn sheen" type="button" onClick={() => beginLive("face", false)}>Take selfie</button>
                 <button className="btn secondary" type="button" onClick={() => consent.gate(() => bridalFile.current?.click())}>Upload</button>
-                <button className="btn secondary" type="button" onClick={() => beginLive("face", true)}>Live makeup</button>
+                <button className="btn secondary" type="button" onClick={() => beginLive("face", true)}>Live capture</button>
                 <input ref={bridalFile} className="sr-only" type="file" accept="image/*" data-photo="bridal" onChange={(event) => {
                   const file = event.target.files?.[0];
                   event.target.value = "";
                   if (!file) return;
                   void fileToShot(file).then((shot) => { setFace(shot); setResult((current) => (current?.kind === "look" ? null : current)); });
                 }} />
-              </div>
+              </PhotoActions>
             )}
             {camError && panel === "looks" ? <p className="text-sm" role="alert">{camError}</p> : null}
             {result?.kind === "look" && !busy ? (
-              <button className="btn" type="button" onClick={() => void saveCurrent()}>Save this look</button>
+              <>
+                <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} shareUrl={result.share} kind="bridal" />
+                <button className="btn" type="button" onClick={() => void saveCurrent()}>Save this look</button>
+              </>
             ) : null}
             <TryBar
               label={lookButton.label}
@@ -693,6 +701,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               busy={busy}
               counter={counter}
               note={capNote(lookButton.note)}
+              another={lookButton.another}
+              onAnother={() => scrollToStep("bridal-steps")}
               onClick={() => { if (face) void generate("look", face); }}
             />
           </section>
@@ -722,7 +732,10 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
                   chrome="clean"
                 />
               ) : result?.kind === "mehendi" && !busy ? (
-                <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" />
+                <>
+                  <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" />
+                  <ResultZoom src={result.after} />
+                </>
               ) : (
                 <>
                   {hand ? <img src={hand.url} alt="Your hand" className="absolute inset-0 h-full w-full object-cover" /> : <p className="absolute inset-0 grid place-items-center px-6 text-center text-sm">Your palm, in good light.</p>}
@@ -733,7 +746,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
             {live === "hand" ? (
               <LiveTray ready={camReady} onShutter={() => void captureLive()} />
             ) : busyKind === "mehendi" ? null : (
-              <div className="grid w-full max-w-[28rem] gap-2">
+              <PhotoActions settled={result?.kind === "mehendi"} className="grid w-full max-w-[28rem] gap-2">
                 <button className="btn sheen" type="button" onClick={() => beginLive("hand")}>Take photo</button>
                 <button className="btn secondary" type="button" onClick={() => consent.gate(() => mehendiFile.current?.click())}>Upload</button>
                 <input ref={mehendiFile} className="sr-only" type="file" accept="image/*" data-photo="mehendi" onChange={(event) => {
@@ -742,15 +755,22 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
                   if (!file) return;
                   void fileToShot(file).then((shot) => { setHand(shot); setResult((current) => (current?.kind === "mehendi" ? null : current)); });
                 }} />
-              </div>
+              </PhotoActions>
             )}
-            {result?.kind === "mehendi" && !busy ? <button className="btn" type="button" onClick={() => void saveCurrent()}>Save this look</button> : null}
+            {result?.kind === "mehendi" && !busy ? (
+              <>
+                <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} shareUrl={result.share} kind="bridal" />
+                <button className="btn" type="button" onClick={() => void saveCurrent()}>Save this look</button>
+              </>
+            ) : null}
             <TryBar
               label={mehendiButton.label}
               enabled={mehendiButton.enabled}
               busy={busy}
               counter={counter}
               note={capNote(mehendiButton.note)}
+              another={mehendiButton.another}
+              onAnother={() => scrollToStep("bridal-mehendi")}
               onClick={() => { if (hand) void generate("mehendi", hand); }}
             />
           </section>
