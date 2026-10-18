@@ -33,7 +33,7 @@ test("the bridal photo shows the loading sweep, then a crossfade", async ({ page
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
   await page.locator("[data-photo='bridal']").setInputFiles(FACE);
   await expect(page.getByRole("img", { name: "Your selfie" })).toBeVisible();
-  await page.getByRole("button", { name: "See Telugu Muhurtham Classic" }).click();
+  await page.getByRole("button", { name: "Try now" }).click();
   const box = page.locator("[data-photo-box='face']");
   const veil = page.locator("[data-generating='yes']");
   await expect(veil).toBeVisible();

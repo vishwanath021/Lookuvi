@@ -9,6 +9,8 @@ export function BeforeAfter({
   afterLabel,
   alignMode,
   eyeDelta,
+  className,
+  afterClassName,
 }: {
   before: string;
   after: string;
@@ -16,6 +18,8 @@ export function BeforeAfter({
   afterLabel: string;
   alignMode?: "landmarks" | "cover";
   eyeDelta?: number | null;
+  className?: string;
+  afterClassName?: string;
 }) {
   const [pos, setPos] = useState(52);
   const box = useRef<HTMLDivElement>(null);
@@ -30,7 +34,7 @@ export function BeforeAfter({
   return (
     <div
       ref={box}
-      className="relative aspect-[3/4] touch-none overflow-hidden bg-[#F3F0F8]"
+      className={className || "relative aspect-[3/4] touch-none overflow-hidden bg-[#F3F0F8]"}
       data-testid="before-after"
       data-align-mode={alignMode || undefined}
       data-eye-delta={eyeDelta == null ? undefined : eyeDelta.toFixed(2)}
@@ -44,7 +48,7 @@ export function BeforeAfter({
         setFromClientX(event.clientX);
       }}
     >
-      <img src={after} alt={afterLabel} className="absolute inset-0 h-full w-full object-cover object-center" draggable={false} />
+      <img src={after} alt={afterLabel} className={`absolute inset-0 h-full w-full object-cover object-center${afterClassName ? ` ${afterClassName}` : ""}`} draggable={false} />
       <img
         src={before}
         alt={beforeLabel}

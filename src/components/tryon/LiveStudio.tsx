@@ -62,6 +62,7 @@ export function LiveStudio({
   frozenUrl,
   makeup,
   footer,
+  chrome = "overlay",
 }: {
   videoRef: RefObject<HTMLVideoElement | null>;
   ready: boolean;
@@ -83,6 +84,8 @@ export function LiveStudio({
   frozenUrl?: string;
   makeup?: ReactNode;
   footer?: ReactNode;
+  /** `clean` keeps the face free: no shutter, shade row, or side rail on the video. */
+  chrome?: "overlay" | "clean";
 }) {
   const [count, setCount] = useState<number | "capturing" | null>(null);
 
@@ -126,16 +129,19 @@ export function LiveStudio({
       </div>
       <button className="cam-round absolute left-3 top-3 z-30" type="button" aria-label="Back" onClick={onBack}>‹</button>
       <button className="cam-round absolute right-3 top-3 z-30" type="button" aria-label="Close" onClick={onClose}>×</button>
-      <StudioRail
-        pin="top"
-        onRetake={onRetake}
-        onZoomIn={() => onZoom(Math.min(2, Math.round((zoom + 0.25) * 100) / 100))}
-        onZoomOut={() => onZoom(Math.max(1, Math.round((zoom - 0.25) * 100) / 100))}
-        onCompare={onCompare}
-        compareOn={compareOn}
-        onDownload={onDownload}
-        canDownload={canDownload}
-      />
+      {chrome === "clean" ? null : (
+        <StudioRail
+          pin="top"
+          onRetake={onRetake}
+          onZoomIn={() => onZoom(Math.min(2, Math.round((zoom + 0.25) * 100) / 100))}
+          onZoomOut={() => onZoom(Math.max(1, Math.round((zoom - 0.25) * 100) / 100))}
+          onCompare={onCompare}
+          compareOn={compareOn}
+          onDownload={onDownload}
+          canDownload={canDownload}
+        />
+      )}
+      {chrome === "clean" ? null : (
       <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 px-3 pb-3">
         {footer}
         <button className="cam-shutter" type="button" aria-label="Take photo" disabled={!ready || count !== null || busy} onClick={() => void shoot()} />
@@ -143,6 +149,7 @@ export function LiveStudio({
           <button className="btn on-photo" type="button" onClick={onUpload}>Upload a photo instead</button>
         ) : null}
       </div>
+      )}
       {count !== null && (
         <div className="absolute inset-0 z-30 grid place-items-center bg-black/45" role="status">
           <p className="font-serif text-5xl">{count === "capturing" ? "Capturing..." : count}</p>

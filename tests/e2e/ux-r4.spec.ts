@@ -28,15 +28,18 @@ test("bridal photo step, chips, one scrollbar, and live fps", async ({ page }, t
   await makeup.screenshot({ path: `${OUT}/after-${label}-makeup.png` });
 
   const cluster = page.locator("[data-photo-cluster='yes']");
-  await cluster.scrollIntoViewIfNeeded();
   const slot = page.locator("[data-photo-box='face']");
+  await slot.scrollIntoViewIfNeeded();
   await expect(slot.getByText("Face the light. No sunglasses.")).toBeVisible();
   const live = page.getByRole("button", { name: "Live makeup", exact: true });
-  const usePhoto = page.getByRole("button", { name: "Use photo", exact: true });
+  const upload = page.getByRole("button", { name: "Upload", exact: true });
+  await live.scrollIntoViewIfNeeded();
   await expect(live).toBeInViewport();
-  await expect(usePhoto).toBeInViewport();
-  const box = await cluster.boundingBox();
-  expect(box && box.height).toBeLessThan(testInfo.project.name === "android" ? 520 : 640);
+  await expect(upload).toBeInViewport();
+  const box = await slot.boundingBox();
+  expect(box && box.height).toBeGreaterThan(280);
+  expect(box && box.width / box.height).toBeGreaterThan(0.7);
+  expect(box && box.width / box.height).toBeLessThan(0.85);
   const gradient = await slot.evaluate((el) => getComputedStyle(el).backgroundImage);
   expect(gradient).toContain("gradient");
   await cluster.screenshot({ path: `${OUT}/after-${label}-photo.png` });

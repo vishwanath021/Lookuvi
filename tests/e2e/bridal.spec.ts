@@ -74,19 +74,25 @@ test("guest can pick an event and a look, refine it, try mehendi, save, compare,
   await page.locator("[data-photo='bridal']").setInputFiles("public/samples/portrait.jpg");
   await expect(page.getByRole("img", { name: "Your selfie" })).toBeVisible();
   await shot(page, "03-selfie");
-  await page.getByRole("button", { name: "See Telugu Muhurtham Classic" }).click();
+  await page.getByRole("button", { name: "Try now" }).click();
   await expect(page.getByRole("heading", { name: "Telugu Muhurtham Classic" })).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("[data-bridal='flow']")).toHaveAttribute("data-busy", "no");
   await expect(page.getByRole("slider", { name: /Before \/ After/i })).toBeVisible();
   await shot(page, "04-result");
 
-  const matte = page.waitForResponse((res) => res.url().includes("/api/v1/tryon/generate") && res.request().method() === "POST");
+  let early = 0;
+  const listen = (res: { url: () => string; request: () => { method: () => string } }) => {
+    if (res.url().includes("/api/v1/tryon/generate") && res.request().method() === "POST") early += 1;
+  };
+  page.on("response", listen);
   await page.getByRole("button", { name: "Matte", exact: true }).click();
-  expect((await matte).ok()).toBeTruthy();
-  await expect(page.locator("[data-bridal='flow']")).toHaveAttribute("data-busy", "no");
-  const berry = page.waitForResponse((res) => res.url().includes("/api/v1/tryon/generate") && res.request().method() === "POST");
   await page.getByRole("button", { name: "Berry", exact: true }).click();
-  expect((await berry).ok()).toBeTruthy();
+  await page.waitForTimeout(400);
+  page.off("response", listen);
+  expect(early).toBe(0);
+  const again = page.waitForResponse((res) => res.url().includes("/api/v1/tryon/generate") && res.request().method() === "POST");
+  await page.getByRole("button", { name: "Try now" }).click();
+  expect((await again).ok()).toBeTruthy();
   await expect(page.locator("[data-bridal='flow']")).toHaveAttribute("data-busy", "no");
   await shot(page, "05-refine");
   await page.getByRole("button", { name: "Save this look" }).click();
@@ -98,7 +104,7 @@ test("guest can pick an event and a look, refine it, try mehendi, save, compare,
   await page.locator("[data-step='mehendi']").screenshot({ path: `${SHOTS}/06-mehendi.png` });
   await shot(page, "06-mehendi-page");
   await page.locator("[data-photo='mehendi']").setInputFiles("tests/fixtures/hand.jpg");
-  await page.getByRole("button", { name: "See the mehendi" }).click();
+  await page.getByRole("button", { name: "Try now" }).click();
   await expect(page.getByRole("heading", { name: /Mehendi/ })).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "Save this look" }).click();
 
@@ -164,7 +170,7 @@ test("zero try-ons still shows a bridal preview and the owner balance", async ({
   await page.goto("/s/demo");
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
   await page.locator("[data-photo='bridal']").setInputFiles("public/samples/portrait.jpg");
-  await page.getByRole("button", { name: "See Telugu Muhurtham Classic" }).click();
+  await page.getByRole("button", { name: "Try now" }).click();
   await expect(page.getByRole("button", { name: "Save this look" })).toBeVisible({ timeout: 30_000 });
   const after = await salonDb();
   const tenant = await after.tenant.findUniqueOrThrow({ where: { slug: "demo" } });

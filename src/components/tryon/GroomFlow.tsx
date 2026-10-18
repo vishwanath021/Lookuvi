@@ -6,6 +6,7 @@ import { BeforeAfter } from "@/components/tryon/BeforeAfter";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio } from "@/components/tryon/LiveStudio";
+import { LargeFrame, LiveTray, SelectionSummary, StepCard, StepRail, TryBar, scrollToStep } from "@/components/tryon/LookStepper";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import {
   GROOM_BEARDS,
@@ -19,6 +20,7 @@ import {
 import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
 import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
+import { tryNowReady } from "@/lib/try-now";
 
 type Shot = { blob: Blob; url: string };
 type Target = "face" | "own-face" | GroomSlotId;
@@ -45,6 +47,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
   const [error, setError] = useState("");
   const [reveal, setReveal] = useState("");
   const [result, setResult] = useState<{ name: string; before: string; after: string } | null>(null);
+  const [revise, setRevise] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -129,6 +132,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
     }
     setResult(null);
     setReveal("");
+    setRevise(true);
   }
 
   async function captureLive() {
@@ -163,7 +167,9 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
     if (busy || !shot) return;
     stopLive();
     setBusy(true);
+    setRevise(false);
     setError("");
+    scrollToStep(kind === "own" ? "groom-own-photo" : "groom-photo");
     try {
       const body = new FormData();
       body.set("photo", shot.blob, "selfie.jpg");
@@ -203,20 +209,18 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
     }
   }
 
-  function chipRow(label: string, hint: string, group: string, choices: GroomChoice[], value: string, onChange: (id: string) => void) {
+  function chipRow(id: string, title: string, hint: string, group: string, choices: GroomChoice[], value: string, onChange: (id: string) => void) {
     return (
-      <div data-step={group}>
-        <p className="mb-2 text-sm font-medium">{label}</p>
-        {hint ? <p className="mb-2 text-sm text-muted">{hint}</p> : null}
+      <StepCard id={id} title={title} hint={hint}>
         {hairPills.length > 1 ? (
-          <div className="mb-2 flex flex-wrap gap-2" data-pills="category" role="group" aria-label={`${group} category`} />
+          <div className="flex flex-wrap gap-2" data-pills="category" role="group" aria-label={`${group} category`} />
         ) : null}
         <div className="flex flex-wrap gap-2" role="group" aria-label={group}>
           {choices.map((item) => (
-            <button key={item.id} className="chip" type="button" aria-pressed={value === item.id} onClick={() => onChange(value === item.id ? "" : item.id)}>{item.name}</button>
+            <button key={item.id} className="chip" type="button" aria-pressed={value === item.id} onClick={() => { onChange(value === item.id ? "" : item.id); setRevise(true); }}>{item.name}</button>
           ))}
         </div>
-      </div>
+      </StepCard>
     );
   }
 
@@ -237,49 +241,72 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
       </div>
 
       <div className={panel === "looks" ? "grid gap-4" : "hidden"} data-panel="looks">
-          {chipRow("1. Wedding hair", "Optional. Tap again to keep his hair.", "Hair", GROOM_HAIR, hairId, setHairId)}
-          {chipRow("2. Beard", "Optional. Tap again to keep his beard.", "Beard", GROOM_BEARDS, beardId, setBeardId)}
-          {chipRow("3. Grooming", "Facial glow, or leave the skin natural.", "Grooming", GROOM_GROOMING, groomingId, setGroomingId)}
-          <PhotoStep
-            title="4. Your selfie"
-            target="face"
-            shot={face}
-            live={live}
-            reveal={panel === "looks" ? reveal : ""}
-            busy={busy && panel === "looks"}
-            camReady={camReady}
-            zoom={zoom}
-            videoRef={videoRef}
-            boxRef={(node) => { boxes.current.face = node; }}
-            onZoom={setZoom}
-            onLive={() => beginLive("face")}
-            onUpload={() => openFile("face")}
-            onClose={stopLive}
-            onShutter={captureLive}
+          <StepRail
+            label="Groom steps"
+            current="groom-hair"
+            steps={[
+              { id: "groom-hair", label: "Hair", icon: "hair" },
+              { id: "groom-beard", label: "Beard", icon: "beard" },
+              { id: "groom-grooming", label: "Grooming", icon: "groom" },
+              { id: "groom-photo", label: "Photo", icon: "photo" },
+            ]}
           />
-          {face && !busy ? <button className="btn sheen" type="button" onClick={() => void generate("looks")}>{result ? "See your look again" : "See your look"}</button> : null}
+          {chipRow("groom-hair", "Hair", "Optional. Tap again to keep his hair.", "Hair", GROOM_HAIR, hairId, setHairId)}
+          {chipRow("groom-beard", "Beard", "Optional. Tap again to keep his beard.", "Beard", GROOM_BEARDS, beardId, setBeardId)}
+          {chipRow("groom-grooming", "Grooming", "Facial glow, or leave the skin natural.", "Grooming", GROOM_GROOMING, groomingId, setGroomingId)}
+          <section id="groom-photo" className="step-card grid gap-3" data-step="photo">
+            <h3 className="text-base font-semibold leading-tight">Photo</h3>
+            <SelectionSummary rows={[
+              { id: "groom-hair", label: "Hair", value: GROOM_HAIR.find((item) => item.id === hairId)?.name || "Keep his hair" },
+              { id: "groom-beard", label: "Beard", value: GROOM_BEARDS.find((item) => item.id === beardId)?.name || "Keep his beard" },
+              { id: "groom-grooming", label: "Grooming", value: GROOM_GROOMING.find((item) => item.id === groomingId)?.name || "Natural skin" },
+            ]} />
+            {result && !busy && panel === "looks" ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
+            <PhotoStep
+              title=""
+              target="face"
+              shot={face}
+              live={live}
+              reveal={panel === "looks" ? reveal : ""}
+              busy={busy && panel === "looks"}
+              camReady={camReady}
+              zoom={zoom}
+              videoRef={videoRef}
+              boxRef={(node) => { boxes.current.face = node; }}
+              onZoom={setZoom}
+              onLive={() => beginLive("face")}
+              onUpload={() => openFile("face")}
+              onClose={stopLive}
+              onShutter={captureLive}
+              large
+              preview={result && !busy && panel === "looks" ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
+            />
+            <TryBar
+              label={result && !revise && panel === "looks" ? "Change and try again" : "Try now"}
+              enabled={Boolean(result && !revise) || tryNowReady(Boolean(face), true)}
+              busy={busy}
+              onClick={() => {
+                if (result && !revise) {
+                  setRevise(true);
+                  scrollToStep("groom-hair");
+                  return;
+                }
+                void generate("looks");
+              }}
+            />
+          </section>
         </div>
       <div data-own="flow" className={panel === "own" ? "grid gap-4" : "hidden"}>
-          <PhotoStep
-            title="1. Your selfie"
-            target="own-face"
-            shot={ownFace}
-            live={live}
-            reveal={panel === "own" ? reveal : ""}
-            busy={busy && panel === "own"}
-            camReady={camReady}
-            zoom={zoom}
-            videoRef={videoRef}
-            boxRef={(node) => { boxes.current["own-face"] = node; }}
-            onZoom={setZoom}
-            onLive={() => beginLive("own-face")}
-            onUpload={() => openFile("own-face")}
-            onClose={stopLive}
-            onShutter={captureLive}
+          <StepRail
+            label="Own look steps"
+            current="groom-clothes"
+            steps={[
+              { id: "groom-clothes", label: "Clothes", icon: "clothes" },
+              { id: "groom-own-photo", label: "Photo", icon: "photo" },
+            ]}
           />
-          <div data-step="items">
-            <p className="mb-2 text-sm font-medium">2. Your clothes</p>
-            <p className="mb-3 text-sm text-muted">Optional. Take a close-up of each piece on its own. These photos are deleted after the preview and are never published.</p>
+          <StepCard id="groom-clothes" title="Clothes" hint="Optional. Take a close-up of each piece on its own. These photos are deleted after the preview and are never published.">
+            <p className="text-sm text-muted">Take a close-up of each piece on its own.</p>
             <div className="grid gap-4">
               {GROOM_OWN_SLOTS.map((slot) => (
                 <div key={slot.id} data-item={slot.id}>
@@ -305,20 +332,51 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
                 </div>
               ))}
             </div>
-          </div>
-          {ownFace && !busy ? <button className="btn sheen" type="button" onClick={() => void generate("own")}>{result ? "See your look again" : "See your look"}</button> : null}
+          </StepCard>
+          <section id="groom-own-photo" className="step-card grid gap-3" data-step="own-photo">
+            <h3 className="text-base font-semibold leading-tight">Photo</h3>
+            <SelectionSummary rows={[
+              { id: "groom-clothes", label: "Clothes", value: GROOM_OWN_SLOTS.filter((slot) => items[slot.id]).map((slot) => slot.label).join(", ") || "No extra pieces" },
+              { id: "groom-own-photo", label: "Photo", value: ownFace ? "Selfie added" : "Add a selfie" },
+            ]} />
+            {result && !busy && panel === "own" ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
+            <PhotoStep
+              title=""
+              target="own-face"
+              shot={ownFace}
+              live={live}
+              reveal={panel === "own" ? reveal : ""}
+              busy={busy && panel === "own"}
+              camReady={camReady}
+              zoom={zoom}
+              videoRef={videoRef}
+              boxRef={(node) => { boxes.current["own-face"] = node; }}
+              onZoom={setZoom}
+              onLive={() => beginLive("own-face")}
+              onUpload={() => openFile("own-face")}
+              onClose={stopLive}
+              onShutter={captureLive}
+              large
+              preview={result && !busy && panel === "own" ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
+            />
+            <TryBar
+              label={result && !revise && panel === "own" ? "Change and try again" : "Try now"}
+              enabled={Boolean(result && !revise) || tryNowReady(Boolean(ownFace), true)}
+              busy={busy}
+              onClick={() => {
+                if (result && !revise) {
+                  setRevise(true);
+                  scrollToStep("groom-clothes");
+                  return;
+                }
+                void generate("own");
+              }}
+            />
+          </section>
         </div>
 
       {camError ? <p className="text-sm" role="alert">{camError}</p> : null}
       {error ? <p className="text-sm" role="status">{error}</p> : null}
-      {result && !busy ? (
-        <div className="grid gap-3">
-          <p className="text-center text-xs font-semibold uppercase tracking-wide">Your groom look</p>
-          <h3 className="text-center font-serif text-2xl">{result.name}</h3>
-          <BeforeAfter before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" />
-          <p className="text-center text-xs text-muted">A preview for your trial. The salon’s grooming on the day is the real result.</p>
-        </div>
-      ) : null}
       <input
         ref={fileRef}
         className="sr-only"
@@ -354,6 +412,8 @@ function PhotoStep({
   onUpload,
   onClose,
   onShutter,
+  large = false,
+  preview = null,
 }: {
   title: string;
   target: Target;
@@ -370,42 +430,45 @@ function PhotoStep({
   onUpload: () => void;
   onClose: () => void;
   onShutter: () => void;
+  large?: boolean;
+  preview?: ReactNode;
 }) {
   const open = live === target;
   const faceTarget = target === "face" || target === "own-face";
-  const filled = open || Boolean(shot) || Boolean(reveal);
   const loading: ReactNode = busy ? <GeneratingLook tool={target === "face" ? "groom" : "groom-own"} blur={false} /> : null;
+  const frame = open ? (
+    <LiveStudio
+      videoRef={videoRef}
+      ready={camReady}
+      facing={faceTarget ? "user" : "environment"}
+      guide={faceTarget ? "face" : "hand"}
+      zoom={zoom}
+      onZoom={onZoom}
+      onBack={onClose}
+      onClose={onClose}
+      onShutter={onShutter}
+      onRetake={onLive}
+      chrome={large ? "clean" : "overlay"}
+    />
+  ) : preview ? preview : (
+    <>
+      {shot ? <img src={shot.url} alt={title || "Your selfie"} className={large ? "absolute inset-0 h-full w-full object-cover" : "h-full w-full object-cover"} /> : null}
+      {reveal ? <img src={reveal} alt="" className="gen-reveal absolute inset-0 h-full w-full object-cover" /> : null}
+      {loading}
+      {!shot && !busy && !reveal ? <p className={large ? "absolute inset-0 grid place-items-center px-6 text-center text-sm" : undefined}>{faceTarget ? "Face the light. No sunglasses." : "A clear photo of the piece."}</p> : null}
+    </>
+  );
   return (
     <div data-photo-cluster="yes">
       {title ? <p className="mb-2 text-sm font-medium">{title}</p> : null}
-      <div ref={boxRef} data-photo-box={target} className={filled ? "relative mx-auto aspect-[3/4] max-h-[240px] w-full max-w-sm overflow-hidden rounded-2xl" : "photo-slot mx-auto w-full max-w-sm"}>
-        {open ? (
-          <LiveStudio
-            videoRef={videoRef}
-            ready={camReady}
-            facing={faceTarget ? "user" : "environment"}
-            guide={faceTarget ? "face" : "hand"}
-            zoom={zoom}
-            onZoom={onZoom}
-            onBack={onClose}
-            onClose={onClose}
-            onShutter={onShutter}
-            onRetake={onLive}
-            onUpload={() => { onClose(); onUpload(); }}
-          />
-        ) : (
-          <>
-            {shot ? <img src={shot.url} alt={title || target} className="h-full w-full object-cover" /> : null}
-            {reveal ? <img src={reveal} alt="" className="gen-reveal absolute inset-0 h-full w-full object-cover" /> : null}
-            {loading}
-            {!shot && !busy && !reveal ? <p>{faceTarget ? "Face the light. No sunglasses." : "A clear photo of the piece."}</p> : null}
-          </>
-        )}
-      </div>
+      {large ? <LargeFrame boxRef={boxRef} name={target}>{frame}</LargeFrame> : (
+        <div ref={boxRef} data-photo-box={target} className={open ? "relative mx-auto aspect-[3/4] max-h-[280px] w-full max-w-sm overflow-hidden rounded-2xl bg-black" : "photo-slot mx-auto w-full max-w-sm"}>{frame}</div>
+      )}
+      {open && large ? <LiveTray ready={camReady} onShutter={() => void onShutter()} /> : null}
       {busy || open ? null : (
-        <div className="mx-auto mt-2 grid w-full max-w-sm gap-2" data-photo-actions="yes">
-          <button className="btn sheen" type="button" onClick={onLive}>Take photo</button>
-          <button className="btn secondary" type="button" onClick={onUpload}>Use photo</button>
+        <div className="grid w-full max-w-[28rem] gap-2" data-photo-actions="yes">
+          <button className="btn sheen" type="button" onClick={onLive}>{faceTarget ? "Take selfie" : "Take photo"}</button>
+          <button className="btn secondary" type="button" onClick={onUpload}>{faceTarget ? "Upload" : "Use photo"}</button>
         </div>
       )}
     </div>
