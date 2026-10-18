@@ -21,8 +21,12 @@ import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
 import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
 import { tryNowReady } from "@/lib/try-now";
+import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
+import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
+import { useVisitTries } from "@/components/tryon/useVisitTries";
 
-type Shot = { blob: Blob; url: string };
+type Shot = { blob: Blob; url: string; digest: string; serverId?: string };
+type LookResult = CachedLook & { after: string; panel: Panel };
 type Target = "face" | "own-face" | GroomSlotId;
 type Panel = "looks" | "own";
 
@@ -46,8 +50,11 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reveal, setReveal] = useState("");
-  const [result, setResult] = useState<{ name: string; before: string; after: string } | null>(null);
-  const [revise, setRevise] = useState(false);
+  const [result, setResult] = useState<LookResult | null>(null);
+  const [served, setServed] = useState({ looks: "", own: "" });
+  const looksCache = useRef(new Map<string, LookResult>());
+  const ownCache = useRef(new Map<string, LookResult>());
+  const visit = useVisitTries(config.slug);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -112,7 +119,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
 
   async function fileToShot(file: File) {
     const blob = file.slice(0, file.size, file.type || "image/jpeg");
-    return { blob, url: URL.createObjectURL(blob) };
+    return shotFromBlob(blob);
   }
 
   function openFile(target: Target) {
@@ -132,7 +139,6 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
     }
     setResult(null);
     setReveal("");
-    setRevise(true);
   }
 
   async function captureLive() {
@@ -159,51 +165,93 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
     if (!blob) return;
     const target = live;
     stopLive();
-    storeShot(target, { blob, url: URL.createObjectURL(blob) });
+    storeShot(target, await shotFromBlob(blob));
+  }
+
+  function itemKey() {
+    return GROOM_OWN_SLOTS.map((slot) => `${slot.id}:${items[slot.id]?.digest || ""}`).join(",");
+  }
+
+  function previewKey(kind: Panel, shot: Shot) {
+    return kind === "own"
+      ? selectionKey(shot.digest, { items: itemKey() })
+      : selectionKey(shot.digest, { hair: hairId, beard: beardId, grooming: groomingId });
+  }
+
+  function showSaved(kind: Panel, key: string, saved: LookResult) {
+    setReveal(saved.after);
+    setResult(saved);
+    setServed((current) => ({ ...current, [kind]: key }));
   }
 
   async function generate(kind: Panel) {
     const shot = kind === "own" ? ownFace : face;
     if (busy || !shot) return;
+    const key = previewKey(kind, shot);
+    const cache = kind === "own" ? ownCache.current : looksCache.current;
+    const cached = cache.get(key);
+    if (cached) {
+      showSaved(kind, key, cached);
+      return;
+    }
     stopLive();
     setBusy(true);
-    setRevise(false);
     setError("");
     scrollToStep(kind === "own" ? "groom-own-photo" : "groom-photo");
     try {
-      const body = new FormData();
-      body.set("photo", shot.blob, "selfie.jpg");
-      body.set("slug", config.slug);
-      body.set("sessionId", guestSessionId());
-      const consentId = (await consent.persist()) || consent.consentId();
-      if (consentId) body.set("consentId", consentId);
-      body.set("requestId", crypto.randomUUID());
-      if (kind === "looks") {
-        if (hairId) body.set("hair", hairId);
-        if (beardId) body.set("beard", beardId);
-        if (groomingId) body.set("grooming", groomingId);
-      } else {
-        for (const slot of GROOM_OWN_SLOTS) {
-          const item = items[slot.id];
-          if (item) body.set(slot.id, item.blob, `${slot.id}.jpg`);
-        }
-      }
-      const res = await fetch("/api/v1/groom", { method: "POST", body });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "That preview did not finish.");
+      const outcome = await takePreview({
+        cache,
+        key,
+        used: visit.used,
+        allowance: visit.allowance,
+        generate: async () => {
+          const body = new FormData();
+          attachSelfie(body, shot, "selfie.jpg");
+          body.set("slug", config.slug);
+          body.set("sessionId", guestSessionId());
+          const consentId = (await consent.persist()) || consent.consentId();
+          if (consentId) body.set("consentId", consentId);
+          body.set("requestId", crypto.randomUUID());
+          if (kind === "looks") {
+            if (hairId) body.set("hair", hairId);
+            if (beardId) body.set("beard", beardId);
+            if (groomingId) body.set("grooming", groomingId);
+          } else {
+            for (const slot of GROOM_OWN_SLOTS) {
+              const item = items[slot.id];
+              if (item) body.set(slot.id, item.blob, `${slot.id}.jpg`);
+            }
+          }
+          const res = await fetch("/api/v1/groom", { method: "POST", body });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if (data.error === "VISIT_CAP") visit.applyBody(data);
+            throw new Error(data.message || "That preview did not finish.");
+          }
+          const contentType = res.headers.get("content-type") || "";
+          if (contentType.includes("json")) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.message || "That preview did not finish.");
+          }
+          visit.applyHeaders(res);
+          const photoId = readPhotoId(res);
+          if (photoId) {
+            const mark = (current: Shot | null) => current && current.digest === shot.digest ? { ...current, serverId: photoId } : current;
+            if (kind === "own") setOwnFace(mark);
+            else setFace(mark);
+          }
+          const out = URL.createObjectURL(await res.blob());
+          const name = kind === "own" ? "Your own look" : GROOM_HAIR.find((item) => item.id === hairId)?.name || "Groom look";
+          return { url: out, name, before: shot.url, after: out, panel: kind };
+        },
+      });
+      if ("blocked" in outcome && outcome.blocked) {
+        setError(VISIT_CAP_MESSAGE);
         return;
       }
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("json")) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "That preview did not finish.");
-        return;
-      }
-      const out = URL.createObjectURL(await res.blob());
-      const name = kind === "own" ? "Your own look" : GROOM_HAIR.find((item) => item.id === hairId)?.name || "Groom look";
-      setReveal(out);
-      setResult({ name, before: shot.url, after: out });
+      if (outcome.result) showSaved(kind, key, outcome.result);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "That preview did not finish.");
     } finally {
       setBusy(false);
     }
@@ -217,7 +265,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
         ) : null}
         <div className="flex flex-wrap gap-2" role="group" aria-label={group}>
           {choices.map((item) => (
-            <button key={item.id} className="chip" type="button" aria-pressed={value === item.id} onClick={() => { onChange(value === item.id ? "" : item.id); setRevise(true); }}>{item.name}</button>
+            <button key={item.id} className="chip" type="button" aria-pressed={value === item.id} onClick={() => onChange(value === item.id ? "" : item.id)}>{item.name}</button>
           ))}
         </div>
       </StepCard>
@@ -229,6 +277,40 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
     if (target === "own-face") return ownFace;
     return items[target];
   };
+  const looksKey = face ? selectionKey(face.digest, { hair: hairId, beard: beardId, grooming: groomingId }) : "";
+  const ownKey = ownFace ? selectionKey(ownFace.digest, { items: itemKey() }) : "";
+  const looksButton = tryButton({
+    ready: tryNowReady(Boolean(face), true),
+    sameAsResult: Boolean(result?.panel === "looks" && looksKey && looksKey === served.looks),
+    atLimit: visit.atLimit,
+    cached: Boolean(looksKey && looksCache.current.has(looksKey)),
+  });
+  const ownButton = tryButton({
+    ready: tryNowReady(Boolean(ownFace), true),
+    sameAsResult: Boolean(result?.panel === "own" && ownKey && ownKey === served.own),
+    atLimit: visit.atLimit,
+    cached: Boolean(ownKey && ownCache.current.has(ownKey)),
+  });
+  const counter = tryCounterLabel(visit.used, visit.allowance);
+  const capNote = (text: string) => text ? `${text}${visit.code ? `. Code ${visit.code}` : ""}` : "";
+
+  useEffect(() => {
+    if (panel !== "looks" || !looksKey) return;
+    const saved = looksCache.current.get(looksKey);
+    if (!saved) return;
+    setReveal(saved.after);
+    setResult(saved);
+    setServed((current) => current.looks === looksKey ? current : { ...current, looks: looksKey });
+  }, [panel, looksKey]);
+
+  useEffect(() => {
+    if (panel !== "own" || !ownKey) return;
+    const saved = ownCache.current.get(ownKey);
+    if (!saved) return;
+    setReveal(saved.after);
+    setResult(saved);
+    setServed((current) => current.own === ownKey ? current : { ...current, own: ownKey });
+  }, [panel, ownKey]);
 
   return (
     <div data-groom="flow" className="grid gap-4">
@@ -236,8 +318,8 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
       <h2 className="page-title">Groom</h2>
       <p className="text-sm text-muted">Wedding hair, a neat beard, and natural skin. Or dress him in his own clothes.</p>
       <div className="seg" role="tablist" aria-label="Groom">
-        <button className="seg-btn" type="button" role="tab" aria-selected={panel === "looks"} onClick={() => { setPanel("looks"); setResult(null); setReveal(""); }}>Looks</button>
-        <button className="seg-btn" type="button" role="tab" aria-selected={panel === "own"} onClick={() => { setPanel("own"); setResult(null); setReveal(""); }}>Your own look</button>
+        <button className="seg-btn" type="button" role="tab" aria-selected={panel === "looks"} onClick={() => setPanel("looks")}>Looks</button>
+        <button className="seg-btn" type="button" role="tab" aria-selected={panel === "own"} onClick={() => setPanel("own")}>Your own look</button>
       </div>
 
       <div className={panel === "looks" ? "grid gap-4" : "hidden"} data-panel="looks">
@@ -261,7 +343,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
               { id: "groom-beard", label: "Beard", value: GROOM_BEARDS.find((item) => item.id === beardId)?.name || "Keep his beard" },
               { id: "groom-grooming", label: "Grooming", value: GROOM_GROOMING.find((item) => item.id === groomingId)?.name || "Natural skin" },
             ]} />
-            {result && !busy && panel === "looks" ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
+            {result?.panel === "looks" && !busy && panel === "looks" ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
             <PhotoStep
               title=""
               target="face"
@@ -279,20 +361,15 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
               onClose={stopLive}
               onShutter={captureLive}
               large
-              preview={result && !busy && panel === "looks" ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
+              preview={result?.panel === "looks" && !busy && panel === "looks" ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
             />
             <TryBar
-              label={result && !revise && panel === "looks" ? "Change and try again" : "Try now"}
-              enabled={Boolean(result && !revise) || tryNowReady(Boolean(face), true)}
+              label={looksButton.label}
+              enabled={looksButton.enabled}
               busy={busy}
-              onClick={() => {
-                if (result && !revise) {
-                  setRevise(true);
-                  scrollToStep("groom-hair");
-                  return;
-                }
-                void generate("looks");
-              }}
+              counter={counter}
+              note={capNote(looksButton.note)}
+              onClick={() => void generate("looks")}
             />
           </section>
         </div>
@@ -339,7 +416,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
               { id: "groom-clothes", label: "Clothes", value: GROOM_OWN_SLOTS.filter((slot) => items[slot.id]).map((slot) => slot.label).join(", ") || "No extra pieces" },
               { id: "groom-own-photo", label: "Photo", value: ownFace ? "Selfie added" : "Add a selfie" },
             ]} />
-            {result && !busy && panel === "own" ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
+            {result?.panel === "own" && !busy && panel === "own" ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
             <PhotoStep
               title=""
               target="own-face"
@@ -357,20 +434,15 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
               onClose={stopLive}
               onShutter={captureLive}
               large
-              preview={result && !busy && panel === "own" ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
+              preview={result?.panel === "own" && !busy && panel === "own" ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
             />
             <TryBar
-              label={result && !revise && panel === "own" ? "Change and try again" : "Try now"}
-              enabled={Boolean(result && !revise) || tryNowReady(Boolean(ownFace), true)}
+              label={ownButton.label}
+              enabled={ownButton.enabled}
               busy={busy}
-              onClick={() => {
-                if (result && !revise) {
-                  setRevise(true);
-                  scrollToStep("groom-clothes");
-                  return;
-                }
-                void generate("own");
-              }}
+              counter={counter}
+              note={capNote(ownButton.note)}
+              onClick={() => void generate("own")}
             />
           </section>
         </div>

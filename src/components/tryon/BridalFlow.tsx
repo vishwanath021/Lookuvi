@@ -8,7 +8,8 @@ import { BridalLookCard } from "@/components/tryon/BridalLookCard";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio } from "@/components/tryon/LiveStudio";
-import { LargeFrame, LiveTray, MakeupSwatches, SelectionSummary, StepCard, StepRail, TryBar, scrollToStep } from "@/components/tryon/LookStepper";
+import { LargeFrame, LiveTray, MakeupSwatches, SelectionSummary, StepCard, StepRail, TryBar } from "@/components/tryon/LookStepper";
+import { useVisitTries } from "@/components/tryon/useVisitTries";
 import { MakeupStage } from "@/components/tryon/MakeupStage";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
@@ -33,6 +34,8 @@ import {
 import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
 import { tryNowReady } from "@/lib/try-now";
+import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
+import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
 
 function EyeIcon() {
   return (
@@ -80,7 +83,8 @@ type SavedLook = {
   kind: "look" | "mehendi";
 };
 
-type Shot = { blob: Blob; url: string };
+type Shot = { blob: Blob; url: string; digest: string; serverId?: string };
+type LookResult = CachedLook & { after: string; share: string; lookId: string; kind: "look" | "mehendi" };
 
 const MAX_SAVED = 6;
 
@@ -137,9 +141,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   const [density, setDensity] = useState("heavy");
   const [busy, setBusy] = useState(false);
   const [busyKind, setBusyKind] = useState<null | "look" | "mehendi">(null);
-  const [reveal, setReveal] = useState("");
   const [error, setError] = useState("");
-  const [result, setResult] = useState<{ name: string; before: string; after: string; share: string; lookId: string; kind: "look" | "mehendi" } | null>(null);
+  const [result, setResult] = useState<LookResult | null>(null);
   const [saved, setSaved] = useState<SavedLook[]>([]);
   const [compare, setCompare] = useState<string[]>([]);
   const [name, setName] = useState("");
@@ -161,8 +164,11 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   const [camReady, setCamReady] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [camError, setCamError] = useState("");
-  const [revise, setRevise] = useState(false);
   const [liveLook, setLiveLook] = useState(false);
+  const [served, setServed] = useState({ look: "", mehendi: "" });
+  const lookCache = useRef(new Map<string, LookResult>());
+  const mehendiCache = useRef(new Map<string, LookResult>());
+  const visit = useVisitTries(config.slug);
   const eventLooks = looksForEvent(eventId);
   const looks = cardsForStyle(eventLooks, lookStyle);
   const makeupCards = cardsForStyle(BRIDAL_MAKEUP, makeupStyle);
@@ -181,72 +187,117 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
 
   async function fileToShot(file: File) {
     const blob = file.slice(0, file.size, file.type || "image/jpeg");
-    return { blob, url: URL.createObjectURL(blob) };
+    return shotFromBlob(blob);
+  }
+
+  function showSaved(kind: "look" | "mehendi", key: string, saved: LookResult) {
+    setResult(saved);
+    setServed((current) => ({ ...current, [kind]: key }));
   }
 
   async function generate(kind: "look" | "mehendi", shot: Shot, overrides?: { finishId?: string; lipId?: string; makeupId?: string; hairId?: string }) {
     if (busy) return;
-    setBusy(true);
-    setBusyKind(kind);
-    setError("");
-    setRevise(false);
-    (kind === "mehendi" ? handBox : faceBox).current?.scrollIntoView({ behavior: "smooth", block: "start" });
     const finish = overrides?.finishId || finishId;
     const lip = overrides?.lipId || lipId;
     const makeup = overrides?.makeupId ?? makeupId;
     const hair = overrides?.hairId ?? hairId;
-    try {
-      const body = new FormData();
-      body.set("photo", shot.blob, kind === "mehendi" ? "hand.jpg" : "selfie.jpg");
-      body.set("slug", config.slug);
-      body.set("sessionId", guestSessionId());
-      const consentId = (await consent.persist()) || consent.consentId();
-      if (consentId) body.set("consentId", consentId);
-      body.set("requestId", crypto.randomUUID());
-      body.set("tool", kind === "mehendi" ? "mehendi" : "bridal");
-      if (kind === "mehendi") {
-        body.set("styleId", mehendiStyle);
-        body.set("mehendiCard", mehendiCardId);
-        body.set("mehendiStyle", mehendiStyle);
-        body.set("coverage", coverage);
-        body.set("mehendiShade", mehendiShade);
-        body.set("density", density);
-      } else if (chosen) {
-        body.set("styleId", chosen.id);
-        body.set("finish", finish);
-        body.set("lip", lip);
-        if (makeup) body.set("makeup", makeup);
-        if (hair) body.set("hair", hair);
-        body.set("kajal", kajal ? "1" : "0");
-        body.set("lashes", lashes ? "1" : "0");
-        body.set("blush", blushOn ? "1" : "0");
-        body.set("browTint", browOn ? "1" : "0");
-      }
-      const res = await fetch("/api/v1/tryon/generate", { method: "POST", body });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "That preview did not finish.");
-        return;
-      }
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("json")) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "That preview did not finish.");
-        return;
-      }
-      const out = URL.createObjectURL(await res.blob());
-      const styleName = kind === "mehendi"
-        ? `Mehendi · ${MEHENDI_STYLES.find((item) => item.id === mehendiStyle)?.label || "Bridal"}`
-        : chosen?.name || "Bridal look";
-      setReveal(out);
-      setResult({
-        name: styleName,
-        before: shot.url,
-        after: out,
-        share: res.headers.get("x-look-share") || "",
-        lookId: kind === "mehendi" ? mehendiStyle : chosen?.id || "",
-        kind,
+    const key = kind === "mehendi"
+      ? selectionKey(shot.digest, { card: mehendiCardId, style: mehendiStyle, coverage, shade: mehendiShade, density })
+      : selectionKey(shot.digest, {
+        event: eventId,
+        look: chosen?.id || "",
+        hair,
+        makeup,
+        finish,
+        lip,
+        kajal: kajal ? "1" : "0",
+        lashes: lashes ? "1" : "0",
+        blush: blushOn ? "1" : "0",
+        brow: browOn ? "1" : "0",
       });
+    const cache = kind === "mehendi" ? mehendiCache.current : lookCache.current;
+    const cached = cache.get(key);
+    if (cached) {
+      showSaved(kind, key, cached);
+      return;
+    }
+    setBusy(true);
+    setBusyKind(kind);
+    setError("");
+    (kind === "mehendi" ? handBox : faceBox).current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    try {
+      const outcome = await takePreview({
+        cache,
+        key,
+        used: visit.used,
+        allowance: visit.allowance,
+        generate: async () => {
+          const body = new FormData();
+          attachSelfie(body, shot, kind === "mehendi" ? "hand.jpg" : "selfie.jpg");
+          body.set("slug", config.slug);
+          body.set("sessionId", guestSessionId());
+          const consentId = (await consent.persist()) || consent.consentId();
+          if (consentId) body.set("consentId", consentId);
+          body.set("requestId", crypto.randomUUID());
+          body.set("tool", kind === "mehendi" ? "mehendi" : "bridal");
+          if (kind === "mehendi") {
+            body.set("styleId", mehendiStyle);
+            body.set("mehendiCard", mehendiCardId);
+            body.set("mehendiStyle", mehendiStyle);
+            body.set("coverage", coverage);
+            body.set("mehendiShade", mehendiShade);
+            body.set("density", density);
+          } else if (chosen) {
+            body.set("styleId", chosen.id);
+            body.set("finish", finish);
+            body.set("lip", lip);
+            if (makeup) body.set("makeup", makeup);
+            if (hair) body.set("hair", hair);
+            body.set("kajal", kajal ? "1" : "0");
+            body.set("lashes", lashes ? "1" : "0");
+            body.set("blush", blushOn ? "1" : "0");
+            body.set("browTint", browOn ? "1" : "0");
+          }
+          const res = await fetch("/api/v1/tryon/generate", { method: "POST", body });
+          const data = res.ok ? null : await res.json().catch(() => ({}));
+          if (!res.ok) {
+            if (data?.error === "VISIT_CAP") visit.applyBody(data);
+            throw new Error(data?.message || "That preview did not finish.");
+          }
+          const contentType = res.headers.get("content-type") || "";
+          if (contentType.includes("json")) {
+            const payload = await res.json().catch(() => ({}));
+            throw new Error(payload.message || "That preview did not finish.");
+          }
+          visit.applyHeaders(res);
+          const photoId = readPhotoId(res);
+          if (photoId) {
+            const mark = (current: Shot | null) => current && current.digest === shot.digest ? { ...current, serverId: photoId } : current;
+            if (kind === "mehendi") setHand(mark);
+            else setFace(mark);
+          }
+          const out = URL.createObjectURL(await res.blob());
+          const styleName = kind === "mehendi"
+            ? `Mehendi · ${MEHENDI_STYLES.find((item) => item.id === mehendiStyle)?.label || "Bridal"}`
+            : chosen?.name || "Bridal look";
+          return {
+            url: out,
+            name: styleName,
+            before: shot.url,
+            after: out,
+            share: res.headers.get("x-look-share") || "",
+            lookId: kind === "mehendi" ? mehendiStyle : chosen?.id || "",
+            kind,
+          };
+        },
+      });
+      if ("blocked" in outcome && outcome.blocked) {
+        setError(VISIT_CAP_MESSAGE);
+        return;
+      }
+      if (outcome.result) showSaved(kind, key, outcome.result);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "That preview did not finish.");
     } finally {
       setBusy(false);
       setBusyKind(null);
@@ -391,11 +442,9 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
     ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, width, height);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
     if (!blob) return;
-    const shot = { blob, url: URL.createObjectURL(blob) };
+    const shot = await shotFromBlob(blob);
     const kind = live;
     stopLive();
-    setReveal("");
-    setRevise(true);
     if (kind === "hand") {
       setHand(shot);
       setResult((current) => (current?.kind === "mehendi" ? null : current));
@@ -411,12 +460,10 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
     setMakeupId(card.id);
     setLipId(card.lipId);
     setFinishId(card.finishId);
-    setRevise(true);
   }
 
   function pickHair(id: string) {
     setHairId(hairId === id ? "" : id);
-    setRevise(true);
   }
 
   function pickMehendi(id: string) {
@@ -457,9 +504,56 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   const makeupName = BRIDAL_MAKEUP.find((item) => item.id === makeupId)?.name || "Makeup";
   const hairName = BRIDAL_HAIR.find((item) => item.id === hairId)?.name || "The look’s own hair";
   const lookReady = tryNowReady(Boolean(face), Boolean(chosen));
-  const lookHold = Boolean(result?.kind === "look" && !revise);
   const mehendiReady = tryNowReady(Boolean(hand), Boolean(mehendiCardId));
-  const mehendiHold = Boolean(result?.kind === "mehendi" && !revise);
+  const lookKey = face ? selectionKey(face.digest, {
+    event: eventId,
+    look: chosen?.id || "",
+    hair: hairId,
+    makeup: makeupId,
+    finish: finishId,
+    lip: lipId,
+    kajal: kajal ? "1" : "0",
+    lashes: lashes ? "1" : "0",
+    blush: blushOn ? "1" : "0",
+    brow: browOn ? "1" : "0",
+  }) : "";
+  const mehendiKey = hand ? selectionKey(hand.digest, {
+    card: mehendiCardId,
+    style: mehendiStyle,
+    coverage,
+    shade: mehendiShade,
+    density,
+  }) : "";
+  const lookButton = tryButton({
+    ready: lookReady,
+    sameAsResult: Boolean(result?.kind === "look" && lookKey && lookKey === served.look),
+    atLimit: visit.atLimit,
+    cached: Boolean(lookKey && lookCache.current.has(lookKey)),
+  });
+  const mehendiButton = tryButton({
+    ready: mehendiReady,
+    sameAsResult: Boolean(result?.kind === "mehendi" && mehendiKey && mehendiKey === served.mehendi),
+    atLimit: visit.atLimit,
+    cached: Boolean(mehendiKey && mehendiCache.current.has(mehendiKey)),
+  });
+  const counter = tryCounterLabel(visit.used, visit.allowance);
+  const capNote = (text: string) => text ? `${text}${visit.code ? `. Code ${visit.code}` : ""}` : "";
+
+  useEffect(() => {
+    if (panel !== "looks" || !lookKey) return;
+    const saved = lookCache.current.get(lookKey);
+    if (!saved) return;
+    setResult(saved);
+    setServed((current) => current.look === lookKey ? current : { ...current, look: lookKey });
+  }, [panel, lookKey]);
+
+  useEffect(() => {
+    if (panel !== "mehendi" || !mehendiKey) return;
+    const saved = mehendiCache.current.get(mehendiKey);
+    if (!saved) return;
+    setResult(saved);
+    setServed((current) => current.mehendi === mehendiKey ? current : { ...current, mehendi: mehendiKey });
+  }, [panel, mehendiKey]);
 
   return (
     <div data-bridal="flow" data-busy={busy ? "yes" : "no"}>
@@ -492,11 +586,11 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
           <StepCard id="bridal-event" title="Event">
             <div className="flex flex-wrap gap-2" role="group" aria-label="Event">
               {BRIDAL_EVENTS.map((item) => (
-                <button key={item.id} className="chip" type="button" aria-pressed={eventId === item.id} onClick={() => { setEventId(item.id); setLookId(cardsForStyle(looksForEvent(item.id), lookStyle)[0]?.id || ""); setRevise(true); }}>{item.label}</button>
+                <button key={item.id} className="chip" type="button" aria-pressed={eventId === item.id} onClick={() => { setEventId(item.id); setLookId(cardsForStyle(looksForEvent(item.id), lookStyle)[0]?.id || ""); }}>{item.label}</button>
               ))}
             </div>
           </StepCard>
-          <PhotoGrid step="look" label="Look" group="Bridal looks" styles={bridalStylesFor(eventLooks)} style={lookStyle} onStyle={chooseLookStyle} items={looks} value={chosen?.id || ""} onChange={(id) => { setLookId(id); setRevise(true); }} />
+          <PhotoGrid step="look" label="Look" group="Bridal looks" styles={bridalStylesFor(eventLooks)} style={lookStyle} onStyle={chooseLookStyle} items={looks} value={chosen?.id || ""} onChange={(id) => { setLookId(id); }} />
           <PhotoGrid step="hair" label="Hair" hint="Optional. Tap again to leave the look’s own hair." group="Hair" styles={bridalStylesFor(BRIDAL_HAIR)} style={hairStyle} onStyle={chooseHairStyle} items={hairCards} value={hairId} onChange={pickHair} />
           <StepCard id="bridal-makeup" title="Makeup" hint="Lip, cheek, and eye colour.">
             {visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP)).length > 0 ? (
@@ -507,12 +601,12 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               </div>
             ) : null}
             <MakeupSwatches items={makeupCards} value={makeupId} onChange={pickMakeup} />
-            <OptionRow label="Makeup finish" options={BRIDAL_FINISHES.map((item) => ({ id: item.id, label: item.label }))} value={finishId} onChange={(id) => { setFinishId(id); setRevise(true); }} />
+            <OptionRow label="Makeup finish" options={BRIDAL_FINISHES.map((item) => ({ id: item.id, label: item.label }))} value={finishId} onChange={(id) => { setFinishId(id); }} />
             <div>
               <p className="mb-2 text-sm font-medium">Lip colour</p>
               <div className="live-row" role="group" aria-label="Lip colour">
                 {BRIDAL_LIPS.map((lip) => (
-                  <button key={lip.id} type="button" aria-pressed={lipId === lip.id} aria-label={lip.name} className="live-dot" style={{ background: lip.hex }} onClick={() => { setLipId(lip.id); setRevise(true); }} />
+                  <button key={lip.id} type="button" aria-pressed={lipId === lip.id} aria-label={lip.name} className="live-dot" style={{ background: lip.hex }} onClick={() => { setLipId(lip.id); }} />
                 ))}
               </div>
             </div>
@@ -576,7 +670,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
                   const file = event.target.files?.[0];
                   event.target.value = "";
                   if (!file) return;
-                  void fileToShot(file).then((shot) => { setFace(shot); setResult((current) => (current?.kind === "look" ? null : current)); setReveal(""); setRevise(true); });
+                  void fileToShot(file).then((shot) => { setFace(shot); setResult((current) => (current?.kind === "look" ? null : current)); });
                 }} />
               </div>
             )}
@@ -585,17 +679,12 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               <button className="btn" type="button" onClick={() => void saveCurrent()}>Save this look</button>
             ) : null}
             <TryBar
-              label={lookHold ? "Change and try again" : "Try now"}
-              enabled={lookHold || lookReady}
+              label={lookButton.label}
+              enabled={lookButton.enabled}
               busy={busy}
-              onClick={() => {
-                if (lookHold) {
-                  setRevise(true);
-                  scrollToStep("bridal-event");
-                  return;
-                }
-                if (face) void generate("look", face);
-              }}
+              counter={counter}
+              note={capNote(lookButton.note)}
+              onClick={() => { if (face) void generate("look", face); }}
             />
           </section>
         </div>
@@ -603,7 +692,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
 
       {panel === "mehendi" && (
         <div className="mt-4 grid gap-4">
-          <PhotoGrid step="mehendi" label="Mehendi" group="Mehendi" styles={bridalStylesFor(MEHENDI_CARDS)} style={mehendiCategory} onStyle={chooseMehendiCategory} items={mehendiCards} value={mehendiCardId} onChange={(id) => { pickMehendi(id); setRevise(true); }} />
+          <PhotoGrid step="mehendi" label="Mehendi" group="Mehendi" styles={bridalStylesFor(MEHENDI_CARDS)} style={mehendiCategory} onStyle={chooseMehendiCategory} items={mehendiCards} value={mehendiCardId} onChange={(id) => { pickMehendi(id); }} />
           <section id="bridal-hand" className="step-card grid gap-3" data-step="hand">
             <h3 className="text-base font-semibold leading-tight">Photo</h3>
             <p className="text-sm">Hold your hand flat in good light. Fill the photo with your palm.</p>
@@ -642,23 +731,18 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
                   const file = event.target.files?.[0];
                   event.target.value = "";
                   if (!file) return;
-                  void fileToShot(file).then((shot) => { setHand(shot); setResult((current) => (current?.kind === "mehendi" ? null : current)); setReveal(""); setRevise(true); });
+                  void fileToShot(file).then((shot) => { setHand(shot); setResult((current) => (current?.kind === "mehendi" ? null : current)); });
                 }} />
               </div>
             )}
             {result?.kind === "mehendi" && !busy ? <button className="btn" type="button" onClick={() => void saveCurrent()}>Save this look</button> : null}
             <TryBar
-              label={mehendiHold ? "Change and try again" : "Try now"}
-              enabled={mehendiHold || mehendiReady}
+              label={mehendiButton.label}
+              enabled={mehendiButton.enabled}
               busy={busy}
-              onClick={() => {
-                if (mehendiHold) {
-                  setRevise(true);
-                  scrollToStep("bridal-mehendi");
-                  return;
-                }
-                if (hand) void generate("mehendi", hand);
-              }}
+              counter={counter}
+              note={capNote(mehendiButton.note)}
+              onClick={() => { if (hand) void generate("mehendi", hand); }}
             />
           </section>
         </div>

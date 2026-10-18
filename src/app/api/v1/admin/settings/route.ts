@@ -35,6 +35,7 @@ const schema = z.object({
   requireLoginToBook: z.boolean().optional(),
   productBridal: z.boolean().optional(),
   productGroom: z.boolean().optional(),
+  visitTryLimit: z.number().int().min(1).max(20).optional(),
   gstin: z.string().max(20).optional().nullable(),
 });
 

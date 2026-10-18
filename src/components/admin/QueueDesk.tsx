@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { VisitUnlock } from "@/components/admin/VisitUnlock";
 import { t } from "@/data/i18n";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
 
@@ -258,6 +259,7 @@ export function QueueDesk({ initial, lang }: { initial: Desk; lang: string }) {
           <button className="btn" type="submit" disabled={busy}>{t(lang, "queueSave")}</button>
         </form>
       </details>
+      <VisitUnlock />
     </div>
   );
 }

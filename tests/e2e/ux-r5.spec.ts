@@ -80,14 +80,15 @@ test("a choice change after the result does not call the preview", async ({ page
   await page.locator("[data-photo='bridal']").setInputFiles("public/samples/portrait.jpg");
   await page.getByRole("button", { name: "Try now" }).click();
   await expect(page.getByRole("heading", { name: "Telugu Muhurtham Classic" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Change something to try again" })).toBeDisabled();
   const calls: string[] = [];
   page.on("request", (req) => {
     if (req.method() === "POST" && req.url().includes("/api/v1/tryon/generate")) calls.push(req.url());
   });
-  await page.getByRole("button", { name: "Change and try again" }).click();
   await page.getByRole("button", { name: "Nude glow", exact: true }).click();
   await page.waitForTimeout(500);
   expect(calls).toEqual([]);
+  await expect(page.getByRole("button", { name: "Try now" })).toBeEnabled();
   await page.getByRole("button", { name: "Try now" }).click();
   await expect(page.locator("[data-bridal='flow']")).toHaveAttribute("data-busy", "yes");
 });

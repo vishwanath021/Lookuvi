@@ -21,8 +21,12 @@ import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
 import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
 import { tryNowReady } from "@/lib/try-now";
+import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
+import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
+import { useVisitTries } from "@/components/tryon/useVisitTries";
 
-type Shot = { blob: Blob; url: string };
+type Shot = { blob: Blob; url: string; digest: string; serverId?: string };
+type LookResult = CachedLook & { after: string };
 type Target = "face" | OwnLookSlotId;
 
 function remember(current: Shot | undefined, next: Shot) {
@@ -42,8 +46,10 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reveal, setReveal] = useState("");
-  const [result, setResult] = useState<{ name: string; before: string; after: string } | null>(null);
-  const [revise, setRevise] = useState(false);
+  const [result, setResult] = useState<LookResult | null>(null);
+  const [servedKey, setServedKey] = useState("");
+  const cache = useRef(new Map<string, LookResult>());
+  const visit = useVisitTries(config.slug);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -109,7 +115,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
 
   async function fileToShot(file: File) {
     const blob = file.slice(0, file.size, file.type || "image/jpeg");
-    return { blob, url: URL.createObjectURL(blob) };
+    return shotFromBlob(blob);
   }
 
   function openFile(target: Target) {
@@ -124,13 +130,11 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
       setFace((current) => remember(current || undefined, shot));
       setResult(null);
       setReveal("");
-      setRevise(true);
       return;
     }
     setItems((current) => ({ ...current, [target]: remember(current[target], shot) }));
     setResult(null);
     setReveal("");
-    setRevise(true);
   }
 
   async function captureLive() {
@@ -157,44 +161,76 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
     if (!blob) return;
     const target = live;
     stopLive();
-    storeShot(target, { blob, url: URL.createObjectURL(blob) });
+    storeShot(target, await shotFromBlob(blob));
+  }
+
+  function currentKey(shot: Shot) {
+    const pieces = OWN_LOOK_SLOTS.map((slot) => `${slot.id}:${items[slot.id]?.digest || ""}`).join(",");
+    return selectionKey(shot.digest, { makeup: makeupId, items: pieces });
+  }
+
+  function showSaved(key: string, saved: LookResult) {
+    setReveal(saved.after);
+    setResult(saved);
+    setServedKey(key);
   }
 
   async function generate() {
     if (busy || !face || !chosen) return;
+    const key = currentKey(face);
+    const cached = cache.current.get(key);
+    if (cached) {
+      showSaved(key, cached);
+      return;
+    }
     stopLive();
     setBusy(true);
-    setRevise(false);
     setError("");
     scrollToStep("own-photo");
     try {
-      const body = new FormData();
-      body.set("photo", face.blob, "selfie.jpg");
-      body.set("slug", config.slug);
-      body.set("sessionId", guestSessionId());
-      const consentId = (await consent.persist()) || consent.consentId();
-      if (consentId) body.set("consentId", consentId);
-      body.set("requestId", crypto.randomUUID());
-      body.set("makeup", chosen.id);
-      for (const slot of OWN_LOOK_SLOTS) {
-        const shot = items[slot.id];
-        if (shot) body.set(slot.id, shot.blob, `${slot.id}.jpg`);
-      }
-      const res = await fetch("/api/v1/bridal/own", { method: "POST", body });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "That preview did not finish.");
+      const outcome = await takePreview({
+        cache: cache.current,
+        key,
+        used: visit.used,
+        allowance: visit.allowance,
+        generate: async () => {
+          const body = new FormData();
+          attachSelfie(body, face, "selfie.jpg");
+          body.set("slug", config.slug);
+          body.set("sessionId", guestSessionId());
+          const consentId = (await consent.persist()) || consent.consentId();
+          if (consentId) body.set("consentId", consentId);
+          body.set("requestId", crypto.randomUUID());
+          body.set("makeup", chosen.id);
+          for (const slot of OWN_LOOK_SLOTS) {
+            const shot = items[slot.id];
+            if (shot) body.set(slot.id, shot.blob, `${slot.id}.jpg`);
+          }
+          const res = await fetch("/api/v1/bridal/own", { method: "POST", body });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if (data.error === "VISIT_CAP") visit.applyBody(data);
+            throw new Error(data.message || "That preview did not finish.");
+          }
+          const contentType = res.headers.get("content-type") || "";
+          if (contentType.includes("json")) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.message || "That preview did not finish.");
+          }
+          visit.applyHeaders(res);
+          const photoId = readPhotoId(res);
+          if (photoId) setFace((current) => current && current.digest === face.digest ? { ...current, serverId: photoId } : current);
+          const out = URL.createObjectURL(await res.blob());
+          return { url: out, name: chosen.name, before: face.url, after: out };
+        },
+      });
+      if ("blocked" in outcome && outcome.blocked) {
+        setError(VISIT_CAP_MESSAGE);
         return;
       }
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("json")) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "That preview did not finish.");
-        return;
-      }
-      const out = URL.createObjectURL(await res.blob());
-      setReveal(out);
-      setResult({ name: chosen.name, before: face.url, after: out });
+      if (outcome.result) showSaved(key, outcome.result);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "That preview did not finish.");
     } finally {
       setBusy(false);
     }
@@ -207,8 +243,24 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
   }
 
   const itemNames = OWN_LOOK_SLOTS.filter((slot) => items[slot.id]).map((slot) => slot.label).join(", ") || "No extra pieces";
-  const ownReady = tryNowReady(Boolean(face), Boolean(chosen));
-  const ownHold = Boolean(result && !revise);
+  const ownKey = face ? currentKey(face) : "";
+  const ownButton = tryButton({
+    ready: tryNowReady(Boolean(face), Boolean(chosen)),
+    sameAsResult: Boolean(result && ownKey && ownKey === servedKey),
+    atLimit: visit.atLimit,
+    cached: Boolean(ownKey && cache.current.has(ownKey)),
+  });
+  const counter = tryCounterLabel(visit.used, visit.allowance);
+  const capNote = ownButton.note ? `${ownButton.note}${visit.code ? `. Code ${visit.code}` : ""}` : "";
+
+  useEffect(() => {
+    if (!ownKey) return;
+    const saved = cache.current.get(ownKey);
+    if (!saved) return;
+    setReveal(saved.after);
+    setResult(saved);
+    setServedKey((current) => current === ownKey ? current : ownKey);
+  }, [ownKey]);
 
   return (
     <div data-own="flow" className="grid gap-4">
@@ -226,11 +278,11 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
         {visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP)).length > 0 ? (
           <div className="flex flex-wrap gap-2" role="group" aria-label="Makeup style">
             {visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP)).map((item) => (
-              <button key={item.id} className="chip" type="button" aria-pressed={makeupStyle === item.id} onClick={() => { chooseMakeupStyle(item.id); setRevise(true); }}>{item.label}</button>
+              <button key={item.id} className="chip" type="button" aria-pressed={makeupStyle === item.id} onClick={() => chooseMakeupStyle(item.id)}>{item.label}</button>
             ))}
           </div>
         ) : null}
-        <MakeupSwatches items={makeupCards} value={makeupId} onChange={(id) => { setMakeupId(id); setRevise(true); }} />
+        <MakeupSwatches items={makeupCards} value={makeupId} onChange={setMakeupId} />
       </StepCard>
       <StepCard id="own-items" title="Your pieces" hint="Optional. Take a close-up of each piece on its own. These photos are deleted after the preview and are never published.">
         <p className="text-sm text-muted">Take a close-up of each piece on its own.</p>
@@ -307,17 +359,12 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
           preview={result && !busy ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
         />
         <TryBar
-          label={ownHold ? "Change and try again" : "Try now"}
-          enabled={ownHold || ownReady}
+          label={ownButton.label}
+          enabled={ownButton.enabled}
           busy={busy}
-          onClick={() => {
-            if (ownHold) {
-              setRevise(true);
-              scrollToStep("own-makeup");
-              return;
-            }
-            void generate();
-          }}
+          counter={counter}
+          note={capNote}
+          onClick={() => void generate()}
         />
       </section>
       {camError ? <p className="text-sm" role="alert">{camError}</p> : null}

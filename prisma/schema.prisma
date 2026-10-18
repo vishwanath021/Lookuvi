@@ -36,6 +36,8 @@ model Tenant {
   productBridal       Boolean   @default(true)
   /** Groom looks and the groom's own clothes. Off until the owner turns it on. */
   productGroom        Boolean   @default(false)
+  /** Real bridal and groom previews one customer can spend during a visit. */
+  visitTryLimit       Int       @default(3)
   trialEndsAt         DateTime?
   removeBranding      Boolean   @default(false)
   allowedOrigins      String    @default("[]")
@@ -83,6 +85,19 @@ model Tenant {
   bookings            Booking[]
   queueState          QueueState?
   queueEntries        QueueEntry[]
+  visitGrants         VisitGrant[]
+}
+
+model VisitGrant {
+  id        String   @id @default(cuid())
+  tenantId  String
+  sessionId String
+  /** Extra tries the salon added on top of visitTryLimit. */
+  bonus     Int      @default(0)
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sessionId])
 }
 
 model Domain {

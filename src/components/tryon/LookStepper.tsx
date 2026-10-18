@@ -127,10 +127,12 @@ export function SelectionSummary({ rows }: { rows: { id: string; label: string; 
   );
 }
 
-export function TryBar({ label, enabled, busy, onClick }: { label: string; enabled: boolean; busy: boolean; onClick: () => void }) {
+export function TryBar({ label, enabled, busy, onClick, counter, note }: { label: string; enabled: boolean; busy: boolean; onClick: () => void; counter?: string; note?: string }) {
   return (
     <div className="try-bar" data-action-bar="yes">
+      {counter ? <p className="mb-1 text-center text-xs text-muted" data-try-count="yes">{counter}</p> : null}
       <button className="btn sheen" type="button" disabled={!enabled || busy} onClick={onClick}>{label}</button>
+      {note ? <p className="mt-1 text-center text-sm" role="status">{note}</p> : null}
     </div>
   );
 }

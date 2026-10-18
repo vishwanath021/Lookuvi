@@ -22,6 +22,7 @@ import { AI_PREVIEW_KINDS, actorKeyFor, capForTier, hashIp, readGuestToken, veri
 import { ensurePhotoConsent } from "@/lib/photo-consent";
 import { prisma } from "@/lib/prisma";
 import { requestClientIp } from "@/lib/ratelimit";
+import { isPhotoId, loadVisitPhoto, rememberVisitPhoto, refuseVisit, stampVisit } from "@/lib/visit-allowance";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 3600;
@@ -71,10 +72,12 @@ export async function POST(req: Request) {
   const browThickness = parseBrowThickness(form.get("browThickness"));
   const browColour = parseBrowColour(form.get("browColour"));
   const photo = form.get("photo");
-  if (!slug || !styleId || sessionId.length < 8 || !(photo instanceof File)) {
+  const photoIdIn = String(form.get("photoId") || "");
+  const reusePhoto = isPhotoId(photoIdIn);
+  if (!slug || !styleId || sessionId.length < 8 || (!reusePhoto && !(photo instanceof File))) {
     return NextResponse.json({ error: "INVALID", message: "Photo, style, and session are required." }, { status: 400 });
   }
-  if (photo.size > 2 * 1024 * 1024) {
+  if (photo instanceof File && photo.size > 2 * 1024 * 1024) {
     return NextResponse.json({ error: "SIZE", message: "Please use a photo under 2 MB." }, { status: 413 });
   }
 
@@ -159,20 +162,34 @@ export async function POST(req: Request) {
     }
   }
 
-  const original = Buffer.from(await photo.arrayBuffer());
   let jpeg: Buffer;
-  try {
-    jpeg = await sanitizeSelfie(original);
-  } catch (error) {
-    const code = error instanceof ImageError ? error.code : "DECODE";
-    return NextResponse.json({ error: code, message: "Use a JPEG, PNG, or WebP selfie under 2 MB." }, { status: 400 });
+  let servedPhotoId = photoIdIn;
+  if (reusePhoto) {
+    const stored = await loadVisitPhoto(tenant.id, sessionId, photoIdIn);
+    if (!stored) return NextResponse.json({ error: "PHOTO", message: "Add the photo again." }, { status: 400 });
+    jpeg = stored;
+  } else {
+    const originalUpload = Buffer.from(await (photo as File).arrayBuffer());
+    try {
+      jpeg = await sanitizeSelfie(originalUpload);
+    } catch (error) {
+      const code = error instanceof ImageError ? error.code : "DECODE";
+      return NextResponse.json({ error: code, message: "Use a JPEG, PNG, or WebP selfie under 2 MB." }, { status: 400 });
+    }
+    servedPhotoId = await rememberVisitPhoto(tenant.id, sessionId, jpeg);
   }
+  const original = jpeg;
 
   if (tool === "nails" || tool === "mehendi") {
     const small = await sharp(jpeg).resize(48, 48, { fit: "fill" }).removeAlpha().raw().toBuffer();
     if (classifySkinPhoto(small, 48, 48, 3) === "face") {
       return NextResponse.json({ error: "HAND", message: tool === "mehendi" ? "That looks like a face. Upload a photo of your hand for the mehendi." : "That looks like a face. Upload a photo of your hand." }, { status: 400 });
     }
+  }
+
+  if (bridalTool) {
+    const blocked = await refuseVisit(tenant.id, sessionId, tenant.visitTryLimit);
+    if (blocked) return NextResponse.json(blocked, { status: 429 });
   }
 
   const requestId = String(form.get("requestId") || "");
@@ -270,9 +287,12 @@ export async function POST(req: Request) {
   const kind = tool === "brows" ? "BROWS" : tool === "beard" ? "BEARD" : tool === "nails" ? "NAILS" : tool === "colour" ? "COLOUR" : tool === "bridal" ? "BRIDAL" : tool === "mehendi" ? "MEHENDI" : "STYLE";
   const effective = engineForGuestTool(tool, engine);
   const superUser = placementDebug ? await viewerIsSuper() : false;
-  const withPose = (response: NextResponse) => {
+  const withPose = async (response: NextResponse) => {
     if (response.status === 200 && placementDebug && superUser) {
       response.headers.set("x-placement-debug", JSON.stringify(placementDebug));
+    }
+    if (response.status === 200 && bridalTool) {
+      await stampVisit(response, tenant.id, sessionId, tenant.visitTryLimit, servedPhotoId);
     }
     return response;
   };
