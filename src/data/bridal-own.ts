@@ -43,11 +43,11 @@ export const OWN_LOOK_SLOTS = [
   },
   {
     id: "necklace",
-    label: "Necklace",
-    subtitle: "",
+    label: "Necklace / Choker",
+    subtitle: "Kanthe / Addigai",
     noun: "necklace",
     optional: true,
-    place: "Place that necklace at her neck.",
+    place: "Place that necklace or choker at her neck.",
   },
   {
     id: "long-haram",
@@ -58,12 +58,64 @@ export const OWN_LOOK_SLOTS = [
     place: "Hang the long haram below the necklace.",
   },
   {
+    id: "bangles",
+    label: "Bangles",
+    subtitle: "Gajulu",
+    noun: "bangles",
+    optional: true,
+    place: "Place those bangles on both wrists.",
+  },
+  {
+    id: "waist-belt",
+    label: "Waist belt",
+    subtitle: "Vaddanam",
+    noun: "waist belt",
+    optional: true,
+    place: "Place the vaddanam around her waist, over the saree pleats.",
+  },
+  {
     id: "hair-accessories",
     label: "Hair accessories",
-    subtitle: "Jada billa / Vaddanam",
+    subtitle: "Jada billa / clips",
     noun: "hair accessories",
     optional: true,
     place: "Place those hair accessories on the bun. If the photo shows a brooch and separate small hair clips, keep the clips separate from the brooch.",
+  },
+  {
+    id: "arm-band",
+    label: "Arm band",
+    subtitle: "Vanki",
+    noun: "arm band",
+    optional: true,
+    more: true,
+    place: "Place the vanki on her upper arm.",
+  },
+  {
+    id: "braid-ornament",
+    label: "Braid ornament",
+    subtitle: "Jada / Jadagantalu",
+    noun: "braid ornament",
+    optional: true,
+    more: true,
+    place: "Place the jada ornament down the braid.",
+  },
+  {
+    id: "anklets",
+    label: "Anklets",
+    subtitle: "Pattilu",
+    noun: "anklets",
+    optional: true,
+    more: true,
+    place: "Place the pattilu on her ankles only if her feet are visible. If her feet are not in the frame, leave the anklets out and do not change the crop.",
+  },
+  {
+    id: "rings",
+    label: "Rings",
+    subtitle: "",
+    noun: "rings",
+    optional: true,
+    more: true,
+    place: "Place those rings on the fingers shown in her photo.",
   },
 ] as const;
 
@@ -81,7 +133,19 @@ export const OWN_LOOK_JEWELLERY_EDGE = 640;
 /** Longest edge for the blouse and hair accessories. */
 export const OWN_LOOK_ITEM_EDGE = 384;
 
-const JEWELLERY_SLOTS = new Set<OwnLookSlotId>(["earrings", "ear-chain", "forehead-pendant", "necklace", "long-haram"]);
+const JEWELLERY_SLOTS = new Set<OwnLookSlotId>([
+  "earrings",
+  "ear-chain",
+  "forehead-pendant",
+  "necklace",
+  "long-haram",
+  "bangles",
+  "waist-belt",
+  "arm-band",
+  "braid-ornament",
+  "anklets",
+  "rings",
+]);
 
 export function ownLookItemEdge(id: string) {
   if (id === "saree") return OWN_LOOK_SAREE_EDGE;
