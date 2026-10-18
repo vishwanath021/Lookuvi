@@ -5,6 +5,12 @@ export function generationStages(tool: string) {
   if (tool === "bridal-own") {
     return ["Reading your photo", "Placing your items", "Applying the makeup", "Finishing the portrait"];
   }
+  if (tool === "groom-own") {
+    return ["Reading your photo", "Placing your clothes", "Fitting the look", "Finishing the portrait"];
+  }
+  if (tool === "groom") {
+    return ["Reading your photo", "Shaping the hair", "Setting the beard", "Finishing the portrait"];
+  }
   const read = tool === "mehendi" || tool === "nails" ? "Reading your hand" : "Reading your face shape";
   const apply =
     tool === "mehendi"

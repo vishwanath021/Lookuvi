@@ -56,7 +56,7 @@ export function maskToolFlags<T extends {
 
 const COLOUR_NOTE = " Live colour is still free.";
 
-export type PreviewTool = "style" | "brows" | "beard" | "nails" | "colour" | "bridal" | "mehendi";
+export type PreviewTool = "style" | "brows" | "beard" | "nails" | "colour" | "bridal" | "mehendi" | "groom";
 
 export function previewToolLabel(tool: PreviewTool) {
   if (tool === "brows") return "brow";
@@ -65,6 +65,7 @@ export function previewToolLabel(tool: PreviewTool) {
   if (tool === "colour") return "colour";
   if (tool === "bridal") return "bridal";
   if (tool === "mehendi") return "mehendi";
+  if (tool === "groom") return "groom";
   return "hairstyle";
 }
 

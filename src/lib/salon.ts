@@ -52,6 +52,7 @@ export type SalonConfig = {
   memberDailyCap: number;
   requireLoginToBook: boolean;
   productBridal: boolean;
+  productGroom: boolean;
   bridalPackages: { key: string; name: string; priceInr: number }[];
   services: SalonService[];
   styles: PublicStyle[];
@@ -145,6 +146,7 @@ export function toSalonConfig(tenant: TenantWithRelations): SalonConfig {
     memberDailyCap: tenant.memberDailyCap,
     requireLoginToBook: tenant.requireLoginToBook,
     productBridal: tenant.productBridal,
+    productGroom: tenant.productGroom,
     bridalPackages: tenant.services
       .filter((service) => BRIDAL_PACKAGE_KEYS.has(service.key) && service.active && service.priceInr > 0)
       .map((service) => ({ key: service.key, name: service.name, priceInr: service.priceInr })),

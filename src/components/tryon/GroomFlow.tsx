@@ -1,0 +1,425 @@
+"use client";
+
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { flushSync } from "react-dom";
+import { BeforeAfter } from "@/components/tryon/BeforeAfter";
+import { ConsentSheet } from "@/components/tryon/ConsentSheet";
+import { GeneratingLook } from "@/components/tryon/GeneratingLook";
+import { LiveStudio } from "@/components/tryon/LiveStudio";
+import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
+import {
+  GROOM_BEARDS,
+  GROOM_GROOMING,
+  GROOM_HAIR,
+  GROOM_OWN_SLOTS,
+  categoryPills,
+  type GroomChoice,
+  type GroomSlotId,
+} from "@/data/groom";
+import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
+import { guestSessionId } from "@/lib/guest-session";
+import type { SalonConfig } from "@/lib/salon";
+
+type Shot = { blob: Blob; url: string };
+type Target = "face" | "own-face" | GroomSlotId;
+type Panel = "looks" | "own";
+
+function remember(current: Shot | undefined, next: Shot) {
+  if (current && current.url.startsWith("blob:")) URL.revokeObjectURL(current.url);
+  return next;
+}
+
+export function GroomFlow({ config }: { config: SalonConfig }) {
+  const [panel, setPanel] = useState<Panel>("looks");
+  const [hairId, setHairId] = useState(GROOM_HAIR[0]?.id || "");
+  const [beardId, setBeardId] = useState("");
+  const [groomingId, setGroomingId] = useState(GROOM_GROOMING[1]?.id || GROOM_GROOMING[0]?.id || "");
+  const [face, setFace] = useState<Shot | null>(null);
+  const [ownFace, setOwnFace] = useState<Shot | null>(null);
+  const [items, setItems] = useState<Partial<Record<GroomSlotId, Shot>>>({});
+  const [live, setLive] = useState<Target | null>(null);
+  const [camReady, setCamReady] = useState(false);
+  const [camError, setCamError] = useState("");
+  const [zoom, setZoom] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [reveal, setReveal] = useState("");
+  const [result, setResult] = useState<{ name: string; before: string; after: string } | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const fileTarget = useRef<Target>("face");
+  const boxes = useRef<Record<string, HTMLDivElement | null>>({});
+  const consent = usePhotoConsent(config.slug, config.defaultLang || "en");
+  const hairPills = categoryPills([] as { id: string; label: string }[]);
+
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  function stopLive() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      video.srcObject = null;
+    }
+    setLive(null);
+    setCamReady(false);
+  }
+
+  function beginLive(target: Target) {
+    consent.gate(() => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      const devices = navigator.mediaDevices;
+      if (!devices?.getUserMedia) {
+        setCamError("The camera is not available. You can use a photo instead.");
+        return;
+      }
+      const facing = target === "face" || target === "own-face" ? "user" : "environment";
+      const pending = devices.getUserMedia({ video: { facingMode: facing === "user" ? "user" : { ideal: "environment" } } });
+      flushSync(() => {
+        setCamError("");
+        setCamReady(false);
+        setZoom(1);
+        setLive(target);
+      });
+      boxes.current[target]?.scrollIntoView({ block: "center" });
+      void pending.then(async (stream) => {
+        const video = videoRef.current;
+        if (!video) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        video.muted = true;
+        video.playsInline = true;
+        video.srcObject = stream;
+        streamRef.current = stream;
+        await video.play();
+        setCamReady(true);
+      }).catch(() => {
+        stopLive();
+        setCamError("Camera permission was denied. Allow the camera for this site, or use a photo.");
+      });
+    });
+  }
+
+  async function fileToShot(file: File) {
+    const blob = file.slice(0, file.size, file.type || "image/jpeg");
+    return { blob, url: URL.createObjectURL(blob) };
+  }
+
+  function openFile(target: Target) {
+    consent.gate(() => {
+      fileTarget.current = target;
+      fileRef.current?.click();
+    });
+  }
+
+  function storeShot(target: Target, shot: Shot) {
+    if (target === "face") {
+      setFace((current) => remember(current || undefined, shot));
+    } else if (target === "own-face") {
+      setOwnFace((current) => remember(current || undefined, shot));
+    } else {
+      setItems((current) => ({ ...current, [target]: remember(current[target], shot) }));
+    }
+    setResult(null);
+    setReveal("");
+  }
+
+  async function captureLive() {
+    const video = videoRef.current;
+    if (!video || !live) return;
+    const srcW = video.videoWidth || 720;
+    const srcH = video.videoHeight || 960;
+    const crop = visiblePortraitCrop(srcW, srcH);
+    const scale = Math.min(1, 1024 / Math.max(crop.sw, crop.sh));
+    const width = Math.max(2, Math.round(crop.sw * scale));
+    const height = Math.max(2, Math.round(crop.sh * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const facing = live === "face" || live === "own-face" ? "user" : "environment";
+    if (captureShouldMirror(facing)) {
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, width, height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    if (!blob) return;
+    const target = live;
+    stopLive();
+    storeShot(target, { blob, url: URL.createObjectURL(blob) });
+  }
+
+  async function generate(kind: Panel) {
+    const shot = kind === "own" ? ownFace : face;
+    if (busy || !shot) return;
+    stopLive();
+    setBusy(true);
+    setError("");
+    try {
+      const body = new FormData();
+      body.set("photo", shot.blob, "selfie.jpg");
+      body.set("slug", config.slug);
+      body.set("sessionId", guestSessionId());
+      const consentId = (await consent.persist()) || consent.consentId();
+      if (consentId) body.set("consentId", consentId);
+      body.set("requestId", crypto.randomUUID());
+      if (kind === "looks") {
+        if (hairId) body.set("hair", hairId);
+        if (beardId) body.set("beard", beardId);
+        if (groomingId) body.set("grooming", groomingId);
+      } else {
+        for (const slot of GROOM_OWN_SLOTS) {
+          const item = items[slot.id];
+          if (item) body.set(slot.id, item.blob, `${slot.id}.jpg`);
+        }
+      }
+      const res = await fetch("/api/v1/groom", { method: "POST", body });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.message || "That preview did not finish.");
+        return;
+      }
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("json")) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.message || "That preview did not finish.");
+        return;
+      }
+      const out = URL.createObjectURL(await res.blob());
+      const name = kind === "own" ? "Your own look" : GROOM_HAIR.find((item) => item.id === hairId)?.name || "Groom look";
+      setReveal(out);
+      setResult({ name, before: shot.url, after: out });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function chipRow(label: string, hint: string, group: string, choices: GroomChoice[], value: string, onChange: (id: string) => void) {
+    return (
+      <div data-step={group}>
+        <p className="mb-2 text-sm font-medium">{label}</p>
+        {hint ? <p className="mb-2 text-sm text-muted">{hint}</p> : null}
+        {hairPills.length > 1 ? (
+          <div className="mb-2 flex flex-wrap gap-2" data-pills="category" role="group" aria-label={`${group} category`} />
+        ) : null}
+        <div className="flex flex-wrap gap-2" role="group" aria-label={group}>
+          {choices.map((item) => (
+            <button key={item.id} className="chip" type="button" aria-pressed={value === item.id} onClick={() => onChange(value === item.id ? "" : item.id)}>{item.name}</button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const shotFor = (target: Target) => {
+    if (target === "face") return face;
+    if (target === "own-face") return ownFace;
+    return items[target];
+  };
+
+  return (
+    <div data-groom="flow" className="grid gap-4">
+      <ConsentSheet open={consent.open} onAgree={() => void consent.agree()} onClose={consent.close} />
+      <h2 className="page-title">Groom</h2>
+      <p className="text-sm text-muted">Wedding hair, a neat beard, and natural skin. Or dress him in his own clothes.</p>
+      <div className="seg" role="tablist" aria-label="Groom">
+        <button className="seg-btn" type="button" role="tab" aria-selected={panel === "looks"} onClick={() => { setPanel("looks"); setResult(null); setReveal(""); }}>Looks</button>
+        <button className="seg-btn" type="button" role="tab" aria-selected={panel === "own"} onClick={() => { setPanel("own"); setResult(null); setReveal(""); }}>Your own look</button>
+      </div>
+
+      <div className={panel === "looks" ? "grid gap-4" : "hidden"} data-panel="looks">
+          {chipRow("1. Wedding hair", "Optional. Tap again to keep his hair.", "Hair", GROOM_HAIR, hairId, setHairId)}
+          {chipRow("2. Beard", "Optional. Tap again to keep his beard.", "Beard", GROOM_BEARDS, beardId, setBeardId)}
+          {chipRow("3. Grooming", "Facial glow, or leave the skin natural.", "Grooming", GROOM_GROOMING, groomingId, setGroomingId)}
+          <PhotoStep
+            title="4. Your selfie"
+            target="face"
+            shot={face}
+            live={live}
+            reveal={panel === "looks" ? reveal : ""}
+            busy={busy && panel === "looks"}
+            camReady={camReady}
+            zoom={zoom}
+            videoRef={videoRef}
+            boxRef={(node) => { boxes.current.face = node; }}
+            onZoom={setZoom}
+            onLive={() => beginLive("face")}
+            onUpload={() => openFile("face")}
+            onClose={stopLive}
+            onShutter={captureLive}
+          />
+          {face && !busy ? <button className="btn sheen" type="button" onClick={() => void generate("looks")}>{result ? "See your look again" : "See your look"}</button> : null}
+        </div>
+      <div data-own="flow" className={panel === "own" ? "grid gap-4" : "hidden"}>
+          <PhotoStep
+            title="1. Your selfie"
+            target="own-face"
+            shot={ownFace}
+            live={live}
+            reveal={panel === "own" ? reveal : ""}
+            busy={busy && panel === "own"}
+            camReady={camReady}
+            zoom={zoom}
+            videoRef={videoRef}
+            boxRef={(node) => { boxes.current["own-face"] = node; }}
+            onZoom={setZoom}
+            onLive={() => beginLive("own-face")}
+            onUpload={() => openFile("own-face")}
+            onClose={stopLive}
+            onShutter={captureLive}
+          />
+          <div data-step="items">
+            <p className="mb-2 text-sm font-medium">2. Your clothes</p>
+            <p className="mb-3 text-sm text-muted">Optional. Take a close-up of each piece on its own. These photos are deleted after the preview and are never published.</p>
+            <div className="grid gap-4">
+              {GROOM_OWN_SLOTS.map((slot) => (
+                <div key={slot.id} data-item={slot.id}>
+                  <p className="mb-2 text-sm font-medium">{slot.label}</p>
+                  <p className="mb-2 text-sm text-muted">Close-up of the piece, on its own.</p>
+                  <PhotoStep
+                    title=""
+                    target={slot.id}
+                    shot={items[slot.id]}
+                    live={live}
+                    reveal=""
+                    busy={false}
+                    camReady={camReady}
+                    zoom={zoom}
+                    videoRef={videoRef}
+                    boxRef={(node) => { boxes.current[slot.id] = node; }}
+                    onZoom={setZoom}
+                    onLive={() => beginLive(slot.id)}
+                    onUpload={() => openFile(slot.id)}
+                    onClose={stopLive}
+                    onShutter={captureLive}
+                    outline={false}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+          {ownFace && !busy ? <button className="btn sheen" type="button" onClick={() => void generate("own")}>{result ? "See your look again" : "See your look"}</button> : null}
+        </div>
+
+      {camError ? <p className="text-sm" role="alert">{camError}</p> : null}
+      {error ? <p className="text-sm" role="status">{error}</p> : null}
+      {result && !busy ? (
+        <div className="grid gap-3">
+          <p className="text-center text-xs font-semibold uppercase tracking-wide">Your groom look</p>
+          <h3 className="text-center font-serif text-2xl">{result.name}</h3>
+          <BeforeAfter before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" />
+          <p className="text-center text-xs text-muted">A preview for your trial. The salon’s grooming on the day is the real result.</p>
+        </div>
+      ) : null}
+      <input
+        ref={fileRef}
+        className="sr-only"
+        type="file"
+        accept="image/*"
+        data-photo="groom"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (!file) return;
+          const target = fileTarget.current;
+          void fileToShot(file).then((shot) => storeShot(target, shot));
+        }}
+      />
+      <span className="sr-only" data-shot={shotFor(live || "face") ? "yes" : "no"} />
+    </div>
+  );
+}
+
+function PhotoStep({
+  title,
+  target,
+  shot,
+  live,
+  reveal,
+  busy,
+  camReady,
+  zoom,
+  videoRef,
+  boxRef,
+  onZoom,
+  onLive,
+  onUpload,
+  onClose,
+  onShutter,
+  outline = true,
+}: {
+  title: string;
+  target: Target;
+  shot?: Shot | null;
+  live: Target | null;
+  reveal: string;
+  busy: boolean;
+  camReady: boolean;
+  zoom: number;
+  videoRef: RefObject<HTMLVideoElement | null>;
+  boxRef: (node: HTMLDivElement | null) => void;
+  onZoom: (zoom: number) => void;
+  onLive: () => void;
+  onUpload: () => void;
+  onClose: () => void;
+  onShutter: () => void;
+  outline?: boolean;
+}) {
+  const open = live === target;
+  const loading: ReactNode = busy ? <GeneratingLook tool={target === "face" ? "groom" : "groom-own"} blur={false} /> : null;
+  return (
+    <div>
+      {title ? <p className="mb-2 text-sm font-medium">{title}</p> : null}
+      {title ? <p className="mb-2 text-sm">Face the light. Keep your whole face inside the outline. No sunglasses.</p> : null}
+      <div ref={boxRef} data-photo-box={target} className="relative mx-auto aspect-[3/4] max-h-[520px] w-full max-w-sm overflow-hidden rounded-2xl bg-[#F3E6D8]">
+        {open ? (
+          <LiveStudio
+            videoRef={videoRef}
+            ready={camReady}
+            facing={target === "face" || target === "own-face" ? "user" : "environment"}
+            guide={target === "face" || target === "own-face" ? "face" : "hand"}
+            zoom={zoom}
+            onZoom={onZoom}
+            onBack={onClose}
+            onClose={onClose}
+            onShutter={onShutter}
+            onRetake={onLive}
+            onUpload={() => { onClose(); onUpload(); }}
+          />
+        ) : (
+          <>
+            {shot ? <img src={shot.url} alt={title || target} className="h-full w-full object-cover" /> : null}
+            {reveal ? <img src={reveal} alt="" className="gen-reveal absolute inset-0 h-full w-full object-cover" /> : null}
+            {loading}
+            {outline && !shot && !busy ? (
+              <div className="pointer-events-none absolute inset-0 grid place-items-center" aria-hidden="true">
+                <div className="h-[68%] w-[56%] rounded-[50%] border-2 border-white/90 shadow-sm" />
+              </div>
+            ) : null}
+            {!shot && !busy ? (
+              <div className="absolute inset-0 grid content-center justify-items-center gap-3 px-6">
+                <button className="btn sheen min-w-44" type="button" onClick={onLive}>{target === "face" || target === "own-face" ? "Take photo" : "Take photo"}</button>
+                <button className="btn secondary min-w-44" type="button" onClick={onUpload}>Use photo</button>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+      {shot && !busy && !open ? (
+        <div className="mx-auto mt-3 grid max-w-sm gap-2">
+          <button className="btn sheen" type="button" onClick={onLive}>Take photo</button>
+          <button className="btn secondary" type="button" onClick={onUpload}>Use photo</button>
+        </div>
+      ) : null}
+    </div>
+  );
+}

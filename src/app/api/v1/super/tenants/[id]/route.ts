@@ -14,6 +14,7 @@ const schema = z.object({
   productTryOn: z.boolean().optional(),
   productQueue: z.boolean().optional(),
   productBridal: z.boolean().optional(),
+  productGroom: z.boolean().optional(),
 });
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -36,6 +37,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       ...(parsed.data.productTryOn !== undefined ? { productTryOn: parsed.data.productTryOn } : {}),
       ...(parsed.data.productQueue !== undefined ? { productQueue: parsed.data.productQueue } : {}),
       ...(parsed.data.productBridal !== undefined ? { productBridal: parsed.data.productBridal } : {}),
+      ...(parsed.data.productGroom !== undefined ? { productGroom: parsed.data.productGroom } : {}),
     },
   });
   if (plan) {
@@ -60,7 +62,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       },
     });
   }
-  const productChange = parsed.data.productTryOn !== undefined || parsed.data.productQueue !== undefined || parsed.data.productBridal !== undefined;
+  const productChange = parsed.data.productTryOn !== undefined || parsed.data.productQueue !== undefined || parsed.data.productBridal !== undefined || parsed.data.productGroom !== undefined;
   if (!plan && !parsed.data.creditDelta) {
     await prisma.auditLog.create({
       data: {
@@ -76,7 +78,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         actorId: access.session.user.id,
         action: "TENANT_UPDATE",
         target: id,
-        meta: JSON.stringify({ productTryOn: parsed.data.productTryOn, productQueue: parsed.data.productQueue, productBridal: parsed.data.productBridal }),
+        meta: JSON.stringify({ productTryOn: parsed.data.productTryOn, productQueue: parsed.data.productQueue, productBridal: parsed.data.productBridal, productGroom: parsed.data.productGroom }),
       },
     });
   }

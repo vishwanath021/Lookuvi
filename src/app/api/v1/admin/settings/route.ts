@@ -33,6 +33,8 @@ const schema = z.object({
   anonDailyCap: z.number().int().min(0).max(500).optional(),
   memberDailyCap: z.number().int().min(0).max(500).optional(),
   requireLoginToBook: z.boolean().optional(),
+  productBridal: z.boolean().optional(),
+  productGroom: z.boolean().optional(),
   gstin: z.string().max(20).optional().nullable(),
 });
 
