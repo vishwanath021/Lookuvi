@@ -6,7 +6,7 @@ export const OWN_LOOK_SLOTS = [
     label: "Saree",
     subtitle: "",
     noun: "saree",
-    optional: false,
+    optional: true,
     place: "Drape that saree on her as a bridal saree.",
   },
   {
@@ -14,7 +14,7 @@ export const OWN_LOOK_SLOTS = [
     label: "Blouse",
     subtitle: "",
     noun: "blouse",
-    optional: false,
+    optional: true,
     place: "Put that blouse on her.",
   },
   {
@@ -22,7 +22,7 @@ export const OWN_LOOK_SLOTS = [
     label: "Earrings",
     subtitle: "Jhumkas",
     noun: "earrings",
-    optional: false,
+    optional: true,
     place: "Hang those earrings from her earlobes.",
   },
   {
@@ -30,7 +30,7 @@ export const OWN_LOOK_SLOTS = [
     label: "Ear chain",
     subtitle: "Champaswaralu",
     noun: "ear chain",
-    optional: false,
+    optional: true,
     place: "Place the champaswaralu chain from the top of the earring, arcing back into her hair.",
   },
   {
@@ -38,7 +38,7 @@ export const OWN_LOOK_SLOTS = [
     label: "Forehead pendant",
     subtitle: "Papidi billa / Maang tikka",
     noun: "forehead pendant",
-    optional: false,
+    optional: true,
     place: "Place the papidi billa on the hair parting and forehead. Keep her own bindi from the selfie.",
   },
   {
@@ -46,7 +46,7 @@ export const OWN_LOOK_SLOTS = [
     label: "Necklace",
     subtitle: "",
     noun: "necklace",
-    optional: false,
+    optional: true,
     place: "Place that necklace at her neck.",
   },
   {
@@ -89,6 +89,11 @@ export function ownLookItemEdge(id: string) {
   return OWN_LOOK_ITEM_EDGE;
 }
 export const OWN_LOOK_MAX_BYTES = 2 * 1024 * 1024;
+/** Largest request the route reads: selfie and every slot at the per-photo cap, plus form overhead. */
+export const OWN_LOOK_MAX_BODY_BYTES = 20 * 1024 * 1024;
+export const OWN_LOOK_TOO_LARGE = "These photos are too large together. Remove a piece and try again. No try was used.";
+/** Many input photos make the edit slower than a single-photo look. The route allows 120 s. */
+export const OWN_LOOK_PROVIDER_TIMEOUT_MS = 100_000;
 /** Selfie plus every slot. A request with more files is refused. */
 export const OWN_LOOK_MAX_IMAGES = 1 + OWN_LOOK_SLOTS.length;
 

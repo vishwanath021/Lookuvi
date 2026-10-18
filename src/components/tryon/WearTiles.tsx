@@ -72,7 +72,6 @@ export function WearTiles({
                     <WearIcon id={item.id} />
                     <span className="wear-name">{item.label}</span>
                     {item.subtitle ? <span className="wear-sub">{item.subtitle}</span> : null}
-                    {item.optional ? <span className="wear-optional">optional</span> : null}
                   </>
                 )}
               </button>

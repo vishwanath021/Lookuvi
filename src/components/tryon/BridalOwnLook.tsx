@@ -24,6 +24,8 @@ import { tryNowReady } from "@/lib/try-now";
 import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
 import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
 import { useVisitTries } from "@/components/tryon/useVisitTries";
+import { OWN_ITEM_EDGE, OWN_SELFIE_EDGE, payloadProblem, postPreview, shrinkPhoto } from "@/lib/own-upload";
+import { dropOwnItem, loadOwnItems, saveOwnItem } from "@/lib/own-items-store";
 import { WearTiles } from "@/components/tryon/WearTiles";
 
 type Shot = { blob: Blob; url: string; digest: string; serverId?: string };
@@ -65,6 +67,21 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
       streamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, []);
+
+  // Android can reload the page when the camera app opens. Bring back the pieces this tab added.
+  useEffect(() => {
+    let live = true;
+    void loadOwnItems(`bridal:${config.slug}`).then(async (saved) => {
+      const restored: Partial<Record<OwnLookSlotId, Shot>> = {};
+      for (const slot of OWN_LOOK_SLOTS) {
+        const blob = saved[slot.id];
+        if (blob) restored[slot.id] = await shotFromBlob(blob);
+      }
+      if (!live || Object.keys(restored).length === 0) return;
+      setItems((current) => ({ ...restored, ...current }));
+    }).catch(() => undefined);
+    return () => { live = false; };
+  }, [config.slug]);
 
   function stopLive() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -114,9 +131,16 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
     });
   }
 
-  async function fileToShot(file: File) {
-    const blob = file.slice(0, file.size, file.type || "image/jpeg");
-    return shotFromBlob(blob);
+  async function fileToShot(file: File, edge: number) {
+    const raw = file.slice(0, file.size, file.type || "image/jpeg");
+    return shotFromBlob(await shrinkPhoto(raw, edge));
+  }
+
+  function addFile(target: Target, file: File) {
+    setError("");
+    void fileToShot(file, target === "face" ? OWN_SELFIE_EDGE : OWN_ITEM_EDGE)
+      .then((shot) => storeShot(target, shot))
+      .catch(() => setError("That photo could not be read. Please pick a JPEG or PNG photo."));
   }
 
   function openFile(target: Target) {
@@ -134,6 +158,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
       delete next[id];
       return next;
     });
+    void dropOwnItem(`bridal:${config.slug}`, id);
     setResult(null);
     setReveal("");
   }
@@ -146,6 +171,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
       return;
     }
     setItems((current) => ({ ...current, [target]: remember(current[target], shot) }));
+    void saveOwnItem(`bridal:${config.slug}`, target, shot.blob);
     setResult(null);
     setReveal("");
   }
@@ -190,6 +216,17 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
 
   async function generate() {
     if (busy || !face || !chosen) return;
+    const problem = payloadProblem([
+      ...(face.serverId ? [] : [{ label: "selfie", size: face.blob.size }]),
+      ...OWN_LOOK_SLOTS.flatMap((slot) => {
+        const shot = items[slot.id];
+        return shot ? [{ label: slot.label, size: shot.blob.size }] : [];
+      }),
+    ]);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     const key = currentKey(face);
     const cached = cache.current.get(key);
     if (cached) {
@@ -219,17 +256,10 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
             const shot = items[slot.id];
             if (shot) body.set(slot.id, shot.blob, `${slot.id}.jpg`);
           }
-          const res = await fetch("/api/v1/bridal/own", { method: "POST", body });
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            if (data.error === "VISIT_CAP") visit.applyBody(data);
-            throw new Error(data.message || "That preview did not finish.");
-          }
-          const contentType = res.headers.get("content-type") || "";
-          if (contentType.includes("json")) {
-            const data = await res.json().catch(() => ({}));
-            throw new Error(data.message || "That preview did not finish.");
-          }
+          const res = await postPreview("/api/v1/bridal/own", body).catch((failure) => {
+            if (failure?.data?.error === "VISIT_CAP") visit.applyBody(failure.data);
+            throw failure;
+          });
           visit.applyHeaders(res);
           const photoId = readPhotoId(res);
           if (photoId) setFace((current) => current && current.digest === face.digest ? { ...current, serverId: photoId } : current);
@@ -297,12 +327,12 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
         ) : null}
         <MakeupSwatches items={makeupCards} value={makeupId} onChange={setMakeupId} />
       </StepCard>
-      <StepCard id="own-items" title="Add what you'll wear" hint="Close-up, one item per photo">
+      <StepCard id="own-items" title="Add what you'll wear" hint="All optional. Close-up, one item per photo">
         <WearTiles
           slots={OWN_LOOK_SLOTS}
           shots={items}
           arm={consent.gate}
-          onFile={(id, file) => { void fileToShot(file).then((shot) => storeShot(id as OwnLookSlotId, shot)); }}
+          onFile={(id, file) => addFile(id as OwnLookSlotId, file)}
           onRemove={(id) => removeItem(id as OwnLookSlotId)}
         />
       </StepCard>
@@ -352,9 +382,9 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
           note={capNote}
           onClick={() => void generate()}
         />
+        {camError ? <p className="text-sm" role="alert">{camError}</p> : null}
+        {error && !busy ? <p className="rounded-lg border border-[#e9b4b4] bg-[#fdf1f1] p-2 text-sm text-[#7a1f1f]" role="alert" data-own-error="yes">{error}</p> : null}
       </section>
-      {camError ? <p className="text-sm" role="alert">{camError}</p> : null}
-      {error ? <p className="text-sm" role="status">{error}</p> : null}
       <input
         ref={fileRef}
         className="sr-only"
@@ -365,8 +395,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
           const file = event.target.files?.[0];
           event.target.value = "";
           if (!file) return;
-          const target = fileTarget.current;
-          void fileToShot(file).then((shot) => storeShot(target, shot));
+          addFile(fileTarget.current, file);
         }}
       />
     </div>

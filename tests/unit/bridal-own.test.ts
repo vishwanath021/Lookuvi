@@ -350,7 +350,9 @@ describe("your own look screen", () => {
     expect(html).toContain("Jada billa / Vaddanam");
     expect(html).toContain("data-wear=\"grid\"");
     expect(html).toContain("wear-grid");
-    expect(html).toContain("wear-optional");
+    expect(html).not.toContain("wear-optional");
+    expect(html).toContain("All optional");
+    expect(OWN_LOOK_SLOTS.every((slot) => slot.optional)).toBe(true);
     expect(html).not.toContain("data-item-card");
     expect(html).not.toContain("photo-slot");
     expect(html).not.toContain("Bangles");

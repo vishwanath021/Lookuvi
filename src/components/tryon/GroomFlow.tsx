@@ -25,6 +25,7 @@ import { tryNowReady } from "@/lib/try-now";
 import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
 import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
 import { useVisitTries } from "@/components/tryon/useVisitTries";
+import { OWN_ITEM_EDGE, OWN_SELFIE_EDGE, postPreview, shrinkPhoto } from "@/lib/own-upload";
 
 type Shot = { blob: Blob; url: string; digest: string; serverId?: string };
 type LookResult = CachedLook & { after: string; panel: Panel };
@@ -118,9 +119,9 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
     });
   }
 
-  async function fileToShot(file: File) {
+  async function fileToShot(file: File, edge = OWN_SELFIE_EDGE) {
     const blob = file.slice(0, file.size, file.type || "image/jpeg");
-    return shotFromBlob(blob);
+    return shotFromBlob(await shrinkPhoto(blob, edge));
   }
 
   function openFile(target: Target) {
@@ -235,17 +236,10 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
               if (item) body.set(slot.id, item.blob, `${slot.id}.jpg`);
             }
           }
-          const res = await fetch("/api/v1/groom", { method: "POST", body });
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            if (data.error === "VISIT_CAP") visit.applyBody(data);
-            throw new Error(data.message || "That preview did not finish.");
-          }
-          const contentType = res.headers.get("content-type") || "";
-          if (contentType.includes("json")) {
-            const data = await res.json().catch(() => ({}));
-            throw new Error(data.message || "That preview did not finish.");
-          }
+          const res = await postPreview("/api/v1/groom", body).catch((failure) => {
+            if (failure?.data?.error === "VISIT_CAP") visit.applyBody(failure.data);
+            throw failure;
+          });
           visit.applyHeaders(res);
           const photoId = readPhotoId(res);
           if (photoId) {
@@ -400,7 +394,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
               slots={GROOM_OWN_SLOTS}
               shots={items}
               arm={consent.gate}
-              onFile={(id, file) => { void fileToShot(file).then((shot) => storeShot(id as GroomSlotId, shot)); }}
+              onFile={(id, file) => { void fileToShot(file, OWN_ITEM_EDGE).then((shot) => storeShot(id as GroomSlotId, shot)).catch(() => setError("That photo could not be read. Please pick a JPEG or PNG photo.")); }}
               onRemove={(id) => removeItem(id as GroomSlotId)}
             />
           </StepCard>
@@ -454,7 +448,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
           event.target.value = "";
           if (!file) return;
           const target = fileTarget.current;
-          void fileToShot(file).then((shot) => storeShot(target, shot));
+          void fileToShot(file).then((shot) => storeShot(target, shot)).catch(() => setError("That photo could not be read. Please pick a JPEG or PNG photo."));
         }}
       />
       <span className="sr-only" data-shot={shotFor(live || "face") ? "yes" : "no"} />

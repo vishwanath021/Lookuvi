@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { OWN_LOOK_MAX_BYTES, OWN_LOOK_MODEL, OWN_LOOK_QUALITY, OWN_LOOK_SLOTS } from "@/data/bridal-own";
+import { OWN_LOOK_MAX_BODY_BYTES, OWN_LOOK_MAX_BYTES, OWN_LOOK_MODEL, OWN_LOOK_PROVIDER_TIMEOUT_MS, OWN_LOOK_TOO_LARGE, OWN_LOOK_QUALITY, OWN_LOOK_SLOTS } from "@/data/bridal-own";
 import { generateOwnLook, ownLookCallLog, OwnLookError, type OwnLookQuote } from "@/lib/bridal-own";
 import { resolveOpenAIKey } from "@/lib/ai/credentials";
 import { BilledProviderError, UnbilledProviderError, UncertainBillingError, UnknownModelError } from "@/lib/ai/errors";
@@ -91,8 +91,12 @@ function failMessage(error: unknown) {
 }
 
 export async function POST(req: Request) {
+  const declared = Number(req.headers.get("content-length") || 0);
+  if (declared > OWN_LOOK_MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "SIZE", message: OWN_LOOK_TOO_LARGE }, { status: 413 });
+  }
   const form = await req.formData().catch(() => null);
-  if (!form) return NextResponse.json({ error: "INVALID", message: "Send your selfie and a makeup look." }, { status: 400 });
+  if (!form) return NextResponse.json({ error: "INVALID", message: "The photos did not arrive. Please try again." }, { status: 400 });
   const slug = String(form.get("slug") || "");
   const sessionId = String(form.get("sessionId") || "");
   const consentId = String(form.get("consentId") || "");
@@ -146,7 +150,7 @@ export async function POST(req: Request) {
     const file = form.get(slot.id);
     if (!(file instanceof File) || file.size === 0) continue;
     if (file.size > OWN_LOOK_MAX_BYTES) {
-      return NextResponse.json({ error: "SIZE", message: "Please use a photo under 2 MB." }, { status: 413 });
+      return NextResponse.json({ error: "SIZE", message: `The ${slot.label} photo is too large. Take it again or pick a smaller photo.` }, { status: 413 });
     }
     items.push({ id: slot.id, bytes: Buffer.from(await file.arrayBuffer()) });
   }
@@ -223,7 +227,7 @@ export async function POST(req: Request) {
         reserved = true;
       },
       edit: async (body) => {
-        const response = await postImageEdit(apiKey, body);
+        const response = await postImageEdit(apiKey, body, OWN_LOOK_PROVIDER_TIMEOUT_MS);
         const payload = (await response.json()) as {
           data?: { b64_json?: string }[];
           usage?: {
