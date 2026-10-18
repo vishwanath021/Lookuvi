@@ -24,14 +24,14 @@ export function inputFidelityForModel(model: string): "high" | "" {
   return "high";
 }
 
-export async function postImageEdit(apiKey: string, form: FormData) {
+export async function postImageEdit(apiKey: string, form: FormData, timeoutMs = 55_000) {
   let response: Response;
   try {
     response = await fetch("https://api.openai.com/v1/images/edits", {
       method: "POST",
       headers: { authorization: `Bearer ${apiKey}` },
       body: form,
-      signal: AbortSignal.timeout(55_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
     const name = error instanceof Error ? error.name : "";

@@ -576,7 +576,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
         ))}
       </div>
 
-      {panel === "own" && <div className="mt-4"><BridalOwnLook config={config} /></div>}
+      {/* Stay mounted so the pieces she added survive a tab switch. */}
+      <div className="mt-4" hidden={panel !== "own"} data-own-panel={panel === "own" ? "open" : "closed"}><BridalOwnLook config={config} /></div>
 
       {panel === "looks" && (
         <div className="mt-4 grid gap-4">

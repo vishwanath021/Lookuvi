@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
+  experimental: {
+    // Middleware buffers request bodies. The default 10 MB cut a multi-photo bridal
+    // request short, so the route could not read it. Routes still cap each photo.
+    middlewareClientMaxBodySize: "20mb",
+  },
   serverExternalPackages: ["sharp", "bcryptjs", "@prisma/client"],
   async headers() {
     return [
