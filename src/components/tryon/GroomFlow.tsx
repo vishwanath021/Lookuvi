@@ -8,6 +8,7 @@ import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio } from "@/components/tryon/LiveStudio";
 import { LargeFrame, LiveTray, SelectionSummary, StepCard, StepRail, TryBar, scrollToStep } from "@/components/tryon/LookStepper";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
+import { WearTiles } from "@/components/tryon/WearTiles";
 import {
   GROOM_BEARDS,
   GROOM_GROOMING,
@@ -127,6 +128,18 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
       fileTarget.current = target;
       fileRef.current?.click();
     });
+  }
+
+  function removeItem(id: GroomSlotId) {
+    setItems((current) => {
+      const shot = current[id];
+      if (shot && shot.url.startsWith("blob:")) URL.revokeObjectURL(shot.url);
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+    setResult(null);
+    setReveal("");
   }
 
   function storeShot(target: Target, shot: Shot) {
@@ -382,33 +395,14 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
               { id: "groom-own-photo", label: "Photo", icon: "photo" },
             ]}
           />
-          <StepCard id="groom-clothes" title="Clothes" hint="Optional. Take a close-up of each piece on its own. These photos are deleted after the preview and are never published.">
-            <p className="text-sm text-muted">Take a close-up of each piece on its own.</p>
-            <div className="grid gap-4">
-              {GROOM_OWN_SLOTS.map((slot) => (
-                <div key={slot.id} data-item={slot.id}>
-                  <p className="mb-2 text-sm font-medium">{slot.label}</p>
-                  <p className="mb-2 text-sm text-muted">Close-up of the piece, on its own.</p>
-                  <PhotoStep
-                    title=""
-                    target={slot.id}
-                    shot={items[slot.id]}
-                    live={live}
-                    reveal=""
-                    busy={false}
-                    camReady={camReady}
-                    zoom={zoom}
-                    videoRef={videoRef}
-                    boxRef={(node) => { boxes.current[slot.id] = node; }}
-                    onZoom={setZoom}
-                    onLive={() => beginLive(slot.id)}
-                    onUpload={() => openFile(slot.id)}
-                    onClose={stopLive}
-                    onShutter={captureLive}
-                  />
-                </div>
-              ))}
-            </div>
+          <StepCard id="groom-clothes" title="Add what you'll wear" hint="Close-up, one item per photo">
+            <WearTiles
+              slots={GROOM_OWN_SLOTS}
+              shots={items}
+              arm={consent.gate}
+              onFile={(id, file) => { void fileToShot(file).then((shot) => storeShot(id as GroomSlotId, shot)); }}
+              onRemove={(id) => removeItem(id as GroomSlotId)}
+            />
           </StepCard>
           <section id="groom-own-photo" className="step-card grid gap-3" data-step="own-photo">
             <h3 className="text-base font-semibold leading-tight">Photo</h3>

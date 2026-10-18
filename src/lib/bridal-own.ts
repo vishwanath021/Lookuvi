@@ -16,7 +16,7 @@ import { editFormFields, editSizeForAspect, planImageEdit, type EditSize, type P
 import { fitInsideCanvas, restoreFrame, type FrameTransform } from "@/lib/ai/frame";
 import { ImageError, sniffImage } from "@/lib/images";
 import { numberEnv } from "@/lib/env";
-import { bufferedInr, usdFromTokenCounts } from "@/lib/ai/tiers";
+import { bufferedInr, providerUsageLog, usdFromTokenCounts, type UsageNumbers } from "@/lib/ai/tiers";
 
 const TEXT_TOKEN_FLOOR = 400;
 const CATALOGUE_SIZES = ["1024x1024", "1024x1536", "1536x1024"] as const satisfies readonly EditSize[];
@@ -96,7 +96,9 @@ function lookDetails(makeup: BridalMakeup) {
 export function buildOwnLookPrompt(makeup: BridalMakeup, slots: { id: OwnLookSlotId; noun: string }[]) {
   const clothing = slots.map((slot, index) => {
     const number = index + 2;
-    return `Image ${number} is her ${slot.noun}. Copy that ${slot.noun} exactly onto her. Do not invent a different ${slot.noun}, and do not swap it for a catalogue piece.`;
+    const place = ownLookSlot(slot.id)?.place;
+    const placed = place ? ` ${place}` : "";
+    return `Image ${number} is her ${slot.noun}. Copy that ${slot.noun} exactly onto her.${placed} Do not invent a different ${slot.noun}, and do not swap it for a catalogue piece.`;
   });
   const items = slots.length
     ? "Dress her in those exact photographed items and no other clothes or jewellery."
@@ -113,7 +115,7 @@ export function buildOwnLookPrompt(makeup: BridalMakeup, slots: { id: OwnLookSlo
     "Keep her natural skin tone and skin texture exactly; do not lighten, whiten or smooth the skin.",
     "Keep any nose pin already in her photo.",
     "Keep any sindoor at the hair parting and any bindi already in her photo.",
-    "Telugu bridal styling: silk drape, a round bindi, and the jewellery from her own photos when she added them.",
+    "Telugu bridal styling: silk drape and the jewellery from her own photos when she added them.",
     "A portrait, photorealistic, with natural light. No text, logos, watermarks, or extra people.",
     "This is a salon trial preview, not a guarantee of the finished makeup.",
   ].filter(Boolean).join(" ");
@@ -239,6 +241,19 @@ export function ownLookEstimateMeta(quote: OwnLookQuote, salonId: string) {
     estimateUsd: quote.estimateUsd,
     estimateInr: quote.estimateInr,
     salonId,
+  };
+}
+
+/** Real provider cost. pictureIn is the image-input count that the USD figure includes. */
+export function ownLookCallLog(usage: UsageNumbers | undefined) {
+  const priced = providerUsageLog(OWN_LOOK_MODEL, usage);
+  const pictureIn = usage?.imageTokens ?? Math.max(0, (usage?.inputTokens ?? 0) - (usage?.textTokens ?? 0));
+  return {
+    costUsd: priced.costUsd,
+    known: priced.known,
+    textCount: priced.textCount,
+    pictureIn,
+    pictureOut: priced.pictureOut,
   };
 }
 

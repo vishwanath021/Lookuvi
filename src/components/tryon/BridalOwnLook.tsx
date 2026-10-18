@@ -24,6 +24,7 @@ import { tryNowReady } from "@/lib/try-now";
 import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
 import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
 import { useVisitTries } from "@/components/tryon/useVisitTries";
+import { WearTiles } from "@/components/tryon/WearTiles";
 
 type Shot = { blob: Blob; url: string; digest: string; serverId?: string };
 type LookResult = CachedLook & { after: string };
@@ -123,6 +124,18 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
       fileTarget.current = target;
       fileRef.current?.click();
     });
+  }
+
+  function removeItem(id: OwnLookSlotId) {
+    setItems((current) => {
+      const shot = current[id];
+      if (shot && shot.url.startsWith("blob:")) URL.revokeObjectURL(shot.url);
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+    setResult(null);
+    setReveal("");
   }
 
   function storeShot(target: Target, shot: Shot) {
@@ -284,41 +297,14 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
         ) : null}
         <MakeupSwatches items={makeupCards} value={makeupId} onChange={setMakeupId} />
       </StepCard>
-      <StepCard id="own-items" title="Your pieces" hint="Optional. Take a close-up of each piece on its own. These photos are deleted after the preview and are never published.">
-        <p className="text-sm text-muted">Take a close-up of each piece on its own.</p>
-        <div className="grid gap-4">
-          {OWN_LOOK_SLOTS.map((slot) => (
-            <div key={slot.id} data-item={slot.id}>
-              <p className="mb-2 text-sm font-medium">{slot.label}</p>
-              <p className="mb-2 text-sm text-muted">Close-up of the piece, on its own.</p>
-              <PhotoBox
-                boxRef={(node) => { boxes.current[slot.id] = node; }}
-                name={slot.id}
-                alt={slot.label}
-                shot={items[slot.id]}
-                live={live === slot.id}
-                reveal=""
-                onLive={() => beginLive(slot.id)}
-                onUpload={() => openFile(slot.id)}
-                camera={live === slot.id ? (
-                  <LiveStudio
-                    videoRef={videoRef}
-                    ready={camReady}
-                    facing="environment"
-                    guide="hand"
-                    zoom={zoom}
-                    onZoom={setZoom}
-                    onBack={stopLive}
-                    onClose={stopLive}
-                    onShutter={captureLive}
-                    onRetake={() => beginLive(slot.id)}
-                  />
-                ) : null}
-                liveLabel="Take photo"
-              />
-            </div>
-          ))}
-        </div>
+      <StepCard id="own-items" title="Add what you'll wear" hint="Close-up, one item per photo">
+        <WearTiles
+          slots={OWN_LOOK_SLOTS}
+          shots={items}
+          arm={consent.gate}
+          onFile={(id, file) => { void fileToShot(file).then((shot) => storeShot(id as OwnLookSlotId, shot)); }}
+          onRemove={(id) => removeItem(id as OwnLookSlotId)}
+        />
       </StepCard>
       <section id="own-photo" className="step-card grid gap-3" data-step="selfie">
         <h3 className="text-base font-semibold leading-tight">Photo</h3>

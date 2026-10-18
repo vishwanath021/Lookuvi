@@ -1,15 +1,70 @@
 /** The bride's own clothes and jewellery. Each slot is optional. */
 
 export const OWN_LOOK_SLOTS = [
-  { id: "saree", label: "Saree", noun: "saree" },
-  { id: "blouse", label: "Blouse", noun: "blouse" },
-  { id: "necklace", label: "Necklace", noun: "necklace" },
-  { id: "earrings", label: "Earrings", noun: "earrings" },
-  { id: "maang-tikka", label: "Maang tikka", noun: "maang tikka" },
-  { id: "bangles", label: "Bangles", noun: "bangles" },
-  { id: "nose-ring", label: "Nose ring", noun: "nose ring" },
-  { id: "hair-accessories", label: "Hair accessories", noun: "hair accessories" },
-  { id: "other", label: "Other", noun: "other item" },
+  {
+    id: "saree",
+    label: "Saree",
+    subtitle: "",
+    noun: "saree",
+    optional: false,
+    place: "Drape that saree on her as a bridal saree.",
+  },
+  {
+    id: "blouse",
+    label: "Blouse",
+    subtitle: "",
+    noun: "blouse",
+    optional: false,
+    place: "Put that blouse on her.",
+  },
+  {
+    id: "earrings",
+    label: "Earrings",
+    subtitle: "Jhumkas",
+    noun: "earrings",
+    optional: false,
+    place: "Hang those earrings from her earlobes.",
+  },
+  {
+    id: "ear-chain",
+    label: "Ear chain",
+    subtitle: "Champaswaralu",
+    noun: "ear chain",
+    optional: false,
+    place: "Place the champaswaralu chain from the top of the earring, arcing back into her hair.",
+  },
+  {
+    id: "forehead-pendant",
+    label: "Forehead pendant",
+    subtitle: "Papidi billa / Maang tikka",
+    noun: "forehead pendant",
+    optional: false,
+    place: "Place the papidi billa on the hair parting and forehead. Keep her own bindi from the selfie.",
+  },
+  {
+    id: "necklace",
+    label: "Necklace",
+    subtitle: "",
+    noun: "necklace",
+    optional: false,
+    place: "Place that necklace at her neck.",
+  },
+  {
+    id: "long-haram",
+    label: "Long haram",
+    subtitle: "",
+    noun: "long haram",
+    optional: true,
+    place: "Hang the long haram below the necklace.",
+  },
+  {
+    id: "hair-accessories",
+    label: "Hair accessories",
+    subtitle: "Jada billa / Vaddanam",
+    noun: "hair accessories",
+    optional: true,
+    place: "Place those hair accessories on the bun.",
+  },
 ] as const;
 
 export type OwnLookSlotId = (typeof OWN_LOOK_SLOTS)[number]["id"];
@@ -23,10 +78,10 @@ export const OWN_LOOK_THREE_BY_FOUR = "1024x1360" as const;
 export const OWN_LOOK_SAREE_EDGE = 512;
 /** Longest edge for a jewellery photo, so the piece stays readable. */
 export const OWN_LOOK_JEWELLERY_EDGE = 640;
-/** Longest edge for blouse, hair accessories, and other. */
+/** Longest edge for the blouse and hair accessories. */
 export const OWN_LOOK_ITEM_EDGE = 384;
 
-const JEWELLERY_SLOTS = new Set<OwnLookSlotId>(["necklace", "earrings", "maang-tikka", "bangles", "nose-ring"]);
+const JEWELLERY_SLOTS = new Set<OwnLookSlotId>(["earrings", "ear-chain", "forehead-pendant", "necklace", "long-haram"]);
 
 export function ownLookItemEdge(id: string) {
   if (id === "saree") return OWN_LOOK_SAREE_EDGE;

@@ -88,6 +88,14 @@ type LookResult = CachedLook & { after: string; share: string; lookId: string; k
 
 const MAX_SAVED = 6;
 
+export function compareControl(open: boolean) {
+  return {
+    label: open ? "Hide compare" : "Compare",
+    className: open ? "btn sheen" : "btn secondary",
+    pressed: open,
+  };
+}
+
 function storageKey(slug: string) {
   return `lookuvi-bridal-${slug}`;
 }
@@ -754,19 +762,22 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
         <div className="mt-4 grid gap-4">
           {saved.length === 0 ? <p className="text-sm">Save a look to compare it and send it to your family.</p> : null}
           <ul className="grid gap-3">
-            {saved.map((look) => (
+            {saved.map((look) => {
+              const compareOn = compareControl(compare.includes(look.id));
+              return (
               <li key={look.id} className="card grid grid-cols-[88px_1fr] gap-3 p-3">
                 <img src={look.after} alt="" className="h-28 w-full rounded-lg object-cover" />
                 <div>
                   <p className="font-medium leading-snug">{look.name}</p>
                   <p className="text-xs text-muted">{bridalEventById(look.eventId)?.label}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button className="btn secondary" type="button" aria-pressed={compare.includes(look.id)} onClick={() => toggleCompare(look.id)}>{compare.includes(look.id) ? "Comparing" : "Compare"}</button>
+                    <button className={compareOn.className} type="button" aria-pressed={compareOn.pressed} data-compare={compareOn.pressed ? "open" : "closed"} onClick={() => toggleCompare(look.id)}>{compareOn.label}</button>
                     <button className="btn secondary" type="button" onClick={() => share(look)}>Share with family</button>
                   </div>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
           {compared.length === 2 && (
             <div>
