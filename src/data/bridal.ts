@@ -26,6 +26,9 @@ export type BridalMakeup = {
   image: boolean;
   lipId: string;
   finishId: string;
+  /** Cheek and lid colours so the option is a swatch, not a text chip. */
+  cheek: string;
+  eye: string;
   prompt: string;
 };
 
@@ -136,8 +139,8 @@ export const BRIDAL_LOOKS: BridalLook[] = [
 ];
 
 /**
- * Soft-glam bridal makeup. No modern photo set is shipped, so `image` stays false
- * and the step renders text chips instead of the old temple portraits.
+ * Soft-glam bridal makeup. No modern photo set is shipped, so each option is a
+ * mini face with lip, cheek, and eye colour. `image` stays false.
  */
 export const BRIDAL_MAKEUP: BridalMakeup[] = [
   {
@@ -147,6 +150,8 @@ export const BRIDAL_MAKEUP: BridalMakeup[] = [
     image: false,
     lipId: "nude-rose",
     finishId: "dewy",
+    cheek: "#E7A3A8",
+    eye: "#C9A4B4",
     prompt: "Makeup: soft-glam bridal with dewy skin, a nude-rose lip, and a little shimmer on the lids.",
   },
   {
@@ -156,6 +161,8 @@ export const BRIDAL_MAKEUP: BridalMakeup[] = [
     image: false,
     lipId: "nude",
     finishId: "dewy",
+    cheek: "#E8B7A2",
+    eye: "#D4B8A4",
     prompt: "Makeup: natural bridal with dewy skin, a nude lip, soft blush, and subtle shimmer.",
   },
   {
@@ -165,6 +172,8 @@ export const BRIDAL_MAKEUP: BridalMakeup[] = [
     image: false,
     lipId: "red",
     finishId: "hd",
+    cheek: "#D9898A",
+    eye: "#8E6A78",
     prompt: "Makeup: a soft red lip, light coverage, and a hint of shimmer. Keep the skin texture.",
   },
   {
@@ -174,6 +183,8 @@ export const BRIDAL_MAKEUP: BridalMakeup[] = [
     image: false,
     lipId: "pink",
     finishId: "glam",
+    cheek: "#E7A0B4",
+    eye: "#C48BB0",
     prompt: "Makeup: soft glam with rose lips, dewy skin, and subtle lid shimmer.",
   },
 ];

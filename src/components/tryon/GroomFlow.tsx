@@ -6,6 +6,7 @@ import { BeforeAfter } from "@/components/tryon/BeforeAfter";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio } from "@/components/tryon/LiveStudio";
+import { LargeFrame, LiveTray, SelectionSummary, StepCard, StepRail, TryBar, scrollToStep } from "@/components/tryon/LookStepper";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import {
   GROOM_BEARDS,
@@ -19,8 +20,13 @@ import {
 import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
 import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
+import { tryNowReady } from "@/lib/try-now";
+import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
+import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
+import { useVisitTries } from "@/components/tryon/useVisitTries";
 
-type Shot = { blob: Blob; url: string };
+type Shot = { blob: Blob; url: string; digest: string; serverId?: string };
+type LookResult = CachedLook & { after: string; panel: Panel };
 type Target = "face" | "own-face" | GroomSlotId;
 type Panel = "looks" | "own";
 
@@ -44,7 +50,11 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reveal, setReveal] = useState("");
-  const [result, setResult] = useState<{ name: string; before: string; after: string } | null>(null);
+  const [result, setResult] = useState<LookResult | null>(null);
+  const [served, setServed] = useState({ looks: "", own: "" });
+  const looksCache = useRef(new Map<string, LookResult>());
+  const ownCache = useRef(new Map<string, LookResult>());
+  const visit = useVisitTries(config.slug);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -109,7 +119,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
 
   async function fileToShot(file: File) {
     const blob = file.slice(0, file.size, file.type || "image/jpeg");
-    return { blob, url: URL.createObjectURL(blob) };
+    return shotFromBlob(blob);
   }
 
   function openFile(target: Target) {
@@ -155,68 +165,110 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
     if (!blob) return;
     const target = live;
     stopLive();
-    storeShot(target, { blob, url: URL.createObjectURL(blob) });
+    storeShot(target, await shotFromBlob(blob));
+  }
+
+  function itemKey() {
+    return GROOM_OWN_SLOTS.map((slot) => `${slot.id}:${items[slot.id]?.digest || ""}`).join(",");
+  }
+
+  function previewKey(kind: Panel, shot: Shot) {
+    return kind === "own"
+      ? selectionKey(shot.digest, { items: itemKey() })
+      : selectionKey(shot.digest, { hair: hairId, beard: beardId, grooming: groomingId });
+  }
+
+  function showSaved(kind: Panel, key: string, saved: LookResult) {
+    setReveal(saved.after);
+    setResult(saved);
+    setServed((current) => ({ ...current, [kind]: key }));
   }
 
   async function generate(kind: Panel) {
     const shot = kind === "own" ? ownFace : face;
     if (busy || !shot) return;
+    const key = previewKey(kind, shot);
+    const cache = kind === "own" ? ownCache.current : looksCache.current;
+    const cached = cache.get(key);
+    if (cached) {
+      showSaved(kind, key, cached);
+      return;
+    }
     stopLive();
     setBusy(true);
     setError("");
+    scrollToStep(kind === "own" ? "groom-own-photo" : "groom-photo");
     try {
-      const body = new FormData();
-      body.set("photo", shot.blob, "selfie.jpg");
-      body.set("slug", config.slug);
-      body.set("sessionId", guestSessionId());
-      const consentId = (await consent.persist()) || consent.consentId();
-      if (consentId) body.set("consentId", consentId);
-      body.set("requestId", crypto.randomUUID());
-      if (kind === "looks") {
-        if (hairId) body.set("hair", hairId);
-        if (beardId) body.set("beard", beardId);
-        if (groomingId) body.set("grooming", groomingId);
-      } else {
-        for (const slot of GROOM_OWN_SLOTS) {
-          const item = items[slot.id];
-          if (item) body.set(slot.id, item.blob, `${slot.id}.jpg`);
-        }
-      }
-      const res = await fetch("/api/v1/groom", { method: "POST", body });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "That preview did not finish.");
+      const outcome = await takePreview({
+        cache,
+        key,
+        used: visit.used,
+        allowance: visit.allowance,
+        generate: async () => {
+          const body = new FormData();
+          attachSelfie(body, shot, "selfie.jpg");
+          body.set("slug", config.slug);
+          body.set("sessionId", guestSessionId());
+          const consentId = (await consent.persist()) || consent.consentId();
+          if (consentId) body.set("consentId", consentId);
+          body.set("requestId", crypto.randomUUID());
+          if (kind === "looks") {
+            if (hairId) body.set("hair", hairId);
+            if (beardId) body.set("beard", beardId);
+            if (groomingId) body.set("grooming", groomingId);
+          } else {
+            for (const slot of GROOM_OWN_SLOTS) {
+              const item = items[slot.id];
+              if (item) body.set(slot.id, item.blob, `${slot.id}.jpg`);
+            }
+          }
+          const res = await fetch("/api/v1/groom", { method: "POST", body });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if (data.error === "VISIT_CAP") visit.applyBody(data);
+            throw new Error(data.message || "That preview did not finish.");
+          }
+          const contentType = res.headers.get("content-type") || "";
+          if (contentType.includes("json")) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.message || "That preview did not finish.");
+          }
+          visit.applyHeaders(res);
+          const photoId = readPhotoId(res);
+          if (photoId) {
+            const mark = (current: Shot | null) => current && current.digest === shot.digest ? { ...current, serverId: photoId } : current;
+            if (kind === "own") setOwnFace(mark);
+            else setFace(mark);
+          }
+          const out = URL.createObjectURL(await res.blob());
+          const name = kind === "own" ? "Your own look" : GROOM_HAIR.find((item) => item.id === hairId)?.name || "Groom look";
+          return { url: out, name, before: shot.url, after: out, panel: kind };
+        },
+      });
+      if ("blocked" in outcome && outcome.blocked) {
+        setError(VISIT_CAP_MESSAGE);
         return;
       }
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("json")) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "That preview did not finish.");
-        return;
-      }
-      const out = URL.createObjectURL(await res.blob());
-      const name = kind === "own" ? "Your own look" : GROOM_HAIR.find((item) => item.id === hairId)?.name || "Groom look";
-      setReveal(out);
-      setResult({ name, before: shot.url, after: out });
+      if (outcome.result) showSaved(kind, key, outcome.result);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "That preview did not finish.");
     } finally {
       setBusy(false);
     }
   }
 
-  function chipRow(label: string, hint: string, group: string, choices: GroomChoice[], value: string, onChange: (id: string) => void) {
+  function chipRow(id: string, title: string, hint: string, group: string, choices: GroomChoice[], value: string, onChange: (id: string) => void) {
     return (
-      <div data-step={group}>
-        <p className="mb-2 text-sm font-medium">{label}</p>
-        {hint ? <p className="mb-2 text-sm text-muted">{hint}</p> : null}
+      <StepCard id={id} title={title} hint={hint}>
         {hairPills.length > 1 ? (
-          <div className="mb-2 flex flex-wrap gap-2" data-pills="category" role="group" aria-label={`${group} category`} />
+          <div className="flex flex-wrap gap-2" data-pills="category" role="group" aria-label={`${group} category`} />
         ) : null}
         <div className="flex flex-wrap gap-2" role="group" aria-label={group}>
           {choices.map((item) => (
             <button key={item.id} className="chip" type="button" aria-pressed={value === item.id} onClick={() => onChange(value === item.id ? "" : item.id)}>{item.name}</button>
           ))}
         </div>
-      </div>
+      </StepCard>
     );
   }
 
@@ -225,6 +277,40 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
     if (target === "own-face") return ownFace;
     return items[target];
   };
+  const looksKey = face ? selectionKey(face.digest, { hair: hairId, beard: beardId, grooming: groomingId }) : "";
+  const ownKey = ownFace ? selectionKey(ownFace.digest, { items: itemKey() }) : "";
+  const looksButton = tryButton({
+    ready: tryNowReady(Boolean(face), true),
+    sameAsResult: Boolean(result?.panel === "looks" && looksKey && looksKey === served.looks),
+    atLimit: visit.atLimit,
+    cached: Boolean(looksKey && looksCache.current.has(looksKey)),
+  });
+  const ownButton = tryButton({
+    ready: tryNowReady(Boolean(ownFace), true),
+    sameAsResult: Boolean(result?.panel === "own" && ownKey && ownKey === served.own),
+    atLimit: visit.atLimit,
+    cached: Boolean(ownKey && ownCache.current.has(ownKey)),
+  });
+  const counter = tryCounterLabel(visit.used, visit.allowance);
+  const capNote = (text: string) => text ? `${text}${visit.code ? `. Code ${visit.code}` : ""}` : "";
+
+  useEffect(() => {
+    if (panel !== "looks" || !looksKey) return;
+    const saved = looksCache.current.get(looksKey);
+    if (!saved) return;
+    setReveal(saved.after);
+    setResult(saved);
+    setServed((current) => current.looks === looksKey ? current : { ...current, looks: looksKey });
+  }, [panel, looksKey]);
+
+  useEffect(() => {
+    if (panel !== "own" || !ownKey) return;
+    const saved = ownCache.current.get(ownKey);
+    if (!saved) return;
+    setReveal(saved.after);
+    setResult(saved);
+    setServed((current) => current.own === ownKey ? current : { ...current, own: ownKey });
+  }, [panel, ownKey]);
 
   return (
     <div data-groom="flow" className="grid gap-4">
@@ -232,54 +318,72 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
       <h2 className="page-title">Groom</h2>
       <p className="text-sm text-muted">Wedding hair, a neat beard, and natural skin. Or dress him in his own clothes.</p>
       <div className="seg" role="tablist" aria-label="Groom">
-        <button className="seg-btn" type="button" role="tab" aria-selected={panel === "looks"} onClick={() => { setPanel("looks"); setResult(null); setReveal(""); }}>Looks</button>
-        <button className="seg-btn" type="button" role="tab" aria-selected={panel === "own"} onClick={() => { setPanel("own"); setResult(null); setReveal(""); }}>Your own look</button>
+        <button className="seg-btn" type="button" role="tab" aria-selected={panel === "looks"} onClick={() => setPanel("looks")}>Looks</button>
+        <button className="seg-btn" type="button" role="tab" aria-selected={panel === "own"} onClick={() => setPanel("own")}>Your own look</button>
       </div>
 
       <div className={panel === "looks" ? "grid gap-4" : "hidden"} data-panel="looks">
-          {chipRow("1. Wedding hair", "Optional. Tap again to keep his hair.", "Hair", GROOM_HAIR, hairId, setHairId)}
-          {chipRow("2. Beard", "Optional. Tap again to keep his beard.", "Beard", GROOM_BEARDS, beardId, setBeardId)}
-          {chipRow("3. Grooming", "Facial glow, or leave the skin natural.", "Grooming", GROOM_GROOMING, groomingId, setGroomingId)}
-          <PhotoStep
-            title="4. Your selfie"
-            target="face"
-            shot={face}
-            live={live}
-            reveal={panel === "looks" ? reveal : ""}
-            busy={busy && panel === "looks"}
-            camReady={camReady}
-            zoom={zoom}
-            videoRef={videoRef}
-            boxRef={(node) => { boxes.current.face = node; }}
-            onZoom={setZoom}
-            onLive={() => beginLive("face")}
-            onUpload={() => openFile("face")}
-            onClose={stopLive}
-            onShutter={captureLive}
+          <StepRail
+            label="Groom steps"
+            current="groom-hair"
+            steps={[
+              { id: "groom-hair", label: "Hair", icon: "hair" },
+              { id: "groom-beard", label: "Beard", icon: "beard" },
+              { id: "groom-grooming", label: "Grooming", icon: "groom" },
+              { id: "groom-photo", label: "Photo", icon: "photo" },
+            ]}
           />
-          {face && !busy ? <button className="btn sheen" type="button" onClick={() => void generate("looks")}>{result ? "See your look again" : "See your look"}</button> : null}
+          {chipRow("groom-hair", "Hair", "Optional. Tap again to keep his hair.", "Hair", GROOM_HAIR, hairId, setHairId)}
+          {chipRow("groom-beard", "Beard", "Optional. Tap again to keep his beard.", "Beard", GROOM_BEARDS, beardId, setBeardId)}
+          {chipRow("groom-grooming", "Grooming", "Facial glow, or leave the skin natural.", "Grooming", GROOM_GROOMING, groomingId, setGroomingId)}
+          <section id="groom-photo" className="step-card grid gap-3" data-step="photo">
+            <h3 className="text-base font-semibold leading-tight">Photo</h3>
+            <SelectionSummary rows={[
+              { id: "groom-hair", label: "Hair", value: GROOM_HAIR.find((item) => item.id === hairId)?.name || "Keep his hair" },
+              { id: "groom-beard", label: "Beard", value: GROOM_BEARDS.find((item) => item.id === beardId)?.name || "Keep his beard" },
+              { id: "groom-grooming", label: "Grooming", value: GROOM_GROOMING.find((item) => item.id === groomingId)?.name || "Natural skin" },
+            ]} />
+            {result?.panel === "looks" && !busy && panel === "looks" ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
+            <PhotoStep
+              title=""
+              target="face"
+              shot={face}
+              live={live}
+              reveal={panel === "looks" ? reveal : ""}
+              busy={busy && panel === "looks"}
+              camReady={camReady}
+              zoom={zoom}
+              videoRef={videoRef}
+              boxRef={(node) => { boxes.current.face = node; }}
+              onZoom={setZoom}
+              onLive={() => beginLive("face")}
+              onUpload={() => openFile("face")}
+              onClose={stopLive}
+              onShutter={captureLive}
+              large
+              preview={result?.panel === "looks" && !busy && panel === "looks" ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
+            />
+            <TryBar
+              label={looksButton.label}
+              enabled={looksButton.enabled}
+              busy={busy}
+              counter={counter}
+              note={capNote(looksButton.note)}
+              onClick={() => void generate("looks")}
+            />
+          </section>
         </div>
       <div data-own="flow" className={panel === "own" ? "grid gap-4" : "hidden"}>
-          <PhotoStep
-            title="1. Your selfie"
-            target="own-face"
-            shot={ownFace}
-            live={live}
-            reveal={panel === "own" ? reveal : ""}
-            busy={busy && panel === "own"}
-            camReady={camReady}
-            zoom={zoom}
-            videoRef={videoRef}
-            boxRef={(node) => { boxes.current["own-face"] = node; }}
-            onZoom={setZoom}
-            onLive={() => beginLive("own-face")}
-            onUpload={() => openFile("own-face")}
-            onClose={stopLive}
-            onShutter={captureLive}
+          <StepRail
+            label="Own look steps"
+            current="groom-clothes"
+            steps={[
+              { id: "groom-clothes", label: "Clothes", icon: "clothes" },
+              { id: "groom-own-photo", label: "Photo", icon: "photo" },
+            ]}
           />
-          <div data-step="items">
-            <p className="mb-2 text-sm font-medium">2. Your clothes</p>
-            <p className="mb-3 text-sm text-muted">Optional. Take a close-up of each piece on its own. These photos are deleted after the preview and are never published.</p>
+          <StepCard id="groom-clothes" title="Clothes" hint="Optional. Take a close-up of each piece on its own. These photos are deleted after the preview and are never published.">
+            <p className="text-sm text-muted">Take a close-up of each piece on its own.</p>
             <div className="grid gap-4">
               {GROOM_OWN_SLOTS.map((slot) => (
                 <div key={slot.id} data-item={slot.id}>
@@ -305,20 +409,46 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
                 </div>
               ))}
             </div>
-          </div>
-          {ownFace && !busy ? <button className="btn sheen" type="button" onClick={() => void generate("own")}>{result ? "See your look again" : "See your look"}</button> : null}
+          </StepCard>
+          <section id="groom-own-photo" className="step-card grid gap-3" data-step="own-photo">
+            <h3 className="text-base font-semibold leading-tight">Photo</h3>
+            <SelectionSummary rows={[
+              { id: "groom-clothes", label: "Clothes", value: GROOM_OWN_SLOTS.filter((slot) => items[slot.id]).map((slot) => slot.label).join(", ") || "No extra pieces" },
+              { id: "groom-own-photo", label: "Photo", value: ownFace ? "Selfie added" : "Add a selfie" },
+            ]} />
+            {result?.panel === "own" && !busy && panel === "own" ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
+            <PhotoStep
+              title=""
+              target="own-face"
+              shot={ownFace}
+              live={live}
+              reveal={panel === "own" ? reveal : ""}
+              busy={busy && panel === "own"}
+              camReady={camReady}
+              zoom={zoom}
+              videoRef={videoRef}
+              boxRef={(node) => { boxes.current["own-face"] = node; }}
+              onZoom={setZoom}
+              onLive={() => beginLive("own-face")}
+              onUpload={() => openFile("own-face")}
+              onClose={stopLive}
+              onShutter={captureLive}
+              large
+              preview={result?.panel === "own" && !busy && panel === "own" ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
+            />
+            <TryBar
+              label={ownButton.label}
+              enabled={ownButton.enabled}
+              busy={busy}
+              counter={counter}
+              note={capNote(ownButton.note)}
+              onClick={() => void generate("own")}
+            />
+          </section>
         </div>
 
       {camError ? <p className="text-sm" role="alert">{camError}</p> : null}
       {error ? <p className="text-sm" role="status">{error}</p> : null}
-      {result && !busy ? (
-        <div className="grid gap-3">
-          <p className="text-center text-xs font-semibold uppercase tracking-wide">Your groom look</p>
-          <h3 className="text-center font-serif text-2xl">{result.name}</h3>
-          <BeforeAfter before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" />
-          <p className="text-center text-xs text-muted">A preview for your trial. The salon’s grooming on the day is the real result.</p>
-        </div>
-      ) : null}
       <input
         ref={fileRef}
         className="sr-only"
@@ -354,6 +484,8 @@ function PhotoStep({
   onUpload,
   onClose,
   onShutter,
+  large = false,
+  preview = null,
 }: {
   title: string;
   target: Target;
@@ -370,42 +502,45 @@ function PhotoStep({
   onUpload: () => void;
   onClose: () => void;
   onShutter: () => void;
+  large?: boolean;
+  preview?: ReactNode;
 }) {
   const open = live === target;
   const faceTarget = target === "face" || target === "own-face";
-  const filled = open || Boolean(shot) || Boolean(reveal);
   const loading: ReactNode = busy ? <GeneratingLook tool={target === "face" ? "groom" : "groom-own"} blur={false} /> : null;
+  const frame = open ? (
+    <LiveStudio
+      videoRef={videoRef}
+      ready={camReady}
+      facing={faceTarget ? "user" : "environment"}
+      guide={faceTarget ? "face" : "hand"}
+      zoom={zoom}
+      onZoom={onZoom}
+      onBack={onClose}
+      onClose={onClose}
+      onShutter={onShutter}
+      onRetake={onLive}
+      chrome={large ? "clean" : "overlay"}
+    />
+  ) : preview ? preview : (
+    <>
+      {shot ? <img src={shot.url} alt={title || "Your selfie"} className={large ? "absolute inset-0 h-full w-full object-cover" : "h-full w-full object-cover"} /> : null}
+      {reveal ? <img src={reveal} alt="" className="gen-reveal absolute inset-0 h-full w-full object-cover" /> : null}
+      {loading}
+      {!shot && !busy && !reveal ? <p className={large ? "absolute inset-0 grid place-items-center px-6 text-center text-sm" : undefined}>{faceTarget ? "Face the light. No sunglasses." : "A clear photo of the piece."}</p> : null}
+    </>
+  );
   return (
     <div data-photo-cluster="yes">
       {title ? <p className="mb-2 text-sm font-medium">{title}</p> : null}
-      <div ref={boxRef} data-photo-box={target} className={filled ? "relative mx-auto aspect-[3/4] max-h-[240px] w-full max-w-sm overflow-hidden rounded-2xl" : "photo-slot mx-auto w-full max-w-sm"}>
-        {open ? (
-          <LiveStudio
-            videoRef={videoRef}
-            ready={camReady}
-            facing={faceTarget ? "user" : "environment"}
-            guide={faceTarget ? "face" : "hand"}
-            zoom={zoom}
-            onZoom={onZoom}
-            onBack={onClose}
-            onClose={onClose}
-            onShutter={onShutter}
-            onRetake={onLive}
-            onUpload={() => { onClose(); onUpload(); }}
-          />
-        ) : (
-          <>
-            {shot ? <img src={shot.url} alt={title || target} className="h-full w-full object-cover" /> : null}
-            {reveal ? <img src={reveal} alt="" className="gen-reveal absolute inset-0 h-full w-full object-cover" /> : null}
-            {loading}
-            {!shot && !busy && !reveal ? <p>{faceTarget ? "Face the light. No sunglasses." : "A clear photo of the piece."}</p> : null}
-          </>
-        )}
-      </div>
+      {large ? <LargeFrame boxRef={boxRef} name={target}>{frame}</LargeFrame> : (
+        <div ref={boxRef} data-photo-box={target} className={open ? "relative mx-auto aspect-[3/4] max-h-[280px] w-full max-w-sm overflow-hidden rounded-2xl bg-black" : "photo-slot mx-auto w-full max-w-sm"}>{frame}</div>
+      )}
+      {open && large ? <LiveTray ready={camReady} onShutter={() => void onShutter()} /> : null}
       {busy || open ? null : (
-        <div className="mx-auto mt-2 grid w-full max-w-sm gap-2" data-photo-actions="yes">
-          <button className="btn sheen" type="button" onClick={onLive}>Take photo</button>
-          <button className="btn secondary" type="button" onClick={onUpload}>Use photo</button>
+        <div className="grid w-full max-w-[28rem] gap-2" data-photo-actions="yes">
+          <button className="btn sheen" type="button" onClick={onLive}>{faceTarget ? "Take selfie" : "Take photo"}</button>
+          <button className="btn secondary" type="button" onClick={onUpload}>{faceTarget ? "Upload" : "Use photo"}</button>
         </div>
       )}
     </div>

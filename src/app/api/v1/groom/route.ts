@@ -10,7 +10,7 @@ import { beginPaidCall, finalizePaidCall, releasePaidCall } from "@/lib/ai/spend
 import { costUsdFromUsage, type UsageNumbers } from "@/lib/ai/tiers";
 import { guestPreviewHeaders } from "@/lib/ai/guest-response";
 import { CreditError, reserveCredits, settleCredits } from "@/lib/credits";
-import { ImageError } from "@/lib/images";
+import { ImageError, sanitizeSelfie } from "@/lib/images";
 import { logProviderCall } from "@/lib/logger";
 import { ensurePhotoConsent } from "@/lib/photo-consent";
 import { AI_PREVIEW_KINDS, actorKeyFor, capForTier, hashIp, readGuestToken, verifySalonToken, type PreviewTier } from "@/lib/preview-access";
@@ -19,6 +19,7 @@ import { requestClientIp } from "@/lib/ratelimit";
 import { deleteObject, putObject } from "@/lib/storage";
 import { auth } from "@/auth";
 import { consumePreviewRateShared, guestLimitMessage } from "@/lib/tools";
+import { isPhotoId, loadVisitPhoto, rememberVisitPhoto, refuseVisit, stampVisit } from "@/lib/visit-allowance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,10 +97,12 @@ export async function POST(req: Request) {
   const sessionId = String(form.get("sessionId") || "");
   const consentId = String(form.get("consentId") || "");
   const photo = form.get("photo");
-  if (!slug || sessionId.length < 8 || !(photo instanceof File)) {
+  const photoIdIn = String(form.get("photoId") || "");
+  const reusePhoto = isPhotoId(photoIdIn);
+  if (!slug || sessionId.length < 8 || (!reusePhoto && !(photo instanceof File))) {
     return NextResponse.json({ error: "INVALID", message: "Your selfie and session are required." }, { status: 400 });
   }
-  if (photo.size > GROOM_MAX_BYTES) {
+  if (photo instanceof File && photo.size > GROOM_MAX_BYTES) {
     return NextResponse.json({ error: "SIZE", message: "Please use a photo under 2 MB." }, { status: 413 });
   }
 
@@ -118,6 +121,24 @@ export async function POST(req: Request) {
     consentId,
     userAgent: req.headers.get("user-agent") || "",
   });
+
+  let selfie: Buffer;
+  let servedPhotoId = photoIdIn;
+  if (reusePhoto) {
+    const stored = await loadVisitPhoto(tenant.id, sessionId, photoIdIn);
+    if (!stored) return NextResponse.json({ error: "PHOTO", message: "Add the photo again." }, { status: 400 });
+    selfie = stored;
+  } else {
+    try {
+      selfie = await sanitizeSelfie(Buffer.from(await (photo as File).arrayBuffer()));
+    } catch (error) {
+      const code = error instanceof ImageError ? error.code : "DECODE";
+      return NextResponse.json({ error: code, message: "Use a JPEG, PNG, or WebP selfie under 2 MB." }, { status: 400 });
+    }
+    servedPhotoId = await rememberVisitPhoto(tenant.id, sessionId, selfie);
+  }
+  const blocked = await refuseVisit(tenant.id, sessionId, tenant.visitTryLimit);
+  if (blocked) return NextResponse.json(blocked, { status: 429 });
 
   const items: { id: string; bytes: Buffer }[] = [];
   for (const slot of GROOM_OWN_SLOTS) {
@@ -179,7 +200,7 @@ export async function POST(req: Request) {
 
   try {
     const result = await generateGroom({
-      selfie: Buffer.from(await photo.arrayBuffer()),
+      selfie,
       items,
       hairId,
       beardId,
@@ -262,10 +283,12 @@ export async function POST(req: Request) {
     });
     await settleCredits(tenant.id, creditRef, "COMMIT");
     const balance = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { creditBalance: true } });
-    return new NextResponse(new Uint8Array(jpeg), {
+    const response = new NextResponse(new Uint8Array(jpeg), {
       status: 200,
       headers: guestPreviewHeaders({ tryOnId: tryOn.id, creditsLeft: balance?.creditBalance ?? 0 }),
     });
+    await stampVisit(response, tenant.id, sessionId, tenant.visitTryLimit, servedPhotoId);
+    return response;
   } catch (error) {
     if (reserved) await settleCredits(tenant.id, creditRef, "REFUND").catch(() => undefined);
     if (callId) {

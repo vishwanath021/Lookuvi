@@ -6,6 +6,7 @@ import { BeforeAfter } from "@/components/tryon/BeforeAfter";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio } from "@/components/tryon/LiveStudio";
+import { LargeFrame, LiveTray, MakeupSwatches, SelectionSummary, StepCard, StepRail, TryBar, scrollToStep } from "@/components/tryon/LookStepper";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import { OWN_LOOK_SLOTS, type OwnLookSlotId } from "@/data/bridal-own";
 import {
@@ -19,8 +20,13 @@ import {
 import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
 import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
+import { tryNowReady } from "@/lib/try-now";
+import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
+import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
+import { useVisitTries } from "@/components/tryon/useVisitTries";
 
-type Shot = { blob: Blob; url: string };
+type Shot = { blob: Blob; url: string; digest: string; serverId?: string };
+type LookResult = CachedLook & { after: string };
 type Target = "face" | OwnLookSlotId;
 
 function remember(current: Shot | undefined, next: Shot) {
@@ -40,7 +46,10 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reveal, setReveal] = useState("");
-  const [result, setResult] = useState<{ name: string; before: string; after: string } | null>(null);
+  const [result, setResult] = useState<LookResult | null>(null);
+  const [servedKey, setServedKey] = useState("");
+  const cache = useRef(new Map<string, LookResult>());
+  const visit = useVisitTries(config.slug);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -106,7 +115,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
 
   async function fileToShot(file: File) {
     const blob = file.slice(0, file.size, file.type || "image/jpeg");
-    return { blob, url: URL.createObjectURL(blob) };
+    return shotFromBlob(blob);
   }
 
   function openFile(target: Target) {
@@ -152,42 +161,76 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
     if (!blob) return;
     const target = live;
     stopLive();
-    storeShot(target, { blob, url: URL.createObjectURL(blob) });
+    storeShot(target, await shotFromBlob(blob));
+  }
+
+  function currentKey(shot: Shot) {
+    const pieces = OWN_LOOK_SLOTS.map((slot) => `${slot.id}:${items[slot.id]?.digest || ""}`).join(",");
+    return selectionKey(shot.digest, { makeup: makeupId, items: pieces });
+  }
+
+  function showSaved(key: string, saved: LookResult) {
+    setReveal(saved.after);
+    setResult(saved);
+    setServedKey(key);
   }
 
   async function generate() {
     if (busy || !face || !chosen) return;
+    const key = currentKey(face);
+    const cached = cache.current.get(key);
+    if (cached) {
+      showSaved(key, cached);
+      return;
+    }
     stopLive();
     setBusy(true);
     setError("");
+    scrollToStep("own-photo");
     try {
-      const body = new FormData();
-      body.set("photo", face.blob, "selfie.jpg");
-      body.set("slug", config.slug);
-      body.set("sessionId", guestSessionId());
-      const consentId = (await consent.persist()) || consent.consentId();
-      if (consentId) body.set("consentId", consentId);
-      body.set("requestId", crypto.randomUUID());
-      body.set("makeup", chosen.id);
-      for (const slot of OWN_LOOK_SLOTS) {
-        const shot = items[slot.id];
-        if (shot) body.set(slot.id, shot.blob, `${slot.id}.jpg`);
-      }
-      const res = await fetch("/api/v1/bridal/own", { method: "POST", body });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "That preview did not finish.");
+      const outcome = await takePreview({
+        cache: cache.current,
+        key,
+        used: visit.used,
+        allowance: visit.allowance,
+        generate: async () => {
+          const body = new FormData();
+          attachSelfie(body, face, "selfie.jpg");
+          body.set("slug", config.slug);
+          body.set("sessionId", guestSessionId());
+          const consentId = (await consent.persist()) || consent.consentId();
+          if (consentId) body.set("consentId", consentId);
+          body.set("requestId", crypto.randomUUID());
+          body.set("makeup", chosen.id);
+          for (const slot of OWN_LOOK_SLOTS) {
+            const shot = items[slot.id];
+            if (shot) body.set(slot.id, shot.blob, `${slot.id}.jpg`);
+          }
+          const res = await fetch("/api/v1/bridal/own", { method: "POST", body });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if (data.error === "VISIT_CAP") visit.applyBody(data);
+            throw new Error(data.message || "That preview did not finish.");
+          }
+          const contentType = res.headers.get("content-type") || "";
+          if (contentType.includes("json")) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.message || "That preview did not finish.");
+          }
+          visit.applyHeaders(res);
+          const photoId = readPhotoId(res);
+          if (photoId) setFace((current) => current && current.digest === face.digest ? { ...current, serverId: photoId } : current);
+          const out = URL.createObjectURL(await res.blob());
+          return { url: out, name: chosen.name, before: face.url, after: out };
+        },
+      });
+      if ("blocked" in outcome && outcome.blocked) {
+        setError(VISIT_CAP_MESSAGE);
         return;
       }
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("json")) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "That preview did not finish.");
-        return;
-      }
-      const out = URL.createObjectURL(await res.blob());
-      setReveal(out);
-      setResult({ name: chosen.name, before: face.url, after: out });
+      if (outcome.result) showSaved(key, outcome.result);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "That preview did not finish.");
     } finally {
       setBusy(false);
     }
@@ -199,45 +242,50 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
     if (!shown.some((card) => card.id === makeupId) && shown[0]) setMakeupId(shown[0].id);
   }
 
+  const itemNames = OWN_LOOK_SLOTS.filter((slot) => items[slot.id]).map((slot) => slot.label).join(", ") || "No extra pieces";
+  const ownKey = face ? currentKey(face) : "";
+  const ownButton = tryButton({
+    ready: tryNowReady(Boolean(face), Boolean(chosen)),
+    sameAsResult: Boolean(result && ownKey && ownKey === servedKey),
+    atLimit: visit.atLimit,
+    cached: Boolean(ownKey && cache.current.has(ownKey)),
+  });
+  const counter = tryCounterLabel(visit.used, visit.allowance);
+  const capNote = ownButton.note ? `${ownButton.note}${visit.code ? `. Code ${visit.code}` : ""}` : "";
+
+  useEffect(() => {
+    if (!ownKey) return;
+    const saved = cache.current.get(ownKey);
+    if (!saved) return;
+    setReveal(saved.after);
+    setResult(saved);
+    setServedKey((current) => current === ownKey ? current : ownKey);
+  }, [ownKey]);
+
   return (
     <div data-own="flow" className="grid gap-4">
       <ConsentSheet open={consent.open} onAgree={() => void consent.agree()} onClose={consent.close} />
-      <div data-step="selfie">
-        <p className="mb-2 text-sm font-medium">1. Your selfie</p>
-        <p className="mb-2 text-sm">Face the light. Keep your whole face inside the outline. No sunglasses.</p>
-        <PhotoBox
-          boxRef={(node) => { boxes.current.face = node; }}
-          name="own-face"
-          alt="Your selfie"
-          shot={face}
-          live={live === "face"}
-          reveal={reveal}
-          showOutline={!busy && !reveal}
-          onLive={() => beginLive("face")}
-          onUpload={() => openFile("face")}
-          camera={live === "face" ? (
-            <LiveStudio
-              videoRef={videoRef}
-              ready={camReady}
-              facing="user"
-              guide="face"
-              zoom={zoom}
-              onZoom={setZoom}
-              onBack={stopLive}
-              onClose={stopLive}
-              onShutter={captureLive}
-              onRetake={() => beginLive("face")}
-              onUpload={() => { stopLive(); openFile("face"); }}
-            />
-          ) : null}
-          loading={busy ? <GeneratingLook tool="bridal-own" blur={false} /> : null}
-          liveLabel="Live makeup"
-        />
-      </div>
-
-      <div data-step="items">
-        <p className="mb-2 text-sm font-medium">2. Your items</p>
-        <p className="mb-3 text-sm text-muted">Optional. Take a close-up of each piece on its own. These photos are deleted after the preview and are never published.</p>
+      <StepRail
+        label="Your own look"
+        current="own-makeup"
+        steps={[
+          { id: "own-makeup", label: "Makeup", icon: "makeup" },
+          { id: "own-items", label: "Pieces", icon: "clothes" },
+          { id: "own-photo", label: "Photo", icon: "photo" },
+        ]}
+      />
+      <StepCard id="own-makeup" title="Makeup">
+        {visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP)).length > 0 ? (
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Makeup style">
+            {visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP)).map((item) => (
+              <button key={item.id} className="chip" type="button" aria-pressed={makeupStyle === item.id} onClick={() => chooseMakeupStyle(item.id)}>{item.label}</button>
+            ))}
+          </div>
+        ) : null}
+        <MakeupSwatches items={makeupCards} value={makeupId} onChange={setMakeupId} />
+      </StepCard>
+      <StepCard id="own-items" title="Your pieces" hint="Optional. Take a close-up of each piece on its own. These photos are deleted after the preview and are never published.">
+        <p className="text-sm text-muted">Take a close-up of each piece on its own.</p>
         <div className="grid gap-4">
           {OWN_LOOK_SLOTS.map((slot) => (
             <div key={slot.id} data-item={slot.id}>
@@ -250,7 +298,6 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
                 shot={items[slot.id]}
                 live={live === slot.id}
                 reveal=""
-                showOutline={false}
                 onLive={() => beginLive(slot.id)}
                 onUpload={() => openFile(slot.id)}
                 camera={live === slot.id ? (
@@ -265,7 +312,6 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
                     onClose={stopLive}
                     onShutter={captureLive}
                     onRetake={() => beginLive(slot.id)}
-                    onUpload={() => { stopLive(); openFile(slot.id); }}
                   />
                 ) : null}
                 liveLabel="Take photo"
@@ -273,37 +319,56 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
             </div>
           ))}
         </div>
-      </div>
-
-      <div data-step="makeup">
-        <p className="mb-2 text-sm font-medium">3. Makeup</p>
-        {visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP)).length > 0 ? (
-          <div className="mb-2 flex flex-wrap gap-2" role="group" aria-label="Makeup style">
-            {visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP)).map((item) => (
-              <button key={item.id} className="chip" type="button" aria-pressed={makeupStyle === item.id} onClick={() => chooseMakeupStyle(item.id)}>{item.label}</button>
-            ))}
-          </div>
-        ) : null}
-        <div className="flex flex-wrap gap-2" role="list" aria-label="Makeup">
-          {makeupCards.map((item) => (
-            <button key={item.id} className="chip" type="button" aria-pressed={item.id === makeupId} onClick={() => setMakeupId(item.id)}>{item.name}</button>
-          ))}
-        </div>
-      </div>
-
-      {face && !busy ? (
-        <button className="btn sheen" type="button" onClick={() => void generate()}>{result ? "See your look again" : "See your look"}</button>
-      ) : null}
+      </StepCard>
+      <section id="own-photo" className="step-card grid gap-3" data-step="selfie">
+        <h3 className="text-base font-semibold leading-tight">Photo</h3>
+        <SelectionSummary rows={[
+          { id: "own-makeup", label: "Makeup", value: chosen?.name || "Makeup" },
+          { id: "own-items", label: "Pieces", value: itemNames },
+        ]} />
+        {result && !busy ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
+        <PhotoBox
+          large
+          boxRef={(node) => { boxes.current.face = node; }}
+          name="face"
+          alt="Your selfie"
+          shot={face}
+          live={live === "face"}
+          reveal={reveal}
+          onLive={() => beginLive("face")}
+          onUpload={() => openFile("face")}
+          camera={live === "face" ? (
+            <LiveStudio
+              videoRef={videoRef}
+              ready={camReady}
+              facing="user"
+              guide="face"
+              zoom={zoom}
+              onZoom={setZoom}
+              onBack={stopLive}
+              onClose={stopLive}
+              onShutter={captureLive}
+              onRetake={() => beginLive("face")}
+              chrome="clean"
+            />
+          ) : null}
+          loading={busy ? <GeneratingLook tool="bridal-own" blur={false} /> : null}
+          liveLabel="Live makeup"
+          trayReady={camReady}
+          onShutter={() => void captureLive()}
+          preview={result && !busy ? <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" /> : null}
+        />
+        <TryBar
+          label={ownButton.label}
+          enabled={ownButton.enabled}
+          busy={busy}
+          counter={counter}
+          note={capNote}
+          onClick={() => void generate()}
+        />
+      </section>
       {camError ? <p className="text-sm" role="alert">{camError}</p> : null}
       {error ? <p className="text-sm" role="status">{error}</p> : null}
-      {result && !busy ? (
-        <div className="grid gap-3">
-          <p className="text-center text-xs font-semibold uppercase tracking-wide">Your own look</p>
-          <h3 className="text-center font-serif text-2xl">{result.name}</h3>
-          <BeforeAfter before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" />
-          <p className="text-center text-xs text-muted">A preview for your trial. The salon’s makeup on the day is the real result.</p>
-        </div>
-      ) : null}
       <input
         ref={fileRef}
         className="sr-only"
@@ -329,12 +394,15 @@ function PhotoBox({
   shot,
   live,
   reveal,
-  showOutline,
   onLive,
   onUpload,
   camera,
   loading,
   liveLabel,
+  large = false,
+  preview = null,
+  trayReady = false,
+  onShutter,
 }: {
   boxRef: (node: HTMLDivElement | null) => void;
   name: string;
@@ -342,41 +410,36 @@ function PhotoBox({
   shot?: Shot | null;
   live: boolean;
   reveal: string;
-  showOutline: boolean;
   onLive: () => void;
   onUpload: () => void;
   camera: ReactNode;
   loading?: ReactNode;
   liveLabel: string;
+  large?: boolean;
+  preview?: ReactNode;
+  trayReady?: boolean;
+  onShutter?: () => void;
 }) {
+  const body = live ? camera : preview ? preview : (
+    <>
+      {shot ? <img src={shot.url} alt={alt} className={large ? "absolute inset-0 h-full w-full object-cover" : "h-full w-full object-cover"} /> : null}
+      {reveal ? <img src={reveal} alt="" className="gen-reveal absolute inset-0 h-full w-full object-cover" /> : null}
+      {loading}
+      {!shot && !loading && !reveal ? <p className={large ? "absolute inset-0 grid place-items-center px-6 text-center text-sm" : undefined}>{large ? "Face the light. No sunglasses." : "A clear photo of the piece."}</p> : null}
+    </>
+  );
   return (
-    <div>
-      <div ref={boxRef} data-photo-box={name} className="relative mx-auto aspect-[3/4] max-h-[520px] w-full max-w-sm overflow-hidden rounded-2xl bg-[#F3E6D8]">
-        {live ? camera : (
-          <>
-            {shot ? <img src={shot.url} alt={alt} className="h-full w-full object-cover" /> : null}
-            {reveal ? <img src={reveal} alt="" className="gen-reveal absolute inset-0 h-full w-full object-cover" /> : null}
-            {loading}
-            {showOutline ? (
-              <div className="pointer-events-none absolute inset-0 grid place-items-center" aria-hidden="true">
-                <div className="h-[68%] w-[56%] rounded-[50%] border-2 border-white/90 shadow-sm" />
-              </div>
-            ) : null}
-            {!shot && !loading ? (
-              <div className="absolute inset-0 grid content-center justify-items-center gap-3 px-6">
-                <button className="btn sheen min-w-44" type="button" onClick={onLive}>{liveLabel}</button>
-                <button className="btn secondary min-w-44" type="button" onClick={onUpload}>Use photo</button>
-              </div>
-            ) : null}
-          </>
-        )}
-      </div>
-      {shot && !loading && !live ? (
-        <div className="mx-auto mt-3 grid max-w-sm gap-2">
+    <div data-photo-cluster={large ? "yes" : undefined}>
+      {large ? <LargeFrame boxRef={boxRef} name={name}>{body}</LargeFrame> : (
+        <div ref={boxRef} data-photo-box={name} className={live ? "relative mx-auto aspect-[3/4] max-h-[280px] w-full max-w-sm overflow-hidden rounded-2xl bg-black" : "photo-slot mx-auto w-full max-w-sm"}>{body}</div>
+      )}
+      {live && large && onShutter ? <LiveTray ready={trayReady} onShutter={onShutter} /> : null}
+      {loading || live ? null : (
+        <div className="mt-2 grid w-full max-w-[28rem] gap-2" data-photo-actions="yes">
           <button className="btn sheen" type="button" onClick={onLive}>{liveLabel}</button>
-          <button className="btn secondary" type="button" onClick={onUpload}>Use photo</button>
+          <button className="btn secondary" type="button" onClick={onUpload}>{large ? "Upload" : "Use photo"}</button>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SalonModeCard } from "@/components/admin/SalonModeCard";
+import { VisitUnlock } from "@/components/admin/VisitUnlock";
 import type { ToolId } from "@/lib/tools";
 
 export function SettingsForm({
@@ -37,6 +38,7 @@ export function SettingsForm({
     requireLoginToBook: boolean;
     productBridal: boolean;
     productGroom: boolean;
+    visitTryLimit: number;
     logoUrl: string | null;
   };
   canRemoveBranding: boolean;
@@ -160,6 +162,9 @@ export function SettingsForm({
           <legend className="font-medium">Looks on the customer screen</legend>
           <label className="flex items-center gap-2"><input type="checkbox" aria-label="Bridal" checked={form.productBridal} onChange={(event) => set("productBridal", event.target.checked)} /> Bridal. On by default. Off hides the Bridal tab.</label>
           <label className="flex items-center gap-2"><input type="checkbox" aria-label="Groom" checked={form.productGroom} onChange={(event) => set("productGroom", event.target.checked)} /> Groom. Off by default. On shows hair, beard, grooming, and his own clothes.</label>
+          <label className="text-sm">Bridal and groom tries per visit
+            <input className="field mt-1" type="number" min={1} max={20} aria-label="Tries per visit" value={form.visitTryLimit} onChange={(event) => set("visitTryLimit", Number(event.target.value))} />
+          </label>
         </fieldset>
         {showTryOn ? <>
         <fieldset className="grid gap-2 text-sm">
@@ -253,6 +258,7 @@ export function SettingsForm({
       </form>
       </section>
       {message && <p className="text-sm" role="status">{message}</p>}
+      <VisitUnlock />
     </div>
   );
 }

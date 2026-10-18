@@ -162,6 +162,7 @@ describe("groom screen and switches", () => {
         requireLoginToBook: false,
         productBridal: true,
         productGroom: false,
+        visitTryLimit: 3,
         logoUrl: null,
       },
       canRemoveBranding: false,

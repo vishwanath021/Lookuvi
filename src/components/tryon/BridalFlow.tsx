@@ -7,7 +7,9 @@ import { BridalOwnLook } from "@/components/tryon/BridalOwnLook";
 import { BridalLookCard } from "@/components/tryon/BridalLookCard";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
-import { LiveStudio, StudioRail } from "@/components/tryon/LiveStudio";
+import { LiveStudio } from "@/components/tryon/LiveStudio";
+import { LargeFrame, LiveTray, MakeupSwatches, SelectionSummary, StepCard, StepRail, TryBar } from "@/components/tryon/LookStepper";
+import { useVisitTries } from "@/components/tryon/useVisitTries";
 import { MakeupStage } from "@/components/tryon/MakeupStage";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
@@ -31,6 +33,9 @@ import {
 } from "@/data/bridal";
 import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
+import { tryNowReady } from "@/lib/try-now";
+import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
+import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
 
 function EyeIcon() {
   return (
@@ -78,7 +83,8 @@ type SavedLook = {
   kind: "look" | "mehendi";
 };
 
-type Shot = { blob: Blob; url: string };
+type Shot = { blob: Blob; url: string; digest: string; serverId?: string };
+type LookResult = CachedLook & { after: string; share: string; lookId: string; kind: "look" | "mehendi" };
 
 const MAX_SAVED = 6;
 
@@ -135,15 +141,14 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   const [density, setDensity] = useState("heavy");
   const [busy, setBusy] = useState(false);
   const [busyKind, setBusyKind] = useState<null | "look" | "mehendi">(null);
-  const [reveal, setReveal] = useState("");
   const [error, setError] = useState("");
-  const [result, setResult] = useState<{ name: string; before: string; after: string; share: string; lookId: string; kind: "look" | "mehendi" } | null>(null);
+  const [result, setResult] = useState<LookResult | null>(null);
   const [saved, setSaved] = useState<SavedLook[]>([]);
   const [compare, setCompare] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [bookNote, setBookNote] = useState("");
-  const resultRef = useRef<HTMLDivElement>(null);
+  const resultRef = useRef<HTMLElement>(null);
   const bridalFile = useRef<HTMLInputElement>(null);
   const mehendiFile = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -158,9 +163,12 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   const [live, setLive] = useState<null | "face" | "hand">(null);
   const [camReady, setCamReady] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [sliderOn, setSliderOn] = useState(true);
-  const [mehendiDone, setMehendiDone] = useState("");
   const [camError, setCamError] = useState("");
+  const [liveLook, setLiveLook] = useState(false);
+  const [served, setServed] = useState({ look: "", mehendi: "" });
+  const lookCache = useRef(new Map<string, LookResult>());
+  const mehendiCache = useRef(new Map<string, LookResult>());
+  const visit = useVisitTries(config.slug);
   const eventLooks = looksForEvent(eventId);
   const looks = cardsForStyle(eventLooks, lookStyle);
   const makeupCards = cardsForStyle(BRIDAL_MAKEUP, makeupStyle);
@@ -179,75 +187,117 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
 
   async function fileToShot(file: File) {
     const blob = file.slice(0, file.size, file.type || "image/jpeg");
-    return { blob, url: URL.createObjectURL(blob) };
+    return shotFromBlob(blob);
   }
 
-  function mehendiStamp(url: string) {
-    return `${url}|${mehendiStyle}|${coverage}|${mehendiShade}|${density}`;
+  function showSaved(kind: "look" | "mehendi", key: string, saved: LookResult) {
+    setResult(saved);
+    setServed((current) => ({ ...current, [kind]: key }));
   }
 
   async function generate(kind: "look" | "mehendi", shot: Shot, overrides?: { finishId?: string; lipId?: string; makeupId?: string; hairId?: string }) {
     if (busy) return;
-    setBusy(true);
-    setBusyKind(kind);
-    setError("");
     const finish = overrides?.finishId || finishId;
     const lip = overrides?.lipId || lipId;
     const makeup = overrides?.makeupId ?? makeupId;
     const hair = overrides?.hairId ?? hairId;
-    try {
-      const body = new FormData();
-      body.set("photo", shot.blob, kind === "mehendi" ? "hand.jpg" : "selfie.jpg");
-      body.set("slug", config.slug);
-      body.set("sessionId", guestSessionId());
-      const consentId = (await consent.persist()) || consent.consentId();
-      if (consentId) body.set("consentId", consentId);
-      body.set("requestId", crypto.randomUUID());
-      body.set("tool", kind === "mehendi" ? "mehendi" : "bridal");
-      if (kind === "mehendi") {
-        body.set("styleId", mehendiStyle);
-        body.set("mehendiCard", mehendiCardId);
-        body.set("mehendiStyle", mehendiStyle);
-        body.set("coverage", coverage);
-        body.set("mehendiShade", mehendiShade);
-        body.set("density", density);
-      } else if (chosen) {
-        body.set("styleId", chosen.id);
-        body.set("finish", finish);
-        body.set("lip", lip);
-        if (makeup) body.set("makeup", makeup);
-        if (hair) body.set("hair", hair);
-        body.set("kajal", kajal ? "1" : "0");
-        body.set("lashes", lashes ? "1" : "0");
-        body.set("blush", blushOn ? "1" : "0");
-        body.set("browTint", browOn ? "1" : "0");
-      }
-      const res = await fetch("/api/v1/tryon/generate", { method: "POST", body });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "That preview did not finish.");
-        return;
-      }
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("json")) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "That preview did not finish.");
-        return;
-      }
-      const out = URL.createObjectURL(await res.blob());
-      const styleName = kind === "mehendi"
-        ? `Mehendi · ${MEHENDI_STYLES.find((item) => item.id === mehendiStyle)?.label || "Bridal"}`
-        : chosen?.name || "Bridal look";
-      if (kind === "mehendi") setMehendiDone(mehendiStamp(shot.url));
-      setReveal(out);
-      setResult({
-        name: styleName,
-        before: shot.url,
-        after: out,
-        share: res.headers.get("x-look-share") || "",
-        lookId: kind === "mehendi" ? mehendiStyle : chosen?.id || "",
-        kind,
+    const key = kind === "mehendi"
+      ? selectionKey(shot.digest, { card: mehendiCardId, style: mehendiStyle, coverage, shade: mehendiShade, density })
+      : selectionKey(shot.digest, {
+        event: eventId,
+        look: chosen?.id || "",
+        hair,
+        makeup,
+        finish,
+        lip,
+        kajal: kajal ? "1" : "0",
+        lashes: lashes ? "1" : "0",
+        blush: blushOn ? "1" : "0",
+        brow: browOn ? "1" : "0",
       });
+    const cache = kind === "mehendi" ? mehendiCache.current : lookCache.current;
+    const cached = cache.get(key);
+    if (cached) {
+      showSaved(kind, key, cached);
+      return;
+    }
+    setBusy(true);
+    setBusyKind(kind);
+    setError("");
+    (kind === "mehendi" ? handBox : faceBox).current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    try {
+      const outcome = await takePreview({
+        cache,
+        key,
+        used: visit.used,
+        allowance: visit.allowance,
+        generate: async () => {
+          const body = new FormData();
+          attachSelfie(body, shot, kind === "mehendi" ? "hand.jpg" : "selfie.jpg");
+          body.set("slug", config.slug);
+          body.set("sessionId", guestSessionId());
+          const consentId = (await consent.persist()) || consent.consentId();
+          if (consentId) body.set("consentId", consentId);
+          body.set("requestId", crypto.randomUUID());
+          body.set("tool", kind === "mehendi" ? "mehendi" : "bridal");
+          if (kind === "mehendi") {
+            body.set("styleId", mehendiStyle);
+            body.set("mehendiCard", mehendiCardId);
+            body.set("mehendiStyle", mehendiStyle);
+            body.set("coverage", coverage);
+            body.set("mehendiShade", mehendiShade);
+            body.set("density", density);
+          } else if (chosen) {
+            body.set("styleId", chosen.id);
+            body.set("finish", finish);
+            body.set("lip", lip);
+            if (makeup) body.set("makeup", makeup);
+            if (hair) body.set("hair", hair);
+            body.set("kajal", kajal ? "1" : "0");
+            body.set("lashes", lashes ? "1" : "0");
+            body.set("blush", blushOn ? "1" : "0");
+            body.set("browTint", browOn ? "1" : "0");
+          }
+          const res = await fetch("/api/v1/tryon/generate", { method: "POST", body });
+          const data = res.ok ? null : await res.json().catch(() => ({}));
+          if (!res.ok) {
+            if (data?.error === "VISIT_CAP") visit.applyBody(data);
+            throw new Error(data?.message || "That preview did not finish.");
+          }
+          const contentType = res.headers.get("content-type") || "";
+          if (contentType.includes("json")) {
+            const payload = await res.json().catch(() => ({}));
+            throw new Error(payload.message || "That preview did not finish.");
+          }
+          visit.applyHeaders(res);
+          const photoId = readPhotoId(res);
+          if (photoId) {
+            const mark = (current: Shot | null) => current && current.digest === shot.digest ? { ...current, serverId: photoId } : current;
+            if (kind === "mehendi") setHand(mark);
+            else setFace(mark);
+          }
+          const out = URL.createObjectURL(await res.blob());
+          const styleName = kind === "mehendi"
+            ? `Mehendi · ${MEHENDI_STYLES.find((item) => item.id === mehendiStyle)?.label || "Bridal"}`
+            : chosen?.name || "Bridal look";
+          return {
+            url: out,
+            name: styleName,
+            before: shot.url,
+            after: out,
+            share: res.headers.get("x-look-share") || "",
+            lookId: kind === "mehendi" ? mehendiStyle : chosen?.id || "",
+            kind,
+          };
+        },
+      });
+      if ("blocked" in outcome && outcome.blocked) {
+        setError(VISIT_CAP_MESSAGE);
+        return;
+      }
+      if (outcome.result) showSaved(kind, key, outcome.result);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "That preview did not finish.");
     } finally {
       setBusy(false);
       setBusyKind(null);
@@ -333,7 +383,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
     setCamReady(false);
   }
 
-  function beginLive(kind: "face" | "hand") {
+  function beginLive(kind: "face" | "hand", makeup = false) {
+    setLiveLook(kind === "face" && makeup);
     consent.gate(() => {
       streamRef.current?.getTracks().forEach((track) => track.stop());
       const devices = navigator.mediaDevices;
@@ -391,15 +442,15 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
     ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, width, height);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
     if (!blob) return;
-    const shot = { blob, url: URL.createObjectURL(blob) };
+    const shot = await shotFromBlob(blob);
     const kind = live;
     stopLive();
     if (kind === "hand") {
       setHand(shot);
-      await generate("mehendi", shot);
+      setResult((current) => (current?.kind === "mehendi" ? null : current));
     } else {
       setFace(shot);
-      await generate("look", shot);
+      setResult((current) => (current?.kind === "look" ? null : current));
     }
   }
 
@@ -409,17 +460,10 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
     setMakeupId(card.id);
     setLipId(card.lipId);
     setFinishId(card.finishId);
-    if (face && result?.kind === "look" && result.lookId === chosen?.id) {
-      void generate("look", face, { finishId: card.finishId, lipId: card.lipId, makeupId: card.id });
-    }
   }
 
   function pickHair(id: string) {
-    const next = hairId === id ? "" : id;
-    setHairId(next);
-    if (face && result?.kind === "look" && result.lookId === chosen?.id) {
-      void generate("look", face, { hairId: next });
-    }
+    setHairId(hairId === id ? "" : id);
   }
 
   function pickMehendi(id: string) {
@@ -457,6 +501,59 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   }
 
   const lipHex = BRIDAL_LIPS.find((item) => item.id === lipId)?.hex || "#9B2335";
+  const makeupName = BRIDAL_MAKEUP.find((item) => item.id === makeupId)?.name || "Makeup";
+  const hairName = BRIDAL_HAIR.find((item) => item.id === hairId)?.name || "The look’s own hair";
+  const lookReady = tryNowReady(Boolean(face), Boolean(chosen));
+  const mehendiReady = tryNowReady(Boolean(hand), Boolean(mehendiCardId));
+  const lookKey = face ? selectionKey(face.digest, {
+    event: eventId,
+    look: chosen?.id || "",
+    hair: hairId,
+    makeup: makeupId,
+    finish: finishId,
+    lip: lipId,
+    kajal: kajal ? "1" : "0",
+    lashes: lashes ? "1" : "0",
+    blush: blushOn ? "1" : "0",
+    brow: browOn ? "1" : "0",
+  }) : "";
+  const mehendiKey = hand ? selectionKey(hand.digest, {
+    card: mehendiCardId,
+    style: mehendiStyle,
+    coverage,
+    shade: mehendiShade,
+    density,
+  }) : "";
+  const lookButton = tryButton({
+    ready: lookReady,
+    sameAsResult: Boolean(result?.kind === "look" && lookKey && lookKey === served.look),
+    atLimit: visit.atLimit,
+    cached: Boolean(lookKey && lookCache.current.has(lookKey)),
+  });
+  const mehendiButton = tryButton({
+    ready: mehendiReady,
+    sameAsResult: Boolean(result?.kind === "mehendi" && mehendiKey && mehendiKey === served.mehendi),
+    atLimit: visit.atLimit,
+    cached: Boolean(mehendiKey && mehendiCache.current.has(mehendiKey)),
+  });
+  const counter = tryCounterLabel(visit.used, visit.allowance);
+  const capNote = (text: string) => text ? `${text}${visit.code ? `. Code ${visit.code}` : ""}` : "";
+
+  useEffect(() => {
+    if (panel !== "looks" || !lookKey) return;
+    const saved = lookCache.current.get(lookKey);
+    if (!saved) return;
+    setResult(saved);
+    setServed((current) => current.look === lookKey ? current : { ...current, look: lookKey });
+  }, [panel, lookKey]);
+
+  useEffect(() => {
+    if (panel !== "mehendi" || !mehendiKey) return;
+    const saved = mehendiCache.current.get(mehendiKey);
+    if (!saved) return;
+    setResult(saved);
+    setServed((current) => current.mehendi === mehendiKey ? current : { ...current, mehendi: mehendiKey });
+  }, [panel, mehendiKey]);
 
   return (
     <div data-bridal="flow" data-busy={busy ? "yes" : "no"}>
@@ -475,20 +572,55 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
 
       {panel === "looks" && (
         <div className="mt-4 grid gap-4">
-          <div data-step="event">
-            <p className="mb-2 text-sm font-medium">1. The event</p>
+          <StepRail
+            label="Bridal steps"
+            current="bridal-event"
+            steps={[
+              { id: "bridal-event", label: "Event", icon: "event" },
+              { id: "bridal-look", label: "Look", icon: "look" },
+              { id: "bridal-hair", label: "Hair", icon: "hair" },
+              { id: "bridal-makeup", label: "Makeup", icon: "makeup" },
+              { id: "bridal-selfie", label: "Photo", icon: "photo" },
+            ]}
+          />
+          <StepCard id="bridal-event" title="Event">
             <div className="flex flex-wrap gap-2" role="group" aria-label="Event">
               {BRIDAL_EVENTS.map((item) => (
                 <button key={item.id} className="chip" type="button" aria-pressed={eventId === item.id} onClick={() => { setEventId(item.id); setLookId(cardsForStyle(looksForEvent(item.id), lookStyle)[0]?.id || ""); }}>{item.label}</button>
               ))}
             </div>
-          </div>
-          <PhotoGrid step="look" label="2. The look" group="Bridal looks" styles={bridalStylesFor(eventLooks)} style={lookStyle} onStyle={chooseLookStyle} items={looks} value={chosen?.id || ""} onChange={setLookId} />
-          <PhotoGrid step="makeup" label="3. Makeup" group="Makeup" styles={bridalStylesFor(BRIDAL_MAKEUP)} style={makeupStyle} onStyle={chooseMakeupStyle} items={makeupCards} value={makeupId} onChange={pickMakeup} textOnly />
-          <PhotoGrid step="hair" label="4. Hair" hint="Optional. Tap again to leave the look’s own hair." group="Hair" styles={bridalStylesFor(BRIDAL_HAIR)} style={hairStyle} onStyle={chooseHairStyle} items={hairCards} value={hairId} onChange={pickHair} />
-          <div data-step="selfie" data-photo-cluster="yes">
-            <p className="mb-2 text-sm font-medium">5. Your selfie</p>
-            <div ref={faceBox} data-photo-box="face" className={live === "face" || face ? "relative mx-auto aspect-[3/4] max-h-[240px] w-full max-w-sm overflow-hidden rounded-2xl" : "photo-slot mx-auto w-full max-w-sm"}>
+          </StepCard>
+          <PhotoGrid step="look" label="Look" group="Bridal looks" styles={bridalStylesFor(eventLooks)} style={lookStyle} onStyle={chooseLookStyle} items={looks} value={chosen?.id || ""} onChange={(id) => { setLookId(id); }} />
+          <PhotoGrid step="hair" label="Hair" hint="Optional. Tap again to leave the look’s own hair." group="Hair" styles={bridalStylesFor(BRIDAL_HAIR)} style={hairStyle} onStyle={chooseHairStyle} items={hairCards} value={hairId} onChange={pickHair} />
+          <StepCard id="bridal-makeup" title="Makeup" hint="Lip, cheek, and eye colour.">
+            {visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP)).length > 0 ? (
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Makeup style">
+                {visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP)).map((item) => (
+                  <button key={item.id} className="chip" type="button" aria-pressed={makeupStyle === item.id} onClick={() => chooseMakeupStyle(item.id)}>{item.label}</button>
+                ))}
+              </div>
+            ) : null}
+            <MakeupSwatches items={makeupCards} value={makeupId} onChange={pickMakeup} />
+            <OptionRow label="Makeup finish" options={BRIDAL_FINISHES.map((item) => ({ id: item.id, label: item.label }))} value={finishId} onChange={(id) => { setFinishId(id); }} />
+            <div>
+              <p className="mb-2 text-sm font-medium">Lip colour</p>
+              <div className="live-row" role="group" aria-label="Lip colour">
+                {BRIDAL_LIPS.map((lip) => (
+                  <button key={lip.id} type="button" aria-pressed={lipId === lip.id} aria-label={lip.name} className="live-dot" style={{ background: lip.hex }} onClick={() => { setLipId(lip.id); }} />
+                ))}
+              </div>
+            </div>
+          </StepCard>
+          <section id="bridal-selfie" ref={resultRef} className="step-card grid gap-3" data-step="selfie" data-photo-cluster="yes">
+            <h3 className="text-base font-semibold leading-tight">Photo</h3>
+            <SelectionSummary rows={[
+              { id: "bridal-event", label: "Event", value: event?.label || "Wedding" },
+              { id: "bridal-look", label: "Look", value: chosen?.name || "A look" },
+              { id: "bridal-hair", label: "Hair", value: hairName },
+              { id: "bridal-makeup", label: "Makeup", value: makeupName },
+            ]} />
+            {result?.kind === "look" && !busy ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
+            <LargeFrame boxRef={faceBox} name="face">
               {live === "face" ? (
                 <LiveStudio
                   videoRef={videoRef}
@@ -500,149 +632,123 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
                   onBack={stopLive}
                   onClose={stopLive}
                   onShutter={captureLive}
-                  onRetake={() => beginLive("face")}
-                  makeup={<MakeupStage video={camReady ? videoRef.current : null} lip={lipHex} kajal={kajal} lashes={lashes} blush={blushOn} brow={browOn} />}
-                  footer={(
-                    <div className="live-row" role="group" aria-label="Live makeup">
-                      <button className="live-pill" type="button" aria-pressed={kajal} aria-label="Kajal" onClick={() => setKajal((value) => !value)}>
-                        <EyeIcon />
-                      </button>
-                      <button className="live-pill" type="button" aria-pressed={lashes} aria-label="Lashes" onClick={() => setLashes((value) => !value)}>
-                        <LashIcon />
-                      </button>
-                      <button className="live-pill" type="button" aria-pressed={blushOn} aria-label="Blush" onClick={() => setBlushOn((value) => !value)}>
-                        <BlushIcon />
-                      </button>
-                      <button className="live-pill" type="button" aria-pressed={browOn} aria-label="Brows" onClick={() => setBrowOn((value) => !value)}>
-                        <BrowIcon />
-                      </button>
-                      <span className="mx-0.5 h-5 w-px shrink-0 self-center bg-white/35" aria-hidden="true" />
-                      {BRIDAL_LIPS.map((lip) => (
-                        <button key={lip.id} type="button" aria-pressed={lipId === lip.id} aria-label={lip.name} className="live-dot" style={{ background: lip.hex }} onClick={() => setLipId(lip.id)} />
-                      ))}
-                    </div>
-                  )}
+                  onRetake={() => beginLive("face", liveLook)}
+                  chrome="clean"
+                  makeup={liveLook ? <MakeupStage video={camReady ? videoRef.current : null} lip={lipHex} kajal={kajal} lashes={lashes} blush={blushOn} brow={browOn} /> : null}
                 />
+              ) : result?.kind === "look" && !busy ? (
+                <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" />
               ) : (
                 <>
-                  {face ? <img src={face.url} alt="Your selfie" className="h-full w-full object-cover" /> : null}
-                  {reveal && result?.kind === "look" ? <img src={reveal} alt="" className="gen-reveal absolute inset-0 h-full w-full object-cover" /> : null}
+                  {face ? <img src={face.url} alt="Your selfie" className="absolute inset-0 h-full w-full object-cover" /> : null}
                   {busyKind === "look" ? <GeneratingLook tool="bridal" /> : null}
-                  {!face && !busyKind && !reveal ? <p>Face the light. No sunglasses.</p> : null}
+                  {!face && !busyKind ? <p className="absolute inset-0 grid place-items-center px-6 text-center text-sm">Face the light. No sunglasses.</p> : null}
                 </>
               )}
-            </div>
-            {busyKind === "look" ? null : (
-            <div className="mx-auto mt-2 grid w-full max-w-sm gap-2" data-photo-actions="yes">
-              {live === "face" ? null : <button className={result ? "btn" : "btn sheen"} type="button" onClick={() => beginLive("face")}>Live makeup</button>}
-              <button className="btn secondary" type="button" onClick={() => consent.gate(() => bridalFile.current?.click())}>Use photo</button>
-              <input ref={bridalFile} className="sr-only" type="file" accept="image/*" data-photo="bridal" onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (!file) return;
-                void fileToShot(file).then((shot) => { setFace(shot); setResult(null); setReveal(""); });
-              }} />
-            </div>
+            </LargeFrame>
+            {live === "face" ? (
+              <LiveTray ready={camReady} onShutter={() => void captureLive()}>
+                {liveLook ? (
+                  <div className="live-row" role="group" aria-label="Live makeup">
+                    <button className="live-pill" type="button" aria-pressed={kajal} aria-label="Kajal" onClick={() => setKajal((value) => !value)}><EyeIcon /></button>
+                    <button className="live-pill" type="button" aria-pressed={lashes} aria-label="Lashes" onClick={() => setLashes((value) => !value)}><LashIcon /></button>
+                    <button className="live-pill" type="button" aria-pressed={blushOn} aria-label="Blush" onClick={() => setBlushOn((value) => !value)}><BlushIcon /></button>
+                    <button className="live-pill" type="button" aria-pressed={browOn} aria-label="Brows" onClick={() => setBrowOn((value) => !value)}><BrowIcon /></button>
+                    <span className="mx-0.5 h-5 w-px shrink-0 self-center bg-[var(--line)]" aria-hidden="true" />
+                    {BRIDAL_LIPS.map((lip) => (
+                      <button key={lip.id} type="button" aria-pressed={lipId === lip.id} aria-label={lip.name} className="live-dot" style={{ background: lip.hex }} onClick={() => setLipId(lip.id)} />
+                    ))}
+                  </div>
+                ) : null}
+              </LiveTray>
+            ) : busyKind === "look" ? null : (
+              <div className="grid w-full max-w-[28rem] gap-2" data-photo-actions="yes">
+                <button className="btn sheen" type="button" onClick={() => beginLive("face", false)}>Take selfie</button>
+                <button className="btn secondary" type="button" onClick={() => consent.gate(() => bridalFile.current?.click())}>Upload</button>
+                <button className="btn secondary" type="button" onClick={() => beginLive("face", true)}>Live makeup</button>
+                <input ref={bridalFile} className="sr-only" type="file" accept="image/*" data-photo="bridal" onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) return;
+                  void fileToShot(file).then((shot) => { setFace(shot); setResult((current) => (current?.kind === "look" ? null : current)); });
+                }} />
+              </div>
             )}
             {camError && panel === "looks" ? <p className="text-sm" role="alert">{camError}</p> : null}
-          </div>
-          {face && chosen && !busy && (!result || result.kind !== "look" || result.lookId !== chosen.id) && (
-            <button className="btn" type="button" onClick={() => void generate("look", face)}>{`See ${chosen.name}`}</button>
-          )}
+            {result?.kind === "look" && !busy ? (
+              <button className="btn" type="button" onClick={() => void saveCurrent()}>Save this look</button>
+            ) : null}
+            <TryBar
+              label={lookButton.label}
+              enabled={lookButton.enabled}
+              busy={busy}
+              counter={counter}
+              note={capNote(lookButton.note)}
+              onClick={() => { if (face) void generate("look", face); }}
+            />
+          </section>
         </div>
       )}
 
       {panel === "mehendi" && (
         <div className="mt-4 grid gap-4">
-          <PhotoGrid step="mehendi" label="Mehendi" group="Mehendi" styles={bridalStylesFor(MEHENDI_CARDS)} style={mehendiCategory} onStyle={chooseMehendiCategory} items={mehendiCards} value={mehendiCardId} onChange={pickMehendi} />
-          <p className="text-sm">Hold your hand flat in good light. Fill the photo with your palm.</p>
-          <div ref={handBox} className="relative mx-auto aspect-[3/4] max-h-[520px] w-full max-w-sm overflow-hidden rounded-2xl bg-[#F3E6D8]">
+          <PhotoGrid step="mehendi" label="Mehendi" group="Mehendi" styles={bridalStylesFor(MEHENDI_CARDS)} style={mehendiCategory} onStyle={chooseMehendiCategory} items={mehendiCards} value={mehendiCardId} onChange={(id) => { pickMehendi(id); }} />
+          <section id="bridal-hand" className="step-card grid gap-3" data-step="hand">
+            <h3 className="text-base font-semibold leading-tight">Photo</h3>
+            <p className="text-sm">Hold your hand flat in good light. Fill the photo with your palm.</p>
+            {result?.kind === "mehendi" && !busy ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
+            <LargeFrame boxRef={handBox} name="hand">
+              {live === "hand" ? (
+                <LiveStudio
+                  videoRef={videoRef}
+                  ready={camReady}
+                  facing="environment"
+                  guide="hand"
+                  zoom={zoom}
+                  onZoom={setZoom}
+                  onBack={stopLive}
+                  onClose={stopLive}
+                  onShutter={captureLive}
+                  onRetake={() => beginLive("hand")}
+                  chrome="clean"
+                />
+              ) : result?.kind === "mehendi" && !busy ? (
+                <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" />
+              ) : (
+                <>
+                  {hand ? <img src={hand.url} alt="Your hand" className="absolute inset-0 h-full w-full object-cover" /> : <p className="absolute inset-0 grid place-items-center px-6 text-center text-sm">Your palm, in good light.</p>}
+                  {busyKind === "mehendi" ? <GeneratingLook tool="mehendi" /> : null}
+                </>
+              )}
+            </LargeFrame>
             {live === "hand" ? (
-              <LiveStudio
-                videoRef={videoRef}
-                ready={camReady}
-                facing="environment"
-                guide="hand"
-                zoom={zoom}
-                onZoom={setZoom}
-                onBack={stopLive}
-                onClose={stopLive}
-                onShutter={captureLive}
-                onRetake={() => beginLive("hand")}
-              />
-            ) : (
-              <>
-                {hand ? <img src={hand.url} alt="Your hand" className="h-full w-full object-cover" /> : <p className="grid h-full place-items-center px-6 text-center text-sm">Upload a photo of your hand.</p>}
-                {reveal && result?.kind === "mehendi" ? <img src={reveal} alt="" className="gen-reveal absolute inset-0 h-full w-full object-cover" /> : null}
-                {busyKind === "mehendi" ? <GeneratingLook tool="mehendi" /> : null}
-              </>
+              <LiveTray ready={camReady} onShutter={() => void captureLive()} />
+            ) : busyKind === "mehendi" ? null : (
+              <div className="grid w-full max-w-[28rem] gap-2">
+                <button className="btn sheen" type="button" onClick={() => beginLive("hand")}>Take photo</button>
+                <button className="btn secondary" type="button" onClick={() => consent.gate(() => mehendiFile.current?.click())}>Upload</button>
+                <input ref={mehendiFile} className="sr-only" type="file" accept="image/*" data-photo="mehendi" onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) return;
+                  void fileToShot(file).then((shot) => { setHand(shot); setResult((current) => (current?.kind === "mehendi" ? null : current)); });
+                }} />
+              </div>
             )}
-          </div>
-          {busyKind === "mehendi" ? null : (
-            <>
-          {live === "hand" ? null : <button className={mehendiDone ? "btn" : "btn sheen"} type="button" onClick={() => beginLive("hand")}>Live mehendi</button>}
-          <button className="btn secondary" type="button" onClick={() => consent.gate(() => mehendiFile.current?.click())}>Use photo</button>
-          <input ref={mehendiFile} className="sr-only" type="file" accept="image/*" data-photo="mehendi" onChange={(event) => {
-            const file = event.target.files?.[0];
-            event.target.value = "";
-            if (!file) return;
-                void fileToShot(file).then((shot) => { setHand(shot); setResult(null); setReveal(""); });
-          }} />
-            </>
-          )}
-          {hand && !busy && mehendiDone !== mehendiStamp(hand.url) && <button className="btn" type="button" onClick={() => void generate("mehendi", hand)}>See the mehendi</button>}
+            {result?.kind === "mehendi" && !busy ? <button className="btn" type="button" onClick={() => void saveCurrent()}>Save this look</button> : null}
+            <TryBar
+              label={mehendiButton.label}
+              enabled={mehendiButton.enabled}
+              busy={busy}
+              counter={counter}
+              note={capNote(mehendiButton.note)}
+              onClick={() => { if (hand) void generate("mehendi", hand); }}
+            />
+          </section>
         </div>
       )}
 
       {error && panel !== "own" && panel !== "saved" ? <p className="mt-3 text-sm" role="status">{error}</p> : null}
-
-      {result && !busy && panel !== "saved" && panel !== "own" && (
-        <div ref={resultRef} className="mt-4 grid gap-3">
-          <p className="text-center text-xs font-semibold uppercase tracking-wide">Real AI look, not a filter</p>
-          <h3 className="text-center font-serif text-2xl">{result.name}</h3>
-          <div className="relative overflow-hidden rounded-2xl">
-            <div className="gen-reveal" style={{ transform: `scale(${zoom})` }}>
-              {sliderOn ? (
-                <BeforeAfter before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" />
-              ) : (
-                <img src={result.after} alt="" className="w-full" />
-              )}
-            </div>
-            <StudioRail
-              onRetake={() => beginLive(result.kind === "mehendi" ? "hand" : "face")}
-              onZoomIn={() => setZoom((value) => Math.min(2, Math.round((value + 0.25) * 100) / 100))}
-              onZoomOut={() => setZoom((value) => Math.max(1, Math.round((value - 0.25) * 100) / 100))}
-              onCompare={() => setSliderOn((value) => !value)}
-              compareOn={sliderOn}
-              onDownload={() => {
-                const anchor = document.createElement("a");
-                anchor.href = result.after;
-                anchor.download = "bridal-look.jpg";
-                anchor.click();
-              }}
-              canDownload
-            />
-          </div>
-          <p className="text-center text-xs text-muted">A preview for your trial. The salon’s makeup on the day is the real result.</p>
-          {result.kind === "look" && (
-            <>
-              <OptionRow label="Makeup finish" options={BRIDAL_FINISHES.map((item) => ({ id: item.id, label: item.label }))} value={finishId} onChange={(id) => { setFinishId(id); if (face) void generate("look", face, { finishId: id }); }} />
-              <div>
-                <p className="mb-2 text-sm font-medium">Lip colour</p>
-                <div className="grid grid-cols-3 gap-2" role="group" aria-label="Lip colour">
-                  {BRIDAL_LIPS.map((lip) => (
-                    <button key={lip.id} type="button" aria-pressed={lipId === lip.id} className={`flex min-h-11 items-center gap-2 rounded-full border px-2 py-1 text-sm ${lipId === lip.id ? "border-[var(--brand)] ring-2 ring-[var(--brand)]" : "border-line"}`} onClick={() => { setLipId(lip.id); if (face) void generate("look", face, { lipId: lip.id }); }}>
-                      <span className="h-6 w-6 shrink-0 rounded-full border border-black/10" style={{ background: lip.hex }} aria-hidden="true" />
-                      {lip.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-          <button className="btn" type="button" onClick={() => void saveCurrent()}>Save this look</button>
-        </div>
-      )}
 
       {panel === "saved" && (
         <div className="mt-4 grid gap-4">
@@ -703,12 +809,12 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   );
 }
 
-function PhotoGrid({ step, label, hint, group, styles, style, onStyle, items, value, onChange, textOnly = false }: { step: string; label: string; hint?: string; group: string; styles: { id: BridalStyleId; label: string }[]; style: BridalStyleId; onStyle: (id: BridalStyleId) => void; items: { id: string; name: string; image: boolean }[]; value: string; onChange: (id: string) => void; textOnly?: boolean }) {
+function PhotoGrid({ step, label, hint, group, styles, style, onStyle, items, value, onChange }: { step: string; label: string; hint?: string; group: string; styles: { id: BridalStyleId; label: string }[]; style: BridalStyleId; onStyle: (id: BridalStyleId) => void; items: { id: string; name: string; image: boolean }[]; value: string; onChange: (id: string) => void }) {
   const pills = visibleStylePills(styles);
   return (
-    <div data-step={step}>
-      <p className="mb-2 text-sm font-medium">{label}</p>
-      {hint ? <p className="mb-2 text-sm text-muted">{hint}</p> : null}
+    <section id={`bridal-${step}`} className="card step-card grid gap-3 p-3" data-step={step}>
+      <h3 className="text-base font-semibold leading-tight">{label}</h3>
+      {hint ? <p className="text-sm text-muted">{hint}</p> : null}
       {pills.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2" role="group" aria-label={`${group} style`}>
           {pills.map((item) => (
@@ -716,13 +822,6 @@ function PhotoGrid({ step, label, hint, group, styles, style, onStyle, items, va
           ))}
         </div>
       )}
-      {textOnly ? (
-        <div className="flex flex-wrap gap-2" role="list" aria-label={group}>
-          {items.map((item) => (
-            <button key={item.id} className="chip" type="button" aria-pressed={item.id === value} onClick={() => onChange(item.id)}>{item.name}</button>
-          ))}
-        </div>
-      ) : (
       <div className="grid grid-cols-2 gap-3" role="list" aria-label={group}>
         {items.map((item, index) => (
           <div key={item.id} role="listitem">
@@ -733,8 +832,7 @@ function PhotoGrid({ step, label, hint, group, styles, style, onStyle, items, va
           </div>
         ))}
       </div>
-      )}
-    </div>
+    </section>
   );
 }
 
