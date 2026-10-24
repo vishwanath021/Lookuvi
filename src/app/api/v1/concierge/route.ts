@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "INVALID" }, { status: 400 });
   const tenant = await loadTenantBySlug(parsed.data.slug);
   if (!tenant) return NextResponse.json({ error: "TENANT" }, { status: 404 });
-  const config = toSalonConfig(tenant);
+  const config = await toSalonConfig(tenant);
   let source: "rules" | "gemini" = "rules";
   let answer = answerConcierge(parsed.data.message, {
     name: config.name,

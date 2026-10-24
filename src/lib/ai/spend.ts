@@ -1,3 +1,4 @@
+import { listedInr } from "@/data/model-prices";
 import { numberEnv } from "@/lib/env";
 import { logInfo } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
@@ -52,6 +53,8 @@ export function costPerCallInr(provider: string, quality: string) {
   const specific = process.env[key];
   if (specific !== undefined && specific !== "" && Number.isFinite(Number(specific))) return Math.max(0, Number(specific));
   if ((provider === "openai" || provider === "gemini") && isModelTier(quality)) return tierRequest(provider, quality).estimateInr;
+  const listed = listedInr(provider, quality);
+  if (listed != null) return listed;
   if (provider === "gemini" && quality === "standard") return numberEnv("AI_COST_INR_STANDARD", DEFAULTS.GEMINI_STANDARD);
   if (provider === "gemini" && quality === "hd") return numberEnv("AI_COST_INR_HD", DEFAULTS.GEMINI_HD);
   return DEFAULTS[`${provider.toUpperCase()}_${quality.toUpperCase()}`] ?? numberEnv("AI_COST_INR_STANDARD", 3.5);

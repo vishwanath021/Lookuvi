@@ -303,8 +303,8 @@ describe("cost source", () => {
     startFalBillingLoop();
     expect(falBillingLoopStarted()).toBe(false);
     const form = readFileSync("src/components/admin/SuperAiForm.tsx", "utf8");
-    expect(form).toContain('aria-label="fal billing key"');
-    expect(form).toContain("falBillingOnly");
+    expect(form).not.toContain('aria-label="fal billing key"');
+    expect(readFileSync("src/app/api/v1/super/ai/route.ts", "utf8")).toContain("falBillingOnly");
     expect(readFileSync("src/instrumentation.ts", "utf8")).toContain("startFalBillingLoop");
     expect(readFileSync("src/lib/ai/reference-run.ts", "utf8")).toContain("syncFalCostAfterGeneration");
   });

@@ -1,3 +1,4 @@
+import { isBlockedStatus } from "@/lib/salon-status";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { bridalEventById, bridalLookById } from "@/data/bridal";
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "INVALID", message: "Add your name, the event, and a date." }, { status: 400 });
   const tenant = await loadTenantBySlug(parsed.data.slug);
-  if (!tenant || tenant.status === "SUSPENDED") return NextResponse.json({ error: "TENANT" }, { status: 404 });
+  if (!tenant || isBlockedStatus(tenant.status)) return NextResponse.json({ error: "TENANT" }, { status: 404 });
   if (!tenant.productBridal) return NextResponse.json({ error: "PRODUCT", message: "Bridal is turned off for this salon." }, { status: 404 });
   const event = bridalEventById(parsed.data.eventId);
   if (!event) return NextResponse.json({ error: "EVENT", message: "Choose the event." }, { status: 400 });

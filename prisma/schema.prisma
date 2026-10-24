@@ -32,8 +32,8 @@ model Tenant {
   productTryOn        Boolean   @default(true)
   /** Sell the live queue and visit alerts. On for a new salon so join-from-home and reminders exist. */
   productQueue        Boolean   @default(true)
-  /** Full bridal looks and mehendi. On for a new salon, including the demo. */
-  productBridal       Boolean   @default(true)
+  /** Full bridal looks and mehendi. Off until the owner turns it on. */
+  productBridal       Boolean   @default(false)
   /** Groom looks and the groom's own clothes. Off until the owner turns it on. */
   productGroom        Boolean   @default(false)
   /** Real bridal and groom previews one customer can spend during a visit. */
@@ -99,6 +99,7 @@ model Tenant {
   whatsappSends       WhatsAppSend[]
   customerReturns     CustomerReturn[]
   broadcasts          SalonBroadcast[]
+  paymentRequests     PaymentRequest[]
 }
 
 model VisitGrant {
@@ -328,18 +329,53 @@ model DataRequest {
 }
 
 model Invoice {
-  id          String   @id @default(cuid())
-  tenantId    String
-  number      String   @unique
-  amountExGst Int
-  gstInr      Int
-  totalInr    Int
-  description String
-  status      String
-  createdAt   DateTime @default(now())
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  tenantId     String
+  number       String   @unique
+  amountExGst  Int
+  gstInr       Int
+  totalInr     Int
+  description  String
+  status       String
+  /** UPI reference recorded by Mark paid. Empty until then. */
+  upiRef       String   @default("")
+  /** RECEIPT until GST_ENABLED is on. Then TAX_INVOICE. */
+  documentKind String   @default("RECEIPT")
+  createdAt    DateTime @default(now())
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+}
+
+/// One row. next is incremented with an upsert so two receipts cannot share a number.
+model ReceiptSeq {
+  id   Int @id
+  next Int @default(1)
+}
+
+/// A UPI reference can pay only one request.
+model UpiReference {
+  ref       String   @id
+  paymentId String   @unique
+  createdAt DateTime @default(now())
+}
+
+model PaymentRequest {
+  id        String    @id @default(cuid())
+  tenantId  String
+  kind      String
+  plan      String    @default("")
+  packId    String    @default("")
+  interval  String    @default("monthly")
+  amountInr Int
+  status    String    @default("PENDING")
+  upiRef    String    @default("")
+  invoiceId String    @default("")
+  createdAt DateTime  @default(now())
+  paidAt    DateTime?
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
 }
 
 model MagicLink {

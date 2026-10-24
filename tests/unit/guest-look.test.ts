@@ -33,8 +33,8 @@ describe("guest reference generation", () => {
     expect(route).not.toContain("browsRoute");
     expect(route).not.toMatch(/gpt-image/);
     const settings = readFileSync("src/components/admin/SuperAiForm.tsx", "utf8");
-    expect(settings).toContain("Brows follow this choice");
     expect(settings).not.toContain("Brows always use OpenAI");
+    expect(settings).not.toContain("browsRoute");
 
     const selfie = await sharp({ create: { width: SELFIE.width, height: SELFIE.height, channels: 3, background: "#c4a484" } }).jpeg().toBuffer();
     const loaded = await loadGuestReference("brows", "soft-arch");

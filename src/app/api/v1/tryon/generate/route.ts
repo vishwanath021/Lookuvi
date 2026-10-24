@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { blockedGuestMessage, isBlockedStatus } from "@/lib/salon-status";
 import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { bridalFinishById, bridalHairById, bridalLipById, bridalLookById, bridalMakeupById, mehendiCardById, mehendiChoice, MEHENDI_COVERAGE, MEHENDI_DENSITY, MEHENDI_SHADES, MEHENDI_STYLES } from "@/data/bridal";
@@ -79,8 +80,8 @@ export async function POST(req: Request) {
 
   const tenant = await prisma.tenant.findUnique({ where: { slug } });
   if (!tenant) return NextResponse.json({ error: "TENANT", message: "Salon not found." }, { status: 404 });
-  if (tenant.status === "SUSPENDED") {
-    return NextResponse.json({ error: "SUSPENDED", message: "This salon's try-on is paused." }, { status: 403 });
+  if (isBlockedStatus(tenant.status)) {
+    return NextResponse.json({ error: "SUSPENDED", message: blockedGuestMessage(tenant.status) }, { status: 403 });
   }
   if (bridalTool && !tenant.productBridal) {
     return NextResponse.json({ error: "PRODUCT", message: "Bridal is turned off for this salon." }, { status: 404 });

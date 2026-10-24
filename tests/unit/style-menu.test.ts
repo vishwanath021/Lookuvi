@@ -32,10 +32,10 @@ describe("catalogue styles stay on the menu", () => {
     const tenant = await prisma.tenant.create({ data: { slug, name: "Menu salon", productTryOn: true } });
     await prisma.tenantStyle.create({ data: { tenantId: tenant.id, styleId: "soft-bob", enabled: false, serviceIds: "[]" } });
     expect(await styleEnabledForTenant(tenant.id, "jasmine-bridal-braid")).toBe(true);
-    expect(await styleEnabledForTenant(tenant.id, "soft-bob")).toBe(false);
+    expect(await styleEnabledForTenant(tenant.id, "soft-bob")).toBe(true);
     const created = await prisma.tenantStyle.findUnique({ where: { tenantId_styleId: { tenantId: tenant.id, styleId: "jasmine-bridal-braid" } } });
-    expect(created?.enabled).toBe(true);
-    expect(await ensureCatalogueStyles(tenant.id)).toBe(STYLES.length - 2);
+    expect(created).toBeNull();
+    expect(await ensureCatalogueStyles(tenant.id)).toBe(STYLES.length - 1);
     expect(await ensureCatalogueStyles(tenant.id)).toBe(0);
     const off = await prisma.tenantStyle.findUnique({ where: { tenantId_styleId: { tenantId: tenant.id, styleId: "soft-bob" } } });
     expect(off?.enabled).toBe(false);
@@ -54,7 +54,7 @@ describe("catalogue styles stay on the menu", () => {
     expect(body.error).not.toBe("STYLE");
     expect(String(body.message || "")).not.toContain("not on this salon's menu");
     const row = await prisma.tenantStyle.findUnique({ where: { tenantId_styleId: { tenantId: tenant.id, styleId: "jasmine-bridal-braid" } } });
-    expect(row?.enabled).toBe(true);
+    expect(row).toBeNull();
   });
 });
 

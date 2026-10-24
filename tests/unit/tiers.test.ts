@@ -83,9 +83,9 @@ describe("tier catalogue", () => {
     expect(resolveGuestTier({ stored: "high", highEnabled: true, mediumApproved: true, purpose: "guest" })).toBe("high");
     const plans = projectSalonMonth(2, 100);
     expect(plans.map((plan) => [plan.name, plan.priceInr, plan.marginInr])).toEqual([
-      ["Lite", 2999, 2799],
-      ["Starter", 5999, 5799],
-      ["Pro", 10999, 10799],
+      ["Basic", 799, 599],
+      ["Standard", 1499, 1299],
+      ["Pro", 2499, 2299],
     ]);
   });
 });
@@ -237,7 +237,7 @@ describe("cost privacy", () => {
     const allowed = await costGet(new Request("http://localhost/api/v1/super/ai/costs?imagesPerMonth=100"));
     expect(allowed.status).toBe(200);
     const body = await allowed.json();
-    expect(body.plans.map((plan: { priceInr: number }) => plan.priceInr)).toEqual([2999, 5999, 10999]);
+    expect(body.plans.map((plan: { priceInr: number }) => plan.priceInr)).toEqual([799, 1499, 2499]);
     expect(body.calls.length).toBeLessThanOrEqual(50);
   });
 });

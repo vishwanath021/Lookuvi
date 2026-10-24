@@ -35,7 +35,7 @@ export default async function LeadsPage() {
         <h1 className="page-title">Leads</h1>
         {/* File download, not a client navigation. */}
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-        {canExport ? <a className="btn" href="/api/v1/admin/leads/export">Download CSV</a> : <p className="text-sm text-muted">Lead export is included with Starter and Pro.</p>}
+        {canExport ? <a className="btn" href="/api/v1/admin/leads/export">Download CSV</a> : <p className="text-sm text-muted">Lead export is included with Standard and Pro.</p>}
       </div>
       {leads.length === 0 && <p className="card p-4 text-sm">No booking taps yet. A lead is created when a guest taps Book this look.</p>}
       <div className="overflow-x-auto">

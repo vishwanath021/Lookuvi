@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { isBlockedStatus } from "@/lib/salon-status";
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -22,7 +22,7 @@ export default async function QrStandee({ params }: { params: Promise<{ slug: st
   const { slug } = await params;
   const tenant = await loadTenantBySlug(slug);
   if (!tenant) notFound();
-  if (tenant.status === "SUSPENDED") return <SalonPaused name={tenant.name} />;
+  if (isBlockedStatus(tenant.status)) return <SalonPaused name={tenant.name} trialEnded={tenant.status === "EXPIRED"} />;
   if (!tenant.productTryOn && !tenant.productQueue) notFound();
   const target = await salonWelcomeTarget(tenant.id, tenant.slug);
   return (
@@ -36,16 +36,12 @@ export default async function QrStandee({ params }: { params: Promise<{ slug: st
         ) : (
           <>
             <img className="mx-auto mt-6 w-56" src={`/api/v1/qr?slug=${tenant.slug}&format=png`} alt={`QR code for ${tenant.name}`} />
-            <p className="mt-4 text-xs break-all" data-qr-url={target.url}>{target.url}</p>
           </>
         )}
         <p className="mt-6 text-sm">{tenant.address}</p>
       </article>
-      <div className="mt-4 flex flex-wrap gap-2 print:hidden">
-        {target.local ? null : <a className="btn" href={`/api/v1/qr?slug=${tenant.slug}&format=png`}>Download PNG</a>}
-        {target.local ? null : <a className="btn secondary" href={`/api/v1/qr?slug=${tenant.slug}&format=svg`}>Download SVG</a>}
-        {target.local ? null : <PrintButton label="Print standee" />}
-        <Link className="btn ghost" href={`/s/${tenant.slug}/welcome`}>Salon page</Link>
+      <div className="mt-4 flex justify-center print:hidden">
+        {target.local ? null : <PrintButton label="Download / Print" />}
       </div>
     </main>
   );

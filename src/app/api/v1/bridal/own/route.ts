@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { blockedGuestMessage, isBlockedStatus } from "@/lib/salon-status";
 import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { OWN_LOOK_MAX_BODY_BYTES, OWN_LOOK_MAX_BYTES, OWN_LOOK_MODEL, OWN_LOOK_PROVIDER_TIMEOUT_MS, OWN_LOOK_TOO_LARGE, OWN_LOOK_QUALITY, OWN_LOOK_SLOTS } from "@/data/bridal-own";
@@ -109,8 +110,8 @@ export async function POST(req: Request) {
 
   const tenant = await prisma.tenant.findUnique({ where: { slug } });
   if (!tenant) return NextResponse.json({ error: "TENANT", message: "Salon not found." }, { status: 404 });
-  if (tenant.status === "SUSPENDED") {
-    return NextResponse.json({ error: "SUSPENDED", message: "This salon's try-on is paused." }, { status: 403 });
+  if (isBlockedStatus(tenant.status)) {
+    return NextResponse.json({ error: "SUSPENDED", message: blockedGuestMessage(tenant.status) }, { status: 403 });
   }
   if (!tenant.productBridal) {
     return NextResponse.json({ error: "PRODUCT", message: "Bridal is turned off for this salon." }, { status: 404 });

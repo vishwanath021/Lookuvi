@@ -184,7 +184,7 @@ async function runScheduledFalBilling() {
   }
 }
 
-/** Hourly billing-events sync. Skipped under vitest so tests do not call fal. */
+/** Nightly billing-events sync. Skipped under vitest so tests do not call fal. */
 export function falBillingLoopStarted() {
   return Boolean(billingTimer);
 }
@@ -194,6 +194,6 @@ export function startFalBillingLoop() {
   void runScheduledFalBilling();
   billingTimer = setInterval(() => {
     void runScheduledFalBilling();
-  }, 60 * 60 * 1000);
+  }, 24 * 60 * 60 * 1000);
   billingTimer.unref?.();
 }

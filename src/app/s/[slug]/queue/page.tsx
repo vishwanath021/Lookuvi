@@ -1,3 +1,4 @@
+import { isBlockedStatus } from "@/lib/salon-status";
 import { notFound } from "next/navigation";
 import { SalonPaused } from "@/components/guest/SalonPaused";
 import { QueueJoinForm } from "@/components/guest/QueueJoinForm";
@@ -18,7 +19,7 @@ export default async function GuestQueuePage({ params }: { params: Promise<{ slu
       </main>
     );
   }
-  if (tenant.status === "SUSPENDED") return <SalonPaused name={tenant.name} />;
+  if (isBlockedStatus(tenant.status)) return <SalonPaused name={tenant.name} trialEnded={tenant.status === "EXPIRED"} />;
   const board = await publicBoard(tenant.slug);
   return (
     <main className="mx-auto max-w-lg px-4 py-8">

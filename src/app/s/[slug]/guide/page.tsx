@@ -1,3 +1,4 @@
+import { isBlockedStatus } from "@/lib/salon-status";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { SalonPaused } from "@/components/guest/SalonPaused";
@@ -14,6 +15,6 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
   const tenant = slug === "by-host" ? await loadTenantByHost(host.split(":")[0] || "") : await loadTenantBySlug(slug);
   if (!ownerFeatures().guide) notFound();
   if (!tenant) notFound();
-  if (tenant.status === "SUSPENDED") return <SalonPaused name={tenant.name} />;
-  return <GuideScreen config={toSalonConfig(tenant)} />;
+  if (isBlockedStatus(tenant.status)) return <SalonPaused name={tenant.name} trialEnded={tenant.status === "EXPIRED"} />;
+  return <GuideScreen config={await toSalonConfig(tenant)} />;
 }

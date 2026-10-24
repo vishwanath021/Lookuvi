@@ -27,7 +27,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         currentTenantId={tenant.id}
         salons={memberships.map((item) => ({ id: item.tenant.id, name: item.tenant.name }))}
       />
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0">
+        {tenant.status === "EXPIRED" || tenant.status === "SUSPENDED" ? (
+          <p className="mb-4 rounded-xl border border-line bg-sand px-3 py-2 text-sm" role="status">
+            {tenant.status === "EXPIRED" ? "Trial ended. Choose a plan to continue try-ons." : "This salon is paused. Guests cannot try on."}
+          </p>
+        ) : null}
+        {children}
+      </div>
     </div>
   );
 }

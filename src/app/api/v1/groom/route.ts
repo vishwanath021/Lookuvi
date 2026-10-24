@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { blockedGuestMessage, isBlockedStatus } from "@/lib/salon-status";
 import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { GROOM_MAX_BYTES, GROOM_MODEL, GROOM_OWN_SLOTS, GROOM_QUALITY } from "@/data/groom";
@@ -104,8 +105,8 @@ export async function POST(req: Request) {
 
   const tenant = await prisma.tenant.findUnique({ where: { slug } });
   if (!tenant) return NextResponse.json({ error: "TENANT", message: "Salon not found." }, { status: 404 });
-  if (tenant.status === "SUSPENDED") {
-    return NextResponse.json({ error: "SUSPENDED", message: "This salon's try-on is paused." }, { status: 403 });
+  if (isBlockedStatus(tenant.status)) {
+    return NextResponse.json({ error: "SUSPENDED", message: blockedGuestMessage(tenant.status) }, { status: 403 });
   }
   if (!tenant.productGroom) {
     return NextResponse.json({ error: "PRODUCT", message: "Groom is turned off for this salon." }, { status: 404 });

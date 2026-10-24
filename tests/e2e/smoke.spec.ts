@@ -465,22 +465,18 @@ test("super admin chooses the salon hairstyle model without calling a provider",
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: "Lookuvi" })).toBeVisible();
   await page.goto("/super/ai");
-  const model = page.getByRole("group", { name: "Salon hairstyle model" });
-  await expect(model).toBeVisible();
-  await expect(model.getByRole("radio", { name: /sunburst/i })).toBeChecked();
-  await expect(model.getByRole("radio", { name: /FLUX\.3/ })).toBeVisible();
+  await expect(page.getByText("In use").first()).toBeVisible();
+  await expect(page.getByText("₹7")).toBeVisible();
   await artifact(page, "super-provider");
   await page.goto("/s/demo");
   await expect(page.getByText("Reference mode")).toHaveCount(0);
   await expect(page.getByText("Hair texture")).toHaveCount(0);
   await expect(page.getByText(/one paid call/i)).toHaveCount(0);
   await page.goto("/super/ai");
-  await model.getByRole("radio", { name: /FLUX\.3/ }).check();
-  await page.getByRole("button", { name: "Save salon default" }).click();
-  await expect(page.getByText("Salon screens use FLUX.3.")).toBeVisible();
-  await model.getByRole("radio", { name: /sunburst/i }).check();
-  await page.getByRole("button", { name: "Save salon default" }).click();
-  await expect(page.getByText("Salon screens use OpenAI sunburst, quality medium.")).toBeVisible();
+  await page.getByRole("button", { name: "Use" }).click();
+  await expect(page.getByText("fal is in use.")).toBeVisible();
+  await page.getByRole("button", { name: "Use" }).click();
+  await expect(page.getByText("OpenAI is in use.")).toBeVisible();
 });
 
 test("super admin sees assumed COGS", async ({ page }) => {
@@ -488,27 +484,16 @@ test("super admin sees assumed COGS", async ({ page }) => {
   await page.getByLabel("Email").fill("super@agenticbuildworks.com");
   await page.getByLabel("Password").fill("SuperAdmin#2026");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/assumption/i)).toBeVisible();
+  await expect(page.getByText(/assumption/i)).toHaveCount(0);
+  await expect(page.getByText("Try-ons this month")).toBeVisible();
   await page.screenshot({ path: "docs/screenshots/09-super.png", fullPage: true });
   await page.goto("/super/costs");
+  await expect(page.getByRole("heading", { name: "Spend & costs" })).toBeVisible();
+  await expect(page.getByText("Month spend")).toBeVisible();
+  await expect(page.getByText("Average ₹/image")).toBeVisible();
+  await page.goto("/super/costs/log");
   await expect(page.getByRole("heading", { name: "Image costs" })).toBeVisible();
-  await expect(page.getByText("Estimate", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Actual", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Previous", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Next", exact: true })).toBeVisible();
-  if ((page.viewportSize()?.width ?? 0) >= 768) {
-    await expect(page.getByRole("columnheader", { name: "Estimate (reserved)" })).toBeVisible();
-    await expect(page.getByRole("columnheader", { name: "Actual", exact: true })).toBeVisible();
-    await expect(page.getByRole("columnheader", { name: "Source" })).toBeVisible();
-  }
-  const sync = page.getByRole("button", { name: "Sync real cost from fal" });
-  await expect(sync).toBeVisible();
-  await sync.click();
-  await expect(page.getByText(/BILLING preset/)).toBeVisible();
-  await page.goto("/super/ai");
-  await page.getByText("Advanced (internal)").click();
-  await page.getByRole("button", { name: "Calibration run" }).click();
-  await expect(page.getByText(/Offline calibration/i)).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole("img", { name: /mask/i })).toHaveCount(5);
-  await page.screenshot({ path: "docs/screenshots/24-calibration.png", fullPage: true });
+  await expect(page.getByRole("button", { name: "Sync real cost from fal" })).toHaveCount(0);
 });

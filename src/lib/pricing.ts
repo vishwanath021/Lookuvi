@@ -1,6 +1,13 @@
 import { GST_RATE } from "@/data/plans";
 
-export function withGst(exGstInr: number) {
+/** Off until Agentic Build Works has a GSTIN. Set GST_ENABLED=true after registration. */
+export function gstEnabled(env: NodeJS.ProcessEnv = process.env) {
+  const raw = (env.GST_ENABLED ?? "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
+}
+
+export function withGst(exGstInr: number, env: NodeJS.ProcessEnv = process.env) {
+  if (!gstEnabled(env)) return { exGstInr, gstInr: 0, totalInr: exGstInr };
   const gstInr = Math.round(exGstInr * GST_RATE);
   return { exGstInr, gstInr, totalInr: exGstInr + gstInr };
 }

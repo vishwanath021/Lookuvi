@@ -1,7 +1,6 @@
 import { Hint } from "@/components/ui/tooltip";
 import { formatAiInr, formatIst } from "@/lib/display";
 import { spendSummary } from "@/lib/ai/spend";
-import { numberEnv } from "@/lib/env";
 import { auditLabel, listAudit } from "@/lib/super/audit";
 import { loadSalons, salonStats } from "@/lib/super/directory";
 import { pageSuper } from "@/lib/session";
@@ -16,8 +15,6 @@ export default async function SuperPage() {
   await pageSuper();
   const [rows, spend, activity] = await Promise.all([loadSalons(), spendSummary(), listAudit({ page: 1 })]);
   const stats = salonStats(rows);
-  const standardInr = numberEnv("AI_COST_INR_STANDARD", 3.5);
-  const hdInr = numberEnv("AI_COST_INR_HD", 7);
   const cap = spend.capInr > 0 ? Math.min(100, (spend.spentInr / spend.capInr) * 100) : 0;
   const recent = activity.items.slice(0, 8);
   return (
@@ -42,7 +39,7 @@ export default async function SuperPage() {
         </article>
         <article className="card p-4">
           <div className="flex items-center gap-1">
-            <p className="text-sm text-muted">Previews this month</p>
+            <p className="text-sm text-muted">Try-ons this month</p>
             <Hint label="About preview counts">Succeeded previews since the start of the month in Asia/Kolkata.</Hint>
           </div>
           <p className="font-serif text-3xl">{stats.previews.toLocaleString("en-IN")}</p>
@@ -50,9 +47,7 @@ export default async function SuperPage() {
         <article className="card p-4">
           <div className="flex items-center gap-1">
             <p className="text-sm text-muted">AI spend vs cap</p>
-            <Hint label="About AI spend">
-              ₹{standardInr} per standard preview and ₹{hdInr} per HD preview. The cap uses the same kind of estimate.
-            </Hint>
+            <Hint label="About AI spend">Month spend against the platform cap. The price list is on AI settings.</Hint>
           </div>
           <p className="font-serif text-3xl">
             {formatAiInr(spend.spentInr)}
@@ -62,16 +57,16 @@ export default async function SuperPage() {
             <div className="h-full bg-aubergine" style={{ width: `${cap}%` }} />
           </div>
           <p className="mt-1 text-xs text-muted">{spend.calls} calls</p>
+          {cap >= 80 ? <p className="mt-1 text-xs" role="status">Spend is at {Math.round(cap)}% of the cap.</p> : null}
         </article>
         <article className="card p-4">
           <div className="flex items-center gap-1">
-            <p className="text-sm text-muted">Credits outstanding</p>
+            <p className="text-sm text-muted">Try-ons left</p>
             <Hint label="About credits">Sum of salon credit balances.</Hint>
           </div>
           <p className="font-serif text-3xl">{stats.credits.toLocaleString("en-IN")}</p>
         </article>
       </section>
-      <p className="mt-4 text-sm text-muted">Preview cost is an assumption, not a provider bill.</p>
       <section className="card mt-6 p-4">
         <h2 className="text-base font-semibold">Recent activity</h2>
         {recent.length === 0 ? (

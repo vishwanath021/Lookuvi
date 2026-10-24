@@ -1,3 +1,4 @@
+import { isBlockedStatus } from "@/lib/salon-status";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
@@ -20,7 +21,7 @@ export default async function SalonWelcome({ params }: { params: Promise<{ slug:
   const { slug } = await params;
   const tenant = await loadTenantBySlug(slug);
   if (!tenant) notFound();
-  if (tenant.status === "SUSPENDED") return <SalonPaused name={tenant.name} />;
+  if (isBlockedStatus(tenant.status)) return <SalonPaused name={tenant.name} trialEnded={tenant.status === "EXPIRED"} />;
   if (!tenant.productQueue && !tenant.productTryOn && !tenant.productBridal && !tenant.productGroom) notFound();
   return (
     <main className="mx-auto max-w-lg px-4 py-10" style={brandStyle(tenant.primaryColor, tenant.accentColor) as CSSProperties}>

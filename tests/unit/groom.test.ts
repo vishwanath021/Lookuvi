@@ -178,7 +178,7 @@ describe("groom screen and switches", () => {
     const sql = readFileSync("prisma/migrations/20261018000000_groom/migration.sql", "utf8");
     expect(sql).toContain(`"productGroom" BOOLEAN NOT NULL DEFAULT false`);
     const schema = readFileSync("prisma/schema.prisma", "utf8");
-    expect(schema).toContain("productBridal       Boolean   @default(true)");
+    expect(schema).toContain("productBridal       Boolean   @default(false)");
     expect(schema).toContain("productGroom        Boolean   @default(false)");
   });
 });

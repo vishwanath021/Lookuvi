@@ -9,7 +9,7 @@ export async function GET() {
   if ("error" in access && access.error) return access.error;
   if (!("tenant" in access)) return NextResponse.json({ error: "NO_TENANT" }, { status: 403 });
   if (!planById(access.tenant.plan).leadExport) {
-    return NextResponse.json({ error: "PLAN", message: "Lead export is included with Starter and Pro." }, { status: 403 });
+    return NextResponse.json({ error: "PLAN", message: "Lead export is included with Standard and Pro." }, { status: 403 });
   }
   const leads = await prisma.lead.findMany({ where: { tenantId: access.tenant.id }, orderBy: { createdAt: "desc" } });
   const lines = ["created,name,phone,look,shade,services,status,lang,src,type,event,event_date"];

@@ -9,12 +9,12 @@ export class CreditError extends Error {
 export async function reserveCredits(tenantId: string, amount: number, refId: string) {
   return prisma.$transaction(async (tx) => {
     const updated = await tx.tenant.updateMany({
-      where: { id: tenantId, creditBalance: { gte: amount }, status: { not: "SUSPENDED" } },
+      where: { id: tenantId, creditBalance: { gte: amount }, status: { notIn: ["SUSPENDED", "EXPIRED"] } },
       data: { creditBalance: { decrement: amount } },
     });
     if (updated.count !== 1) {
       const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
-      if (!tenant || tenant.status === "SUSPENDED") throw new CreditError("SUSPENDED");
+      if (!tenant || tenant.status === "SUSPENDED" || tenant.status === "EXPIRED") throw new CreditError("SUSPENDED");
       throw new CreditError("INSUFFICIENT");
     }
     const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: tenantId } });

@@ -1,12 +1,12 @@
 import { CREDIT_PACKS, planById, TRIAL_DAYS } from "@/data/plans";
+import { allocateReceiptNumber } from "@/lib/billing/receipt-number";
 import { dailyCapAfterPlanChange } from "@/lib/billing/plan-assign";
 import { grantCredits } from "@/lib/credits";
 import { prisma } from "@/lib/prisma";
-import { withGst } from "@/lib/pricing";
+import { gstEnabled, withGst } from "@/lib/pricing";
 
 async function nextInvoiceNumber() {
-  const count = await prisma.invoice.count();
-  return `ABW-${new Date().getFullYear()}-${String(count + 1).padStart(4, "0")}`;
+  return prisma.$transaction((tx) => allocateReceiptNumber(tx));
 }
 
 export async function activatePlan(input: {
@@ -60,6 +60,7 @@ export async function activatePlan(input: {
   const recurring = input.interval === "yearly" ? plan.monthlyExGst * 10 : plan.monthlyExGst;
   const setup = input.chargeSetup ? plan.setupExGst : 0;
   const money = withGst(recurring + setup);
+  const tax = gstEnabled();
   const invoice = await prisma.invoice.create({
     data: {
       tenantId: input.tenantId,
@@ -67,8 +68,12 @@ export async function activatePlan(input: {
       amountExGst: recurring + setup,
       gstInr: money.gstInr,
       totalInr: money.totalInr,
-      description: `${plan.name} ${input.interval}${setup ? ` + setup` : ""} (ex-GST ₹${recurring + setup})`,
+      description: tax
+        ? `${plan.name} ${input.interval}${setup ? ` + setup` : ""} (ex-GST Rs ${recurring + setup})`
+        : `${plan.name} ${input.interval} receipt`,
       status: "PAID",
+      upiRef: paymentRef,
+      documentKind: tax ? "TAX_INVOICE" : "RECEIPT",
     },
   });
   return { plan: plan.id, credits: plan.credits, invoiceNumber: invoice.number, totalInr: invoice.totalInr };
@@ -79,6 +84,7 @@ export async function addCreditPack(tenantId: string, packId: string, provider: 
   if (!pack) throw new Error("UNKNOWN_PACK");
   await grantCredits(tenantId, pack.credits, "PACK", externalId || pack.id);
   const money = withGst(pack.priceExGst);
+  const tax = gstEnabled();
   const invoice = await prisma.invoice.create({
     data: {
       tenantId,
@@ -86,8 +92,10 @@ export async function addCreditPack(tenantId: string, packId: string, provider: 
       amountExGst: pack.priceExGst,
       gstInr: money.gstInr,
       totalInr: money.totalInr,
-      description: `${pack.credits} preview credits via ${provider}`,
+      description: `${pack.credits} try-ons via ${provider}`,
       status: "PAID",
+      upiRef: externalId || "",
+      documentKind: tax ? "TAX_INVOICE" : "RECEIPT",
     },
   });
   return { credits: pack.credits, invoiceNumber: invoice.number, totalInr: invoice.totalInr };

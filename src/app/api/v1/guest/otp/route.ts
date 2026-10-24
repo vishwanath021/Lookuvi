@@ -1,3 +1,4 @@
+import { isBlockedStatus } from "@/lib/salon-status";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { CONSENT_HASH, CONSENT_VERSION } from "@/data/consent";
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
   const phone = normalizePhone(parsed.data.phone);
   if (!phone) return NextResponse.json({ error: "PHONE", message: "Enter a mobile number with 10 digits, or include the country code." }, { status: 400 });
   const tenant = await prisma.tenant.findUnique({ where: { slug: parsed.data.slug } });
-  if (!tenant || tenant.status === "SUSPENDED") return NextResponse.json({ error: "TENANT" }, { status: 404 });
+  if (!tenant || isBlockedStatus(tenant.status)) return NextResponse.json({ error: "TENANT" }, { status: 404 });
   const phoneLimit = await sharedRateLimit(`otp:${tenant.id}:${phone}`, 5, 60 * 60 * 1000);
   const ipLimit = await sharedRateLimit(`otp-ip:${requestClientIp(req)}`, 20, 60 * 60 * 1000);
   if (!phoneLimit.ok || !ipLimit.ok) {

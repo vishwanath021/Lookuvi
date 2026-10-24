@@ -40,7 +40,7 @@ type Desk = {
 
 const LABELS: Record<string, string> = { chair: "queueChair", station: "queueStation", room: "queueRoom" };
 
-export function QueueDesk({ initial, lang }: { initial: Desk; lang: string }) {
+export function QueueDesk({ initial, lang, showVisits = false }: { initial: Desk; lang: string; showVisits?: boolean }) {
   const [desk, setDesk] = useState(initial);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -264,7 +264,7 @@ export function QueueDesk({ initial, lang }: { initial: Desk; lang: string }) {
           <button className="btn" type="submit" disabled={busy}>{t(lang, "queueSave")}</button>
         </form>
       </details>
-      <VisitUnlock />
+      <VisitUnlock show={showVisits} />
     </div>
   );
 }

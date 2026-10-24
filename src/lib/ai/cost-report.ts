@@ -1,6 +1,6 @@
 import { actualIsKnown, capPaise, costSourceLabel, KNOWN_ACTUAL_SOURCES } from "@/lib/ai/cost-source";
 import { kolkataMonthStart, spendCapInr, sumCapPaise } from "@/lib/ai/spend";
-import { parseTier, projectSalonMonth, tierRequest, type ImageProviderName } from "@/lib/ai/tiers";
+import { projectSalonMonth, type ImageProviderName } from "@/lib/ai/tiers";
 import { prisma } from "@/lib/prisma";
 
 export type CostCallRow = {
@@ -110,10 +110,7 @@ export async function costReport(args: {
     avgInr: Math.round((group.total / group.count)) / 100,
   }));
   const billedAvg = billed.length ? billed.reduce((sum, row) => sum + row.costInrPaise, 0) / billed.length / 100 : null;
-  const provider = args.provider === "gemini" ? "gemini" : "openai";
-  const tier = parseTier(args.tier);
-  const fallback = tierRequest(provider, tier).estimateInr;
-  const avgInr = billedAvg == null ? fallback : Math.round(billedAvg * 100) / 100;
+  const avgInr = billedAvg == null ? 0 : Math.round(billedAvg * 100) / 100;
   const mapCall = (row: NonNullable<typeof newest>): CostCallRow => ({
     id: row.id,
     at: row.createdAt.toISOString(),

@@ -5,10 +5,10 @@ import { NAILS, toPublicNail, type PublicNail } from "@/data/nails";
 import { planById } from "@/data/plans";
 import { SHADES } from "@/data/shades";
 import { STYLES, toPublicStyle, type PublicStyle } from "@/data/styles";
+import { platformSuitabilityMap } from "@/lib/catalog-tags";
 import { applySuitability } from "@/lib/hair-suitability";
 import { parseJson } from "@/lib/json";
 import { prisma } from "@/lib/prisma";
-import { styleOnMenu } from "@/lib/style-menu";
 import { maskToolFlags } from "@/lib/tools";
 
 export type SalonService = {
@@ -88,12 +88,11 @@ export async function loadTenantByHost(host: string) {
   return tenantQuery({ id: domain.tenantId });
 }
 
-export function toSalonConfig(tenant: TenantWithRelations): SalonConfig {
+export async function toSalonConfig(tenant: TenantWithRelations): Promise<SalonConfig> {
   const plan = planById(tenant.plan);
-  const styleRows = new Map(tenant.styles.map((row) => [row.styleId, row]));
   const customNames = new Map(tenant.styles.map((row) => [row.styleId, row.customName]));
-  const suitability = new Map(tenant.styles.map((row) => [row.styleId, row.suitabilityJson]));
-  let styles = STYLES.filter((style) => styleOnMenu(styleRows.get(style.id))).map((style) => {
+  const suitability = await platformSuitabilityMap();
+  let styles = STYLES.map((style) => {
     const pub = toPublicStyle(style);
     const custom = customNames.get(style.id);
     const named = custom ? { ...pub, name: custom } : pub;
@@ -103,8 +102,7 @@ export function toSalonConfig(tenant: TenantWithRelations): SalonConfig {
   if (!tenant.showMen) styles = styles.filter((style) => style.gender !== "men");
   if (!tenant.showKids) styles = styles.filter((style) => style.gender !== "kids");
   if (plan.styleLimit) styles = styles.slice(0, plan.styleLimit);
-  const enabledShades = new Set(tenant.shades.filter((row) => row.enabled).map((row) => row.shadeId));
-  const shades = SHADES.filter((shade) => enabledShades.has(shade.id)).map(({ id, name, hex, lift, serviceKeys }) => ({
+  const shades = SHADES.map(({ id, name, hex, lift, serviceKeys }) => ({
     id,
     name,
     hex,
