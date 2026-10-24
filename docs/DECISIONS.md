@@ -107,3 +107,11 @@ Date of this review: 24 October 2026. Scope: the seven-salon launch on top of re
 **Product owner.** Adjust credits is how goodwill and corrections are made. Typing a number that is larger than the balance should say the balance cannot go below zero. It must not look like the platform broke, and it must not leave a half-applied change.
 
 **Decision.** The salon update route catches `CreditError` and returns 400 with "The balance can't go below zero." The balance and the ledger stay as they were.
+
+## D12. The test sheet is the cases that were run
+
+**Architect.** The approval note's case counts were estimates, about 340. Inventing near-duplicate clicks to hit that number would produce a sheet that looks complete and proves nothing. A case the runner did not execute has to stay UNTESTED. Browser video covers the screens an HTTP call cannot click, and it is not a second pass of every row.
+
+**Product owner.** Every agreed functionality id still has to appear, with Given / When / Then and a result a co-founder can read. Missing k6, a production authenticator, a live WhatsApp handset, or a payment must be visible as not run, not as a pass.
+
+**Decision.** `docs/test-plan/` is the case list that was executed on the local mock server: 193 pass, 0 fail, 4 untested. The four are production TOTP, the k6 script (k6 is not installed), Razorpay (billing is off for launch), and the nails face check (the portrait was not accepted as a nails look, so the hand check did not run). Six short videos cover the customer, staff, owner, super admin, platform, and cross-screen paths after those paths succeeded.
