@@ -328,6 +328,9 @@ describe("plans and production mock billing", () => {
     const assign = readFileSync("src/app/api/v1/super/tenants/[id]/route.ts", "utf8");
     expect(assign).toContain('action: "PLAN_ASSIGN"');
     expect(assign).toContain('action: "CREDIT_ADJUST"');
+    expect(assign).toContain("The balance can't go below zero.");
+    expect(readFileSync("src/app/api/v1/admin/leads/export/route.ts", "utf8")).toContain("leadExport");
+    expect(readFileSync("src/app/admin/leads/page.tsx", "utf8")).toContain("Lead export is included with Starter and Pro.");
     expect(readFileSync("docker-entrypoint.sh", "utf8")).toContain("npx prisma migrate deploy");
     expect(readFileSync("docker-compose.prod.yml", "utf8")).toContain("prisma migrate deploy");
     expect(readFileSync("Dockerfile", "utf8")).toContain('CMD ["./docker-entrypoint.sh"]');

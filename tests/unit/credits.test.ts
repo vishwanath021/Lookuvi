@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { CreditError, reserveCredits, settleCredits } from "@/lib/credits";
+import { CreditError, grantCredits, reserveCredits, settleCredits } from "@/lib/credits";
 import { prisma } from "@/lib/prisma";
 
 describe("credit ledger", () => {
@@ -22,6 +22,17 @@ describe("credit ledger", () => {
     expect(after.creditBalance).toBe(1);
     const reasons = await prisma.creditLedger.findMany({ where: { tenantId }, orderBy: { createdAt: "asc" } });
     expect(reasons.map((row) => row.reason)).toEqual(["RESERVE", "COMMIT", "RESERVE", "REFUND"]);
+  });
+
+  it("refuses a grant that would make the balance negative", async () => {
+    const tenant = await prisma.tenant.create({
+      data: { slug: `neg-${Date.now()}`, name: "Negative", creditBalance: 10, whatsapp: "919800000001" },
+    });
+    await expect(grantCredits(tenant.id, -11, "ADJUSTMENT", "super", "too much")).rejects.toBeInstanceOf(CreditError);
+    const after = await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id } });
+    expect(after.creditBalance).toBe(10);
+    expect(await prisma.creditLedger.count({ where: { tenantId: tenant.id } })).toBe(0);
+    await prisma.tenant.delete({ where: { id: tenant.id } });
   });
 
   afterAll(async () => {

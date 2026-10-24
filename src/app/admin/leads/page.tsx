@@ -1,4 +1,5 @@
 import { LeadStatus } from "@/components/admin/LeadStatus";
+import { planById } from "@/data/plans";
 import { formatIst, humanLookName, humanShade } from "@/lib/display";
 import { formatEventDate, sortLeads } from "@/lib/leads";
 import { prisma } from "@/lib/prisma";
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LeadsPage() {
   const { tenant } = await pageTenant();
+  const canExport = planById(tenant.plan).leadExport;
   // Unordered take drops a new bridal trial once the salon has a long list of older looks.
   const [dated, recent] = await Promise.all([
     prisma.lead.findMany({
@@ -33,7 +35,7 @@ export default async function LeadsPage() {
         <h1 className="page-title">Leads</h1>
         {/* File download, not a client navigation. */}
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-        <a className="btn" href="/api/v1/admin/leads/export">Download CSV</a>
+        {canExport ? <a className="btn" href="/api/v1/admin/leads/export">Download CSV</a> : <p className="text-sm text-muted">Lead export is included with Starter and Pro.</p>}
       </div>
       {leads.length === 0 && <p className="card p-4 text-sm">No booking taps yet. A lead is created when a guest taps Book this look.</p>}
       <div className="overflow-x-auto">

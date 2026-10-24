@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isPlanId } from "@/data/plans";
 import { applyPlanChange } from "@/lib/billing/plan-assign";
-import { grantCredits } from "@/lib/credits";
+import { CreditError, grantCredits } from "@/lib/credits";
 import { prisma } from "@/lib/prisma";
 import { requireSuper } from "@/lib/session";
 
@@ -51,7 +51,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     });
   }
   if (parsed.data.creditDelta) {
-    const balance = await grantCredits(id, parsed.data.creditDelta, "ADJUSTMENT", "super", parsed.data.note || "");
+    let balance: number;
+    try {
+      balance = await grantCredits(id, parsed.data.creditDelta, "ADJUSTMENT", "super", parsed.data.note || "");
+    } catch (error) {
+      if (error instanceof CreditError) {
+        return NextResponse.json({ error: "INSUFFICIENT", message: "The balance can't go below zero." }, { status: 400 });
+      }
+      throw error;
+    }
     await prisma.auditLog.create({
       data: {
         actorId: access.session.user.id,
