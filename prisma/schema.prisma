@@ -38,6 +38,14 @@ model Tenant {
   productGroom        Boolean   @default(false)
   /** Real bridal and groom previews one customer can spend during a visit. */
   visitTryLimit       Int       @default(3)
+  /** One WhatsApp reminder after a completed visit. */
+  remindersOn         Boolean   @default(true)
+  /** Whole days after lastVisitAt. The owner screen allows 28 to 42. */
+  reminderDays        Int       @default(35)
+  /** Reminder and offer sends WhatsApp accepted this Asia/Kolkata month. */
+  whatsappMonthlyCap  Int       @default(50)
+  /** Succeeded previews included this Asia/Kolkata month. The next one is refused. */
+  monthlyTryAllowance Int       @default(30)
   trialEndsAt         DateTime?
   removeBranding      Boolean   @default(false)
   allowedOrigins      String    @default("[]")
@@ -86,6 +94,9 @@ model Tenant {
   queueState          QueueState?
   queueEntries        QueueEntry[]
   visitGrants         VisitGrant[]
+  whatsappSends       WhatsAppSend[]
+  customerReturns     CustomerReturn[]
+  broadcasts          SalonBroadcast[]
 }
 
 model VisitGrant {
@@ -451,15 +462,26 @@ model Customer {
   dob          String        @default("")
   audience     String        @default("")
   hairLength   String        @default("")
-  onboarded    Boolean       @default(false)
-  createdAt    DateTime      @default(now())
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  people       GuestPerson[]
-  bookings     Booking[]
-  looks        SavedLook[]
+  onboarded           Boolean       @default(false)
+  visitCount          Int           @default(0)
+  lastVisitAt         DateTime?
+  /** Set on a completed visit. Cleared only after WhatsApp accepts the reminder. */
+  needsReminder       Boolean       @default(false)
+  reminderLockUntil   DateTime?
+  lastRemindedVisitAt DateTime?
+  optedOutAt          DateTime?
+  /** STOP or DESK. Empty when reminders are allowed. */
+  optOutSource        String        @default("")
+  createdAt           DateTime      @default(now())
+  tenant              Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  people              GuestPerson[]
+  bookings            Booking[]
+  looks               SavedLook[]
+  returns             CustomerReturn[]
 
   @@unique([tenantId, phone])
   @@index([tenantId])
+  @@index([tenantId, needsReminder, lastVisitAt])
 }
 
 model GuestPerson {
@@ -568,6 +590,60 @@ model RateBucket {
   hits      Int      @default(0)
   resetAt   DateTime
   updatedAt DateTime @updatedAt
+}
+
+/// Inbound STOP on the shared Lookuvi WhatsApp number. One row blocks every salon.
+model WhatsAppOptOut {
+  phone     String   @id
+  createdAt DateTime @default(now())
+}
+
+/// A reminder or offer attempt. Live queue alerts are not stored here.
+model WhatsAppSend {
+  id          String   @id @default(cuid())
+  tenantId    String
+  customerId  String   @default("")
+  phone       String
+  kind        String
+  status      String
+  provider    String   @default("")
+  error       String   @default("")
+  broadcastId String   @default("")
+  linkToken   String?  @unique
+  monthKey    String
+  createdAt   DateTime @default(now())
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  returns     CustomerReturn[]
+
+  @@index([tenantId, monthKey, status])
+  @@index([tenantId, kind, createdAt])
+}
+
+/// One join attributed to one reminder send.
+model CustomerReturn {
+  id         String       @id @default(cuid())
+  tenantId   String
+  customerId String
+  sendId     String       @unique
+  createdAt  DateTime     @default(now())
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer   Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  send       WhatsAppSend @relation(fields: [sendId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([customerId])
+}
+
+model SalonBroadcast {
+  id        String   @id @default(cuid())
+  tenantId  String
+  text      String
+  sent      Int      @default(0)
+  held      Int      @default(0)
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
 }
 
 model PasswordReset {

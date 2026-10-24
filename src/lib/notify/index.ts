@@ -1,6 +1,6 @@
 import { logInfo } from "@/lib/logger";
 
-export type NotifyKind = "joined" | "almost" | "confirmed";
+export type NotifyKind = "joined" | "almost" | "confirmed" | "reminder" | "offer";
 
 export type NotifyMessage = {
   to: string;
@@ -17,6 +17,8 @@ export type NotifyEnv = {
   WHATSAPP_TEMPLATE_JOIN?: string;
   WHATSAPP_TEMPLATE_ALERT?: string;
   WHATSAPP_TEMPLATE_CONFIRMED?: string;
+  WHATSAPP_TEMPLATE_REMINDER?: string;
+  WHATSAPP_TEMPLATE_OFFER?: string;
   WHATSAPP_TEMPLATE_LANG?: string;
 };
 
@@ -29,6 +31,8 @@ export function whatsAppConfigured(env: NotifyEnv) {
 export function templateFor(kind: NotifyKind, env: NotifyEnv) {
   if (kind === "joined") return env.WHATSAPP_TEMPLATE_JOIN || "";
   if (kind === "almost") return env.WHATSAPP_TEMPLATE_ALERT || "";
+  if (kind === "reminder") return env.WHATSAPP_TEMPLATE_REMINDER || "";
+  if (kind === "offer") return env.WHATSAPP_TEMPLATE_OFFER || "";
   return env.WHATSAPP_TEMPLATE_CONFIRMED || "";
 }
 
@@ -52,7 +56,7 @@ export async function sendWhatsApp(message: NotifyMessage, env: NotifyEnv, fetch
         components: [
           {
             type: "body",
-            parameters: message.parameters.map((text) => ({ type: "text", text: text.slice(0, 200) })),
+            parameters: message.parameters.map((text) => ({ type: "text", text: text.slice(0, 1024) })),
           },
         ],
       },

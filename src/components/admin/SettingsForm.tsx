@@ -35,6 +35,7 @@ export function SettingsForm({
     hairSuggestUsesCredits: boolean;
     anonDailyCap: number;
     memberDailyCap: number;
+    monthlyTryAllowance: number;
     requireLoginToBook: boolean;
     productBridal: boolean;
     productGroom: boolean;
@@ -202,11 +203,14 @@ export function SettingsForm({
                   <label className="text-sm">Anonymous daily previews
                     <input className="field mt-1" type="number" min={0} max={500} value={form.anonDailyCap} onChange={(event) => set("anonDailyCap", Number(event.target.value))} />
                   </label>
-                  <label className="text-sm">Logged-in daily previews
+                  <label className="text-sm">Tries per signed-in customer per day
                     <input className="field mt-1" type="number" min={0} max={500} value={form.memberDailyCap} onChange={(event) => set("memberDailyCap", Number(event.target.value))} />
                   </label>
                 </div>
-                <p className="text-xs text-muted">0 means no AI previews for that group.{enabledTools.includes("colour") ? " Live colour stays free." : ""}</p>
+                <label className="text-sm">Included try-ons per month
+                  <input className="field mt-1" type="number" min={0} max={5000} aria-label="Included try-ons per month" value={form.monthlyTryAllowance} onChange={(event) => set("monthlyTryAllowance", Number(event.target.value))} />
+                </label>
+                <p className="text-xs text-muted">0 means no AI previews for that group. The monthly number is a hard stop for the salon, including staff. Guests who are not signed in use the anonymous daily cap. Provider rupee caps still apply.{enabledTools.includes("colour") ? " Live colour stays free." : ""}</p>
                 <SalonModeCard initialUrl={salonModeUrl} canRotate />
               </>
             ) : null}

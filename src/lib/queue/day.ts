@@ -11,3 +11,8 @@ export function kolkataDayKey(now = new Date()) {
 export function kolkataToday(now = new Date()) {
   return kolkataDayKey(now);
 }
+
+/** YYYY-MM in Asia/Kolkata. Same month the try-on allowance and WhatsApp cap use. */
+export function kolkataMonthKey(now = new Date()) {
+  return kolkataDayKey(now).slice(0, 7);
+}

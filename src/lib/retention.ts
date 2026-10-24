@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import { BENCHMARK_STAGES } from "@/lib/ai/benchmark";
 import { numberEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import { sweepDueReminders } from "@/lib/reminders";
 import { purgeOldQueueEntries, sweepAllQueues } from "@/lib/queue/service";
 import { deleteObject } from "@/lib/storage";
 
@@ -28,7 +29,8 @@ export async function runRetention() {
   await prisma.rateBucket.deleteMany({ where: { resetAt: { lt: oldBuckets } } }).catch(() => undefined);
   const queue = await purgeOldQueueEntries().catch(() => 0);
   const alerts = await sweepAllQueues().catch(() => ({ sent: 0, salons: 0 }));
-  return { jobs: staleJobs.length, benchmarks: staleRuns.length, queue, alerts: alerts.sent };
+  const reminders = await sweepDueReminders().catch(() => ({ sent: 0, reason: "FAIL", salons: 0 }));
+  return { jobs: staleJobs.length, benchmarks: staleRuns.length, queue, alerts: alerts.sent, reminders: reminders.sent };
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;

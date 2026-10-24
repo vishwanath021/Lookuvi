@@ -1,0 +1,27 @@
+# Return visits checklist
+
+WhatsApp only. No web push, no PWA install prompt, no VAPID keys, no consumer-app hook.
+
+Each item is something an owner or a guest can see, or a rule a test must hold. Status starts as planned and is filled after the running-app walkthrough.
+
+| # | Check | Status |
+|---|---|---|
+| 1 | A walk-in phone typed at the desk is stored on that salon only. Name can be empty. The placeholder "Walk-in" is not saved as a name. | Passed. Desk walk-in with only a phone showed as "No name", then 1 visit after Done. |
+| 2 | A remote join phone is stored on that salon only. The same number at another salon is a different row. | Passed in unit tests (two salons, one phone, two rows). |
+| 3 | Visit count and last visit move only when staff mark the visit done (live queue Done, or Mark visited on a confirmed request). Joining, a no-show, or a cancel does not count a visit. | Passed. Adding a number left "No visit yet". Done on the queue counted 1 visit. A no-show does not increment, covered by unit test. |
+| 4 | The owner can search the list, add one number, and import up to 500 lines. A line may be `phone`, `phone, name`, or `phone, name, YYYY-MM-DD`. A bad phone is skipped. A future date is ignored. | Passed on the running page. Import reported "Saved 2 numbers. Skipped 1 that are not Indian mobiles. Ignored 1 dates." Search found the walk-in. |
+| 5 | Staff can view, add, import, and stop reminders for a number. Only the owner changes the interval, the monthly cap, and sends an offer. | Passed. Staff sign-in shows the list and the sentence "The owner sets reminders and offers." The offer and interval forms are not on that screen. |
+| 6 | The join message, the near-turn message, the confirmed-visit message, and the desk WhatsApp text each include the salon join-from-home link (`/s/{slug}/queue`) and the try-on link (`/s/{slug}`). The personal status link stays as well. | Passed. Desk WhatsApp link on the running queue included both. Template bodies covered by unit tests. |
+| 7 | With reminders on, a customer with a completed visit is due once the owner interval has passed (28 to 42 days, default 35). They receive one reminder for that visit, not a second one, until a newer visit is marked done. | Passed in unit tests. The running server has no WhatsApp token, so the sweep does not send. |
+| 8 | Reminder copy is: `Time for your next visit at <salon>? Join the queue from home: <link> Try a look: <link> Reply STOP to opt out.` | Passed in unit tests. |
+| 9 | The owner can send one offer. It uses the same cap and the same STOP rule. It does not cancel the visit reminder. | Passed. The running page said nothing was sent because WhatsApp is not connected, and usage stayed 0 of 40. Cap and reminder-flag behaviour covered by unit tests. |
+| 10 | The monthly cap counts reminder and offer messages that WhatsApp accepted. It never counts a failed send, a skipped send, or a live queue alert. The sweep stops when the cap is reached. | Passed in unit tests. |
+| 11 | Reply STOP, or the desk "Stop reminders" action, blocks reminders and offers. STOP cannot be turned back on by the owner. A desk stop can. STOP on the shared Lookuvi WhatsApp number applies to every salon that has that phone. | Passed. Desk stop on the running page offered "Turn reminders on". Signed webhook STOP and the cross-salon block are unit tests. |
+| 12 | Live queue alerts still go out when the outreach cap is used up. They still require the join consent tick. | Passed in unit tests. Queue alerts are not `WhatsAppSend` rows and do not read the cap. |
+| 13 | If `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_ID` are missing, or the template name is missing, nothing is sent, the cap is not used, and the customer stays due. The screen says WhatsApp is not connected. Buttons stay usable. | Passed on the running page. |
+| 14 | A join that carries the reminder's `r` token and the same phone counts one return for that reminder. A different phone, a second join, or an offer link does not increase the reminder return count. | Passed in unit tests. |
+| 15 | The customers screen shows reminders sent this month, offers sent, WhatsApp used versus the cap, returns this month, and the share of people reminded in the last 90 days who came back through the reminder link. The pilot target shown on the screen is 20%. | Passed. With no reminders yet the page says the pilot target is 20%. After reminders exist it shows the share and the same target. |
+| 16 | This salon's list, sends, and returns are invisible to another salon. | Passed in unit tests. |
+| 17 | Included try-ons this month default to 30 and hard-stop the next preview. Signed-in customers keep the existing per-customer daily cap. Guests who are not signed in keep the anonymous daily cap. Platform and per-salon rupee spend caps still apply. | Passed. The page showed "0 of 30 included try-ons". The hard stop is a unit test. Daily caps and rupee caps are the existing gates. A phone-only daily cap is out of scope. |
+| 18 | Owner screens are English, use the existing brushed purple metal, add no gold, add no second scrollbar, and do not use a disabled control as the way to explain that WhatsApp is off. | Passed on the running page. |
+| 19 | The join form still has the consent tick, plus an English line that this salon may send one WhatsApp reminder after the visit and that STOP opts out. | Passed on the running join page. |

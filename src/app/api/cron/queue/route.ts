@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { sweepDueReminders } from "@/lib/reminders";
 import { sweepAllQueues } from "@/lib/queue/service";
 
 export const dynamic = "force-dynamic";
@@ -15,5 +16,6 @@ function authorized(req: Request) {
 export async function POST(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
   const result = await sweepAllQueues();
-  return NextResponse.json({ ok: true, ...result });
+  const reminders = await sweepDueReminders();
+  return NextResponse.json({ ok: true, ...result, reminders });
 }

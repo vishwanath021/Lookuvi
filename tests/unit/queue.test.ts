@@ -121,8 +121,12 @@ describe("queue joins", () => {
     expect(send.mock.calls[0][0].kind).toBe("joined");
     expect(send.mock.calls[0][0].to).toBe("919876500112");
     expect(send.mock.calls[0][0].body).toContain("you have joined, token 1, about 0 min");
+    expect(send.mock.calls[0][0].body).toContain("Join from home:");
+    expect(send.mock.calls[0][0].body).toContain("Try a look:");
     expect(send.mock.calls[0][0].parameters[1]).toBe("1");
     expect(send.mock.calls[0][0].parameters[3]).toContain(`/s/${slug}/q/`);
+    expect(send.mock.calls[0][0].parameters[4]).toContain(`/s/${slug}/queue`);
+    expect(send.mock.calls[0][0].parameters[5]).toBe(`http://localhost:3000/s/${slug}`);
     await addWalkIn(tenant.id, { name: "Desk" }, send);
     expect(send.mock.calls).toHaveLength(1);
     await expect(addWalkIn(tenant.id, { name: "Bad", phone: "12345" }, send)).rejects.toMatchObject({ code: "PHONE" });
