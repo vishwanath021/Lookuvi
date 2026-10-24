@@ -5,7 +5,8 @@ import { sharedRateLimit } from "@/lib/ratelimit";
 import { notifyGuest, type NotifyMessage, type NotifyResult } from "@/lib/notify";
 import { kolkataDayKey } from "@/lib/queue/day";
 import { peopleAhead, serviceMinutes, waitMinutes, type WaitRow } from "@/lib/queue/estimate";
-import { almostMessage, confirmedMessage, deskWhatsAppText, joinedMessage, statusPath, statusUrl } from "@/lib/queue/messages";
+import { attributeReturn, recordVisit, rememberCustomer } from "@/lib/customers/service";
+import { almostMessage, confirmedMessage, deskWhatsAppText, joinedMessage, queueHomeUrl, statusPath, statusUrl, tryOnUrl } from "@/lib/queue/messages";
 import { indianMobile } from "@/lib/queue/phone";
 
 export class QueueError extends Error {
@@ -113,6 +114,10 @@ async function createQueuedEntry(data: Omit<Prisma.QueueEntryUncheckedCreateInpu
   throw new QueueError("BUSY", "The queue is busy. Try again.", 409);
 }
 
+function visitLinks(slug: string, ref: string) {
+  return { link: statusUrl(slug, ref), home: queueHomeUrl(slug), tryOn: tryOnUrl(slug) };
+}
+
 function ticket(slug: string, row: EntryRow, mode: string, waitMin: number, ahead: number) {
   return {
     ref: row.cancelToken,
@@ -167,7 +172,7 @@ export async function sweepAlerts(tenantId: string, send: Sender = notifyGuest) 
       salon: tenant.name,
       token: entry.token,
       waitMin: wait.waitMin,
-      link: statusUrl(tenant.slug, entry.cancelToken),
+      ...visitLinks(tenant.slug, entry.cancelToken),
     }), send);
     if (ok) sent += 1;
   }
@@ -236,6 +241,7 @@ export async function joinQueue(input: {
   requestedSlot?: string;
   ip: string;
   deviceId?: string;
+  returnToken?: string;
   send?: Sender;
 }) {
   const send = input.send || notifyGuest;
@@ -259,6 +265,8 @@ export async function joinQueue(input: {
     orderBy: { joinedAt: "desc" },
   });
   if (existing) {
+    await rememberCustomer({ tenantId: tenant.id, phone, name });
+    if (input.returnToken) await attributeReturn({ tenantId: tenant.id, phone, linkToken: input.returnToken });
     const loaded = await loadDay(tenant.id, existing.dayKey);
     const wait = timing(loaded.entries, existing.id, loaded.state.avgMinutes, loaded.state.units);
     return ticket(tenant.slug, existing as EntryRow, state.mode, wait.waitMin, wait.ahead);
@@ -285,6 +293,8 @@ export async function joinQueue(input: {
     requestedSlot: state.mode === "REQUEST" ? requestedSlot : "",
     consentAt: new Date(),
   });
+  await rememberCustomer({ tenantId: tenant.id, phone, name });
+  if (input.returnToken) await attributeReturn({ tenantId: tenant.id, phone, linkToken: input.returnToken });
   const loaded = await loadDay(tenant.id, dayKey);
   const row = loaded.entries.find((entry) => entry.id === created.id) || (created as EntryRow);
   const wait = timing(loaded.entries, row.id, loaded.state.avgMinutes, loaded.state.units);
@@ -294,7 +304,7 @@ export async function joinQueue(input: {
         salon: tenant.name,
         token: row.token,
         waitMin: wait.waitMin,
-        link: statusUrl(tenant.slug, row.cancelToken),
+        ...visitLinks(tenant.slug, row.cancelToken),
       }),
       to: phone,
     });
@@ -347,9 +357,9 @@ export async function guestVisit(input: { slug: string; ref: string; action: "wa
   return guestTicket(input.slug, input.ref);
 }
 
-function deskCard(tenantName: string, row: EntryRow, avgMinutes: number, entries: EntryRow[], units: number) {
+function deskCard(tenantName: string, slug: string, row: EntryRow, avgMinutes: number, entries: EntryRow[], units: number) {
   const wait = timing(entries, row.id, avgMinutes, units);
-  const text = deskWhatsAppText(tenantName, row.token, row.name);
+  const text = deskWhatsAppText(tenantName, row.token, row.name, { home: queueHomeUrl(slug), tryOn: tryOnUrl(slug) });
   const phone = row.phone;
   return {
     id: row.id,
@@ -388,7 +398,7 @@ export async function deskSnapshot(tenantId: string) {
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });
-  const card = (row: EntryRow) => deskCard(tenant.name, row, state.avgMinutes, entries, state.units);
+  const card = (row: EntryRow) => deskCard(tenant.name, tenant.slug, row, state.avgMinutes, entries, state.units);
   const serving = Array.from({ length: state.units }, (_, index) => {
     const unit = index + 1;
     const entry = entries.find((row) => row.unitSlot === unit && (row.status === "CALLED" || row.status === "IN_SERVICE"));
@@ -407,8 +417,8 @@ export async function deskSnapshot(tenantId: string) {
     services,
     serving,
     waiting: entries.filter((row) => row.status === "WAITING").map(card),
-    requests: (requests as EntryRow[]).filter((row) => row.status === "REQUESTED").map((row) => deskCard(tenant.name, row, state.avgMinutes, [], state.units)),
-    confirmed: (requests as EntryRow[]).filter((row) => row.status === "CONFIRMED").map((row) => deskCard(tenant.name, row, state.avgMinutes, [], state.units)),
+    requests: (requests as EntryRow[]).filter((row) => row.status === "REQUESTED").map((row) => deskCard(tenant.name, tenant.slug, row, state.avgMinutes, [], state.units)),
+    confirmed: (requests as EntryRow[]).filter((row) => row.status === "CONFIRMED").map((row) => deskCard(tenant.name, tenant.slug, row, state.avgMinutes, [], state.units)),
   };
 }
 
@@ -462,9 +472,10 @@ export async function finishEntry(tenantId: string, id: string, status: "DONE" |
   await requireDesk(tenantId);
   const row = await prisma.queueEntry.findFirst({ where: { id, tenantId } });
   if (!row) throw new QueueError("NOT_FOUND", "That guest was not found.", 404);
-  const allowed = status === "DONE" ? ["CALLED", "IN_SERVICE", "WAITING"] : ["WAITING", "CALLED", "IN_SERVICE"];
+  const allowed = status === "DONE" ? ["CALLED", "IN_SERVICE", "WAITING", "CONFIRMED"] : ["WAITING", "CALLED", "IN_SERVICE"];
   if (!allowed.includes(row.status)) throw new QueueError("STATE", "That guest is already closed.", 409);
   await prisma.queueEntry.update({ where: { id }, data: { status, doneAt: new Date(), unitSlot: null } });
+  if (status === "DONE" && row.phone) await recordVisit(tenantId, row.phone, row.name);
   await sweepAlerts(tenantId, send);
   return deskSnapshot(tenantId);
 }
@@ -488,6 +499,7 @@ export async function addWalkIn(tenantId: string, input: { name?: string; phone?
     source: "WALKIN",
   });
   if (phone) {
+    await rememberCustomer({ tenantId, phone, name: (input.name || "").trim() });
     const loaded = await loadDay(tenantId, dayKey);
     const row = loaded.entries.find((entry) => entry.id === created.id);
     const wait = timing(loaded.entries, created.id, loaded.state.avgMinutes, loaded.state.units);
@@ -496,7 +508,7 @@ export async function addWalkIn(tenantId: string, input: { name?: string; phone?
         salon: tenant.name,
         token: created.token,
         waitMin: row ? wait.waitMin : 0,
-        link: statusUrl(tenant.slug, created.cancelToken),
+        ...visitLinks(tenant.slug, created.cancelToken),
       }),
       to: phone,
     });
@@ -548,7 +560,7 @@ export async function confirmRequest(tenantId: string, id: string, input: { date
   });
   if (row.phone) {
     await safeSend(send, {
-      ...confirmedMessage({ salon: tenant.name, date, slot, link: statusUrl(tenant.slug, row.cancelToken) }),
+      ...confirmedMessage({ salon: tenant.name, date, slot, ...visitLinks(tenant.slug, row.cancelToken) }),
       to: row.phone,
     });
   }

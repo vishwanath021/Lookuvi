@@ -53,6 +53,7 @@ describe("owner feature flags", () => {
     const queued = ownerNav({ ...off, productTryOn: false, productQueue: true });
     const labels = queued.map((link) => link.label);
     expect(labels).toContain("Queue");
+    expect(labels).toContain("Customers");
     expect(labels).not.toContain("Styles");
     expect(labels).not.toContain("View try-on");
     expect(labels).not.toContain("QR and embed");

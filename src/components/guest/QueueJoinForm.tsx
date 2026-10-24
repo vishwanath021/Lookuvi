@@ -33,10 +33,13 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
   const [ready, setReady] = useState(false);
   const [memory, setMemory] = useState<Memory | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [returnToken, setReturnToken] = useState("");
   const request = board.mode === "REQUEST";
 
   useEffect(() => {
     setReady(true);
+    const token = new URLSearchParams(window.location.search).get("r") || "";
+    if (/^[A-Za-z0-9_-]{16,80}$/.test(token)) setReturnToken(token);
     try {
       const saved = JSON.parse(localStorage.getItem(`lookuvi-queue:${board.slug}`) || "null") as Memory | null;
       if (saved?.phone && saved.ref) setMemory(saved);
@@ -88,6 +91,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
         requestedDate: request ? date : undefined,
         requestedSlot: request ? slot : undefined,
         deviceId: deviceId(),
+        returnToken: returnToken || undefined,
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -147,7 +151,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
         ) : null}
         <label className="flex min-h-11 items-start gap-2 text-sm" htmlFor="queue-updates">
           <input id="queue-updates" className="mt-1" type="checkbox" checked={consent} aria-label={t(lang, "queueConsent")} onChange={(event) => setConsent(event.target.checked)} required />
-          <span>{t(lang, "queueConsent")}</span>
+          <span>{t(lang, "queueConsent")}<span className="mt-1 block text-muted">This salon may send one WhatsApp reminder after your visit. Reply STOP to opt out.</span></span>
         </label>
         <button className="btn w-full text-lg" type="submit" disabled={busy || (!board.open && !request)}>{busy ? "…" : request ? t(lang, "queueRequest") : t(lang, "queueJoin")}</button>
         {message ? <p className="text-sm" role="status">{message}</p> : null}

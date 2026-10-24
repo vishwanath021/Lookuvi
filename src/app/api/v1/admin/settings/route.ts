@@ -36,6 +36,7 @@ const schema = z.object({
   productBridal: z.boolean().optional(),
   productGroom: z.boolean().optional(),
   visitTryLimit: z.number().int().min(1).max(20).optional(),
+  monthlyTryAllowance: z.number().int().min(0).max(5000).optional(),
   gstin: z.string().max(20).optional().nullable(),
 });
 
@@ -73,7 +74,7 @@ export async function PUT(req: Request) {
     if (!toolEnabled(id)) delete rest[field as keyof typeof rest];
   }
   if (!access.tenant.productTryOn) {
-    for (const field of ["toolColour", "toolStyle", "toolBrows", "toolBeard", "toolNails", "hairPickerOn", "hairSuggestOn", "hairSuggestUsesCredits", "anonDailyCap", "memberDailyCap", "requireLoginToBook"] as const) {
+    for (const field of ["toolColour", "toolStyle", "toolBrows", "toolBeard", "toolNails", "hairPickerOn", "hairSuggestOn", "hairSuggestUsesCredits", "anonDailyCap", "memberDailyCap", "monthlyTryAllowance", "requireLoginToBook"] as const) {
       delete rest[field];
     }
   }

@@ -54,6 +54,7 @@ export function ownerNav(input: {
   const links: OwnerNavLink[] = [];
   if (input.onboardingDone === false) links.push({ href: "/admin/onboarding", label: "Onboarding", section: "main" });
   if (input.productQueue) links.push({ href: "/admin/queue", label: "Queue", section: "main" });
+  if (input.productQueue) links.push({ href: "/admin/customers", label: "Customers", section: "main" });
   links.push({ href: "/admin/leads", label: "Leads", section: "main" });
   if (input.productTryOn) links.push({ href: "/admin/qr", label: input.features.embed ? "QR and embed" : "QR", section: "main" });
   if (input.productTryOn) links.push({ href: "/admin/styles", label: "Styles", section: "more" });

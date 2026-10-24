@@ -22,6 +22,7 @@ import { AI_PREVIEW_KINDS, actorKeyFor, capForTier, hashIp, readGuestToken, veri
 import { ensurePhotoConsent } from "@/lib/photo-consent";
 import { prisma } from "@/lib/prisma";
 import { requestClientIp } from "@/lib/ratelimit";
+import { refuseMonthlyTries } from "@/lib/try-allowance";
 import { isPhotoId, loadVisitPhoto, rememberVisitPhoto, refuseVisit, stampVisit } from "@/lib/visit-allowance";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -110,6 +111,8 @@ export async function POST(req: Request) {
   if (usedToday >= tenant.dailyCap) {
     return NextResponse.json({ error: "DAILY_CAP", message: guestLimitMessage("daily") }, { status: 429 });
   }
+  const monthly = await refuseMonthlyTries(tenant.id, tenant.monthlyTryAllowance);
+  if (monthly) return NextResponse.json(monthly, { status: 429 });
 
   const bridalFields = readBridalGenerateFields(form);
   const makeup = bridalMakeupById(bridalFields.makeup || "");

@@ -52,6 +52,7 @@ export default async function SettingsPage() {
           hairSuggestUsesCredits: tenant.hairSuggestUsesCredits,
           anonDailyCap: tenant.anonDailyCap,
           memberDailyCap: tenant.memberDailyCap,
+          monthlyTryAllowance: tenant.monthlyTryAllowance,
           requireLoginToBook: tenant.requireLoginToBook,
           productBridal: tenant.productBridal,
           productGroom: tenant.productGroom,

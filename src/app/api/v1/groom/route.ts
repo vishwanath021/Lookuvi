@@ -19,6 +19,7 @@ import { requestClientIp } from "@/lib/ratelimit";
 import { deleteObject, putObject } from "@/lib/storage";
 import { auth } from "@/auth";
 import { consumePreviewRateShared, guestLimitMessage } from "@/lib/tools";
+import { refuseMonthlyTries } from "@/lib/try-allowance";
 import { isPhotoId, loadVisitPhoto, rememberVisitPhoto, refuseVisit, stampVisit } from "@/lib/visit-allowance";
 
 export const runtime = "nodejs";
@@ -158,6 +159,8 @@ export async function POST(req: Request) {
   if (usedToday >= tenant.dailyCap) {
     return NextResponse.json({ error: "DAILY_CAP", message: guestLimitMessage("daily") }, { status: 429 });
   }
+  const monthly = await refuseMonthlyTries(tenant.id, tenant.monthlyTryAllowance);
+  if (monthly) return NextResponse.json(monthly, { status: 429 });
 
   const salonToken = String(form.get("salonToken") || "");
   const salonOk = verifySalonToken(salonToken, tenant.id, tenant.salonNonce);

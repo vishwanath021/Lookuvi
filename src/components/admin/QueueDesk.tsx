@@ -208,11 +208,16 @@ export function QueueDesk({ initial, lang }: { initial: Desk; lang: string }) {
           {desk.confirmed.length > 0 ? (
             <>
               <h2 className="mt-6 font-serif text-2xl">{t(lang, "queueConfirmed")}</h2>
-              <ul className="mt-2 text-sm">
+              <div className="mt-3 grid gap-3">
                 {desk.confirmed.map((card) => (
-                  <li key={card.id} className="border-b border-line py-2">{card.name} · {card.requestedDate} {card.requestedSlot}</li>
+                  <article key={card.id} className="card p-4">
+                    <p className="text-lg">{card.name}</p>
+                    <p className="text-sm">{card.requestedDate} · {card.requestedSlot}</p>
+                    <button className="btn mt-3" type="button" disabled={busy} onClick={() => void act({ action: "done", id: card.id })}>Mark visited</button>
+                    {links(card)}
+                  </article>
                 ))}
-              </ul>
+              </div>
             </>
           ) : null}
         </section>
