@@ -56,6 +56,7 @@ export async function POST(req: Request) {
       trialEndsAt: trialEnds,
       creditBalance: plan.credits,
       dailyCap: plan.credits,
+      productQueue: true,
       city: parsed.data.city || "",
       whatsapp: parsed.data.whatsapp || "",
       toolColour: true,

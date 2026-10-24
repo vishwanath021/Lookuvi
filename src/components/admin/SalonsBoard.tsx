@@ -123,7 +123,9 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
       say(data.message || "Could not update that salon.", false);
       return false;
     }
-    const text = data.plan ? `Plan set to ${data.plan}. Included tries added.` : "Updated.";
+    const text = data.plan
+      ? `Plan set to ${data.plan}. Tries already on the salon stay. Use Adjust credits to add more.`
+      : "Updated.";
     say(text);
     const structural = Boolean(body.plan) || body.creditDelta !== undefined || Boolean(body.status);
     if (!structural) {
@@ -335,7 +337,7 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
       </Dialog>
 
       <Dialog open={planOpen} onOpenChange={setPlanOpen}>
-        <DialogContent title="Change plan" description="Included tries are added. MRR counts only while the salon is active.">
+        <DialogContent title="Change plan" description="Changing the plan does not add or remove tries. Use Adjust credits for that. MRR counts only while the salon is active.">
           <form
             className="grid gap-3"
             onSubmit={(event) => {

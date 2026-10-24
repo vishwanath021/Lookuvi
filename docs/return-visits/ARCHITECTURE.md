@@ -81,7 +81,7 @@ The Cloud API webhook is `GET/POST /api/whatsapp/webhook`. It is outside the adm
 
 The only opt-out phrases are `STOP`, `STOPALL`, and `UNSUBSCRIBE`, with optional trailing punctuation. `CANCEL` is not an opt-out, because a guest may mean today's token.
 
-Lookuvi sends from one WhatsApp phone id for every salon. An inbound STOP has no salon id. The phone is written to `WhatsAppOptOut` and every `Customer` with that phone is marked `optOutSource = STOP`. The owner cannot undo that. A desk stop is `optOutSource = DESK` on that salon only, and the owner can clear it if the global row does not exist.
+Lookuvi sends from one WhatsApp phone id for every salon. A plain STOP is stored for the salon that last sent a reminder, offer, or queue message to that phone. If that cannot be told apart and the phone is saved at exactly one salon, that salon is used. It is not copied onto every salon. STOPALL and UNSUBSCRIBE are the shared-number opt-out: one row with an empty salon id, and every salon with that phone is marked. Meta’s rule is about the business number, so those two words are the way off the sender entirely. The owner cannot undo a STOP. A desk stop is `optOutSource = DESK` on that salon only, and the owner can clear it when no STOP row exists for that salon or for the shared number.
 
 STOP blocks reminders and offers. It does not block the queue alert for a visit the guest just joined with the consent tick.
 

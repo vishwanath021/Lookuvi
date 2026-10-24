@@ -30,7 +30,7 @@ Claim order matters. Clearing `needsReminder` before WhatsApp accepts the send l
 
 `CANCEL` as an opt-out word is wrong. Guests already cancel a token. Only STOP, STOPALL, and UNSUBSCRIBE.
 
-One sending number means STOP is global. Pretending it is per salon would message the same phone from the same Lookuvi number after they opted out. The owner cannot override it.
+A plain STOP is per salon, attributed to the last message we sent that phone. STOPALL and UNSUBSCRIBE opt out of the shared Lookuvi number for every salon. That is the path off the sender when Meta’s one-number rule applies. The owner cannot override a STOP.
 
 The unsigned webhook was rejected. Without `WHATSAPP_APP_SECRET` the route refuses the body. Desk opt-out still works when the webhook is not configured.
 

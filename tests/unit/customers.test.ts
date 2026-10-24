@@ -170,12 +170,15 @@ describe("reminders, cap, and STOP", () => {
     const beta = await salon("return-stop-b");
     const row = await due(alpha.id, "9100004666");
     await rememberCustomer({ tenantId: beta.id, phone: "9100004666", name: "Asha" });
-    await applyStop("9100004666");
+    await applyStop("9100004666", { tenantId: alpha.id });
     expect(await sweepDueReminders(send, ready)).toMatchObject({ sent: 0 });
     expect((await prisma.customer.findFirstOrThrow({ where: { id: row.id } })).optOutSource).toBe("STOP");
     expect((await resumeReminders(alpha.id, row.id)).ok).toBe(false);
     const other = await prisma.customer.findFirstOrThrow({ where: { tenantId: beta.id, phone: "919100004666" } });
-    expect(other.optOutSource).toBe("STOP");
+    expect(other.optOutSource).toBe("");
+    await applyStop("9100004666", { global: true });
+    expect((await prisma.customer.findFirstOrThrow({ where: { tenantId: beta.id, phone: "919100004666" } })).optOutSource).toBe("STOP");
+    expect((await resumeReminders(beta.id, other.id)).ok).toBe(false);
   });
 
   it("counts a reminder return only for the same phone and the same salon", async () => {
@@ -285,5 +288,36 @@ describe("WhatsApp STOP webhook", () => {
     expect(await ok.text()).toBe("ok");
     const deniedGet = await webhookGet(new Request("http://localhost/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=nope&hub.challenge=ok"));
     expect(deniedGet.status).toBe(403);
+  });
+
+  it("applies a plain STOP only to the salon that last messaged that phone", async () => {
+    process.env.WHATSAPP_APP_SECRET = "app-secret";
+    const alpha = await salon("return-hook-a");
+    const beta = await salon("return-hook-b");
+    await rememberCustomer({ tenantId: alpha.id, phone: "9100006666", name: "Asha" });
+    await rememberCustomer({ tenantId: beta.id, phone: "9100006666", name: "Asha" });
+    await prisma.whatsAppSend.create({
+      data: { tenantId: beta.id, phone: "919100006666", kind: "reminder", status: "SENT", monthKey: "2026-10" },
+    });
+    const payload = JSON.stringify({
+      entry: [{ changes: [{ value: { messages: [{ from: "919100006666", type: "text", text: { body: "STOP" } }] } }] }],
+    });
+    const signed = await webhook(new Request("http://localhost/api/whatsapp/webhook", {
+      method: "POST",
+      body: payload,
+      headers: { "x-hub-signature-256": whatsAppSignature(payload, "app-secret") },
+    }));
+    expect(signed.status).toBe(200);
+    expect((await prisma.customer.findFirstOrThrow({ where: { tenantId: beta.id, phone: "919100006666" } })).optOutSource).toBe("STOP");
+    expect((await prisma.customer.findFirstOrThrow({ where: { tenantId: alpha.id, phone: "919100006666" } })).optOutSource).toBe("");
+    const all = JSON.stringify({
+      entry: [{ changes: [{ value: { messages: [{ from: "919100006666", type: "text", text: { body: "STOPALL" } }] } }] }],
+    });
+    await webhook(new Request("http://localhost/api/whatsapp/webhook", {
+      method: "POST",
+      body: all,
+      headers: { "x-hub-signature-256": whatsAppSignature(all, "app-secret") },
+    }));
+    expect((await prisma.customer.findFirstOrThrow({ where: { tenantId: alpha.id, phone: "919100006666" } })).optOutSource).toBe("STOP");
   });
 });

@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { isStopText } from "@/lib/customers/parse";
+import { stopScope } from "@/lib/customers/parse";
 import { indianMobile } from "@/lib/queue/phone";
 
 export function whatsAppSignature(raw: string, secret: string) {
@@ -27,13 +27,21 @@ function messagesFrom(body: unknown) {
   return found;
 }
 
-/** Phones that sent STOP, STOPALL, or UNSUBSCRIBE. Anything else is ignored. */
-export function stopPhonesFromPayload(body: unknown) {
-  const phones = new Set<string>();
+export type StopEvent = { phone: string; scope: "salon" | "global" };
+
+/**
+ * STOP is for one salon. STOPALL and UNSUBSCRIBE leave the shared WhatsApp number entirely.
+ * A later global word wins over a salon word in the same payload.
+ */
+export function stopEventsFromPayload(body: unknown): StopEvent[] {
+  const events = new Map<string, StopEvent>();
   for (const message of messagesFrom(body)) {
-    if (!isStopText(message.text)) continue;
+    const scope = stopScope(message.text);
+    if (!scope) continue;
     const phone = indianMobile(message.from);
-    if (phone) phones.add(phone);
+    if (!phone) continue;
+    const current = events.get(phone);
+    if (!current || scope === "global") events.set(phone, { phone, scope });
   }
-  return [...phones];
+  return [...events.values()];
 }

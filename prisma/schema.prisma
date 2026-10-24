@@ -30,8 +30,8 @@ model Tenant {
   status              String    @default("TRIAL")
   /** Sell try-on for this salon. Off hides guest try-on and blocks preview APIs. */
   productTryOn        Boolean   @default(true)
-  /** Sell the live queue and visit alerts. */
-  productQueue        Boolean   @default(false)
+  /** Sell the live queue and visit alerts. On for a new salon so join-from-home and reminders exist. */
+  productQueue        Boolean   @default(true)
   /** Full bridal looks and mehendi. On for a new salon, including the demo. */
   productBridal       Boolean   @default(true)
   /** Groom looks and the groom's own clothes. Off until the owner turns it on. */
@@ -592,10 +592,16 @@ model RateBucket {
   updatedAt DateTime @updatedAt
 }
 
-/// Inbound STOP on the shared Lookuvi WhatsApp number. One row blocks every salon.
+/// Inbound STOP. tenantId empty means STOPALL or UNSUBSCRIBE on the shared number (every salon).
+/// A plain STOP is one row for the salon that sent the message being answered.
 model WhatsAppOptOut {
-  phone     String   @id
+  id        String   @id @default(cuid())
+  phone     String
+  tenantId  String   @default("")
   createdAt DateTime @default(now())
+
+  @@unique([phone, tenantId])
+  @@index([phone])
 }
 
 /// A reminder or offer attempt. Live queue alerts are not stored here.

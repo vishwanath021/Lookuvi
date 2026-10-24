@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { applyStop } from "@/lib/customers/service";
+import { applyStop, salonForInboundStop } from "@/lib/customers/service";
 import { tooMany } from "@/lib/http/guard";
-import { signatureMatches, stopPhonesFromPayload } from "@/lib/whatsapp/inbound";
+import { signatureMatches, stopEventsFromPayload } from "@/lib/whatsapp/inbound";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +32,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, stopped: 0 });
   }
   let stopped = 0;
-  for (const phone of stopPhonesFromPayload(body)) stopped += await applyStop(phone);
+  for (const event of stopEventsFromPayload(body)) {
+    if (event.scope === "global") {
+      stopped += await applyStop(event.phone, { global: true });
+      continue;
+    }
+    const tenantId = await salonForInboundStop(event.phone);
+    if (tenantId) stopped += await applyStop(event.phone, { tenantId });
+  }
   return NextResponse.json({ ok: true, stopped });
 }

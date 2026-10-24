@@ -1,4 +1,5 @@
 import { CREDIT_PACKS, planById, TRIAL_DAYS } from "@/data/plans";
+import { dailyCapAfterPlanChange } from "@/lib/billing/plan-assign";
 import { grantCredits } from "@/lib/credits";
 import { prisma } from "@/lib/prisma";
 import { withGst } from "@/lib/pricing";
@@ -17,6 +18,7 @@ export async function activatePlan(input: {
   chargeSetup: boolean;
 }) {
   const plan = planById(input.plan);
+  const current = await prisma.tenant.findUniqueOrThrow({ where: { id: input.tenantId } });
   const periodEnd = new Date();
   periodEnd.setMonth(periodEnd.getMonth() + (input.interval === "yearly" ? 12 : 1));
   await prisma.tenant.update({
@@ -25,7 +27,7 @@ export async function activatePlan(input: {
       plan: plan.id,
       status: "ACTIVE",
       removeBranding: plan.removeBranding,
-      dailyCap: plan.credits,
+      dailyCap: dailyCapAfterPlanChange(current.dailyCap, current.plan, plan.id),
       trialEndsAt: null,
     },
   });
@@ -49,7 +51,11 @@ export async function activatePlan(input: {
       currentPeriodEnd: periodEnd,
     },
   });
-  await grantCredits(input.tenantId, plan.credits, "PLAN_GRANT", input.externalId || plan.id);
+  const paymentRef = input.externalId || "";
+  const alreadyGranted = paymentRef
+    ? await prisma.creditLedger.findFirst({ where: { tenantId: input.tenantId, reason: "PLAN_GRANT", refId: paymentRef } })
+    : null;
+  if (!alreadyGranted) await grantCredits(input.tenantId, plan.credits, "PLAN_GRANT", paymentRef || plan.id);
   const recurring = input.interval === "yearly" ? plan.monthlyExGst * 10 : plan.monthlyExGst;
   const setup = input.chargeSetup ? plan.setupExGst : 0;
   const money = withGst(recurring + setup);
