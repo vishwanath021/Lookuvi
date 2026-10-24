@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
+import { kolkataDayStart } from "@/lib/queue/day";
 import { getObject, putObject } from "@/lib/storage";
 import { VISIT_CAP_MESSAGE, VISIT_TRY_KINDS, visitAllowed } from "@/lib/visit-tries";
 
@@ -64,8 +65,7 @@ export async function unlockVisit(tenantId: string, sessionId: string, extra: nu
 }
 
 export async function visitsToday(tenantId: string) {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
+  const start = kolkataDayStart();
   const rows = await prisma.tryOn.findMany({
     where: { tenantId, createdAt: { gte: start }, kind: { in: [...VISIT_TRY_KINDS] }, status: "SUCCEEDED" },
     select: { sessionId: true },

@@ -16,9 +16,15 @@ export function nextCustomerName(current: string, incoming: string) {
   return clean;
 }
 
-export function isStopText(text: string) {
+export function stopScope(text: string): "salon" | "global" | null {
   const cleaned = text.trim().toLowerCase().replace(/[.!]+$/g, "").replace(/\s+/g, "");
-  return cleaned === "stop" || cleaned === "stopall" || cleaned === "unsubscribe";
+  if (cleaned === "stopall" || cleaned === "unsubscribe") return "global";
+  if (cleaned === "stop") return "salon";
+  return null;
+}
+
+export function isStopText(text: string) {
+  return stopScope(text) !== null;
 }
 
 export function cleanOffer(text: string) {

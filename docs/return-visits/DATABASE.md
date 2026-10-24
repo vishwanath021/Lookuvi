@@ -27,11 +27,11 @@ The table already exists, unique on `(tenantId, phone)`.
 
 Index `(tenantId, needsReminder, lastVisitAt)` for the due query.
 
-Deleting a guest account still deletes the `Customer` row, which is the existing OTP behaviour. The global STOP row remains, so a later save of that phone is opted out again.
+Deleting a guest account still deletes the `Customer` row, which is the existing OTP behaviour. A STOP row for that salon, or a shared-number row, opts the phone out again the next time it is saved.
 
 ## WhatsAppOptOut
 
-One row per phone, primary key `phone` stored as `91XXXXXXXXXX`. Created when an inbound message is STOP. Shared across salons because there is one sending number.
+One row per phone and salon. `phone` is `91XXXXXXXXXX`. `tenantId` empty means STOPALL or UNSUBSCRIBE on the shared Lookuvi number, which blocks every salon. A plain STOP sets `tenantId` to the salon whose message was answered. Rows that existed before this change are kept as shared-number rows so an old opt-out is not dropped.
 
 ## WhatsAppSend
 

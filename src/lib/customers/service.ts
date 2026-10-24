@@ -6,10 +6,52 @@ import { customerFilter, displayPhone, istNoon, nextCustomerName, parseCustomerI
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+export async function phoneBlockedForSalon(tenantId: string, phone: string) {
+  const hit = await prisma.whatsAppOptOut.findFirst({
+    where: { phone, OR: [{ tenantId }, { tenantId: "" }] },
+    select: { id: true },
+  });
+  return Boolean(hit);
+}
+
+export async function blockedPhoneSet(tenantId: string, phones: string[]) {
+  const blocked = new Set<string>();
+  for (let index = 0; index < phones.length; index += 500) {
+    const rows = await prisma.whatsAppOptOut.findMany({
+      where: { phone: { in: phones.slice(index, index + 500) }, OR: [{ tenantId }, { tenantId: "" }] },
+      select: { phone: true },
+    });
+    for (const row of rows) blocked.add(row.phone);
+  }
+  return blocked;
+}
+
+/** Salon of the message a plain STOP is answering. Null when it cannot be attributed. */
+export async function salonForInboundStop(phoneInput: string) {
+  const phone = indianMobile(phoneInput);
+  if (!phone) return null;
+  const send = await prisma.whatsAppSend.findFirst({
+    where: { phone, status: "SENT" },
+    orderBy: { createdAt: "desc" },
+    select: { tenantId: true, createdAt: true },
+  });
+  const entry = await prisma.queueEntry.findFirst({
+    where: { phone },
+    orderBy: { joinedAt: "desc" },
+    select: { tenantId: true, joinedAt: true },
+  });
+  if (send && entry) return send.createdAt >= entry.joinedAt ? send.tenantId : entry.tenantId;
+  if (send) return send.tenantId;
+  if (entry) return entry.tenantId;
+  const customers = await prisma.customer.findMany({ where: { phone }, select: { tenantId: true }, take: 2 });
+  if (customers.length === 1) return customers[0].tenantId;
+  return null;
+}
+
 export async function rememberCustomer(input: { tenantId: string; phone: string; name?: string }) {
   const phone = indianMobile(input.phone);
   if (!phone) return null;
-  const blocked = await prisma.whatsAppOptOut.findUnique({ where: { phone } });
+  const blocked = await phoneBlockedForSalon(input.tenantId, phone);
   const existing = await prisma.customer.findUnique({ where: { tenantId_phone: { tenantId: input.tenantId, phone } } });
   const name = nextCustomerName(existing?.name || "", input.name || "");
   if (!existing) {
@@ -91,11 +133,7 @@ export async function listCustomers(tenantId: string, q: string) {
     take: 100,
   });
   const phones = rows.map((row) => row.phone);
-  const blocked = new Set(
-    phones.length
-      ? (await prisma.whatsAppOptOut.findMany({ where: { phone: { in: phones } }, select: { phone: true } })).map((row) => row.phone)
-      : [],
-  );
+  const blocked = await blockedPhoneSet(tenantId, phones);
   return rows.map((row) => {
     const stopped = blocked.has(row.phone) || row.optOutSource === "STOP";
     return {
@@ -122,7 +160,7 @@ export async function deskOptOut(tenantId: string, id: string) {
   });
   if (!result.count) return { ok: false as const, message: "That number is not on this salon's list." };
   const row = await prisma.customer.findFirst({ where: { id, tenantId } });
-  if (row && (await prisma.whatsAppOptOut.findUnique({ where: { phone: row.phone } }))) {
+  if (row && (await phoneBlockedForSalon(tenantId, row.phone))) {
     await prisma.customer.update({ where: { id }, data: { optOutSource: "STOP" } });
   }
   return { ok: true as const, message: "Reminders are off for this number." };
@@ -131,18 +169,25 @@ export async function deskOptOut(tenantId: string, id: string) {
 export async function resumeReminders(tenantId: string, id: string) {
   const row = await prisma.customer.findFirst({ where: { id, tenantId } });
   if (!row) return { ok: false as const, message: "That number is not on this salon's list." };
-  const globalStop = await prisma.whatsAppOptOut.findUnique({ where: { phone: row.phone } });
-  if (globalStop || row.optOutSource === "STOP") return { ok: false as const, message: "This number replied STOP. Reminders stay off." };
+  if ((await phoneBlockedForSalon(tenantId, row.phone)) || row.optOutSource === "STOP") {
+    return { ok: false as const, message: "This number replied STOP. Reminders stay off." };
+  }
   await prisma.customer.update({ where: { id }, data: { optedOutAt: null, optOutSource: "" } });
   return { ok: true as const, message: "Reminders are on for this number." };
 }
 
-export async function applyStop(phoneInput: string) {
+/** Salon STOP, or a shared-number STOPALL / UNSUBSCRIBE (tenantId ""). */
+export async function applyStop(phoneInput: string, scope: { tenantId: string } | { global: true }) {
   const phone = indianMobile(phoneInput);
   if (!phone) return 0;
-  await prisma.whatsAppOptOut.upsert({ where: { phone }, create: { phone }, update: {} });
+  const tenantId = "global" in scope ? "" : scope.tenantId;
+  await prisma.whatsAppOptOut.upsert({
+    where: { phone_tenantId: { phone, tenantId } },
+    create: { phone, tenantId },
+    update: {},
+  });
   const result = await prisma.customer.updateMany({
-    where: { phone },
+    where: tenantId ? { phone, tenantId } : { phone },
     data: { optedOutAt: new Date(), optOutSource: "STOP", needsReminder: false, reminderLockUntil: null },
   });
   return result.count;

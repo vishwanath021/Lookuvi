@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isPlanId, planById } from "@/data/plans";
+import { isPlanId } from "@/data/plans";
+import { applyPlanChange } from "@/lib/billing/plan-assign";
 import { grantCredits } from "@/lib/credits";
 import { prisma } from "@/lib/prisma";
 import { requireSuper } from "@/lib/session";
@@ -27,27 +28,25 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const tenant = await prisma.tenant.findUnique({ where: { id } });
   if (!tenant) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   if (parsed.data.plan && !isPlanId(parsed.data.plan)) return NextResponse.json({ error: "PLAN" }, { status: 400 });
-  const plan = parsed.data.plan && isPlanId(parsed.data.plan) ? planById(parsed.data.plan) : null;
+  const planChange = parsed.data.plan && isPlanId(parsed.data.plan) ? await applyPlanChange(id, parsed.data.plan) : null;
   await prisma.tenant.update({
     where: { id },
     data: {
       name: parsed.data.name,
       status: parsed.data.status,
-      ...(plan ? { plan: plan.id, dailyCap: plan.credits } : {}),
       ...(parsed.data.productTryOn !== undefined ? { productTryOn: parsed.data.productTryOn } : {}),
       ...(parsed.data.productQueue !== undefined ? { productQueue: parsed.data.productQueue } : {}),
       ...(parsed.data.productBridal !== undefined ? { productBridal: parsed.data.productBridal } : {}),
       ...(parsed.data.productGroom !== undefined ? { productGroom: parsed.data.productGroom } : {}),
     },
   });
-  if (plan) {
-    await grantCredits(id, plan.credits, "PLAN_ASSIGN", "super");
+  if (planChange) {
     await prisma.auditLog.create({
       data: {
         actorId: access.session.user.id,
         action: "PLAN_ASSIGN",
         target: id,
-        meta: JSON.stringify({ plan: plan.id, credits: plan.credits }),
+        meta: JSON.stringify({ plan: planChange.plan, creditsGranted: planChange.creditsGranted, dailyCap: planChange.dailyCap }),
       },
     });
   }
@@ -63,7 +62,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     });
   }
   const productChange = parsed.data.productTryOn !== undefined || parsed.data.productQueue !== undefined || parsed.data.productBridal !== undefined || parsed.data.productGroom !== undefined;
-  if (!plan && !parsed.data.creditDelta) {
+  if (!planChange && !parsed.data.creditDelta) {
     await prisma.auditLog.create({
       data: {
         actorId: access.session.user.id,
@@ -82,5 +81,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       },
     });
   }
-  return NextResponse.json({ ok: true, ...(plan ? { plan: plan.id, credits: plan.credits } : {}) });
+  return NextResponse.json({
+    ok: true,
+    ...(planChange ? { plan: planChange.plan, creditsGranted: planChange.creditsGranted, dailyCap: planChange.dailyCap } : {}),
+  });
 }

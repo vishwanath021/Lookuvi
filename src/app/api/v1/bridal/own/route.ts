@@ -19,18 +19,13 @@ import { requestClientIp } from "@/lib/ratelimit";
 import { deleteObject, putObject } from "@/lib/storage";
 import { auth } from "@/auth";
 import { consumePreviewRateShared, guestLimitMessage } from "@/lib/tools";
+import { kolkataDayStart } from "@/lib/queue/day";
 import { refuseMonthlyTries } from "@/lib/try-allowance";
 import { isPhotoId, loadVisitPhoto, rememberVisitPhoto, refuseVisit, stampVisit } from "@/lib/visit-allowance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-
-function startOfToday() {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
 
 async function signedInOwnerOrSuper(tenantId: string) {
   try {
@@ -159,7 +154,7 @@ export async function POST(req: Request) {
   const ip = requestClientIp(req);
   const staffId = await signedInOwnerOrSuper(tenant.id);
   const usedToday = await prisma.tryOn.count({
-    where: { tenantId: tenant.id, kind: { in: [...AI_PREVIEW_KINDS] }, status: "SUCCEEDED", createdAt: { gte: startOfToday() } },
+    where: { tenantId: tenant.id, kind: { in: [...AI_PREVIEW_KINDS] }, status: "SUCCEEDED", createdAt: { gte: kolkataDayStart() } },
   });
   if (usedToday >= tenant.dailyCap) {
     return NextResponse.json({ error: "DAILY_CAP", message: guestLimitMessage("daily") }, { status: 429 });
@@ -177,7 +172,7 @@ export async function POST(req: Request) {
   const limit = staffId ? null : capForTier(tier, tenant.anonDailyCap, tenant.memberDailyCap);
   if (limit !== null) {
     const personal = await prisma.tryOn.count({
-      where: { tenantId: tenant.id, actorKey, status: "SUCCEEDED", kind: { in: [...AI_PREVIEW_KINDS] }, createdAt: { gte: startOfToday() } },
+      where: { tenantId: tenant.id, actorKey, status: "SUCCEEDED", kind: { in: [...AI_PREVIEW_KINDS] }, createdAt: { gte: kolkataDayStart() } },
     });
     if (personal >= limit) {
       return NextResponse.json({ error: "CAP", tier, message: guestLimitMessage(tier === "member" ? "member" : "anon") }, { status: 429 });

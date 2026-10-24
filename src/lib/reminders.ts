@@ -4,6 +4,7 @@ import { kolkataMonthKey } from "@/lib/queue/day";
 import { notifyGuest, templateFor, whatsAppConfigured, type NotifyEnv, type NotifyMessage, type NotifyResult } from "@/lib/notify";
 import { offerMessage, queueHomeUrl, reminderMessage, tryOnUrl } from "@/lib/queue/messages";
 import { cleanOffer } from "@/lib/customers/parse";
+import { blockedPhoneSet, phoneBlockedForSalon } from "@/lib/customers/service";
 
 const OUTREACH_LOCK = 872164;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -82,8 +83,7 @@ async function remindOne(
     data: { reminderLockUntil: new Date(now.getTime() + LOCK_MS) },
   });
   if (claimed.count !== 1) return "skip" as const;
-  const blocked = await prisma.whatsAppOptOut.findUnique({ where: { phone: customer.phone } });
-  if (blocked) {
+  if (await phoneBlockedForSalon(salon.id, customer.phone)) {
     await prisma.customer.update({
       where: { id: customer.id },
       data: { optedOutAt: new Date(), optOutSource: "STOP", needsReminder: false, reminderLockUntil: null },
@@ -171,15 +171,7 @@ export async function sendBroadcast(tenantId: string, text: string, send: Sender
     if (!b.lastVisitAt) return -1;
     return b.lastVisitAt.getTime() - a.lastVisitAt.getTime();
   });
-  const blocked = new Set<string>();
-  const phones = people.map((row) => row.phone);
-  for (let index = 0; index < phones.length; index += 500) {
-    const rows = await prisma.whatsAppOptOut.findMany({
-      where: { phone: { in: phones.slice(index, index + 500) } },
-      select: { phone: true },
-    });
-    for (const row of rows) blocked.add(row.phone);
-  }
+  const blocked = await blockedPhoneSet(tenantId, people.map((row) => row.phone));
   let sent = 0;
   let held = 0;
   let stop: "" | "cap" | "template" = "";

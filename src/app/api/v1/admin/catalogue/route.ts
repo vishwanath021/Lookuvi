@@ -30,9 +30,10 @@ export async function PUT(req: Request) {
   const knownStyles = new Set(STYLES.map((style) => style.id));
   const knownShades = new Set(SHADES.map((shade) => shade.id));
   const enabledCount = parsed.data.styles.filter((style) => style.enabled && knownStyles.has(style.styleId)).length;
-  const limit = planById(access.tenant.plan).styleLimit;
+  const plan = planById(access.tenant.plan);
+  const limit = plan.styleLimit;
   if (limit && enabledCount > limit) {
-    return NextResponse.json({ error: "PLAN", message: `Starter includes ${limit} styles. Upgrade to enable more.` }, { status: 403 });
+    return NextResponse.json({ error: "PLAN", message: `${plan.name} includes ${limit} styles. Upgrade to enable more.` }, { status: 403 });
   }
   for (const style of parsed.data.styles) {
     if (!knownStyles.has(style.styleId)) continue;

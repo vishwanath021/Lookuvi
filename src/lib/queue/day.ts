@@ -16,3 +16,9 @@ export function kolkataToday(now = new Date()) {
 export function kolkataMonthKey(now = new Date()) {
   return kolkataDayKey(now).slice(0, 7);
 }
+
+/** Midnight at the start of the Asia/Kolkata calendar day. Daily preview caps use this, not the server clock. */
+export function kolkataDayStart(now = new Date()) {
+  const [year, month, day] = kolkataDayKey(now).split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, -5, -30));
+}
