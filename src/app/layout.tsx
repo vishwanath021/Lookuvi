@@ -1,16 +1,61 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Cormorant_Garamond, Inter, Noto_Sans_Devanagari, Noto_Sans_Kannada, Noto_Sans_Tamil, Noto_Sans_Telugu } from "next/font/google";
+import localFont from "next/font/local";
 import { TapFeel } from "@/components/brand/TapFeel";
 import "./globals.css";
 
-const sans = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-sans", display: "swap" });
-const display = Cormorant_Garamond({ subsets: ["latin"], weight: ["600"], variable: "--font-display", display: "swap" });
-// Indic faces are for the language switch. Preloading them on an English page warns that the files were never used.
-const deva = Noto_Sans_Devanagari({ subsets: ["devanagari"], weight: ["400", "600"], variable: "--font-deva", display: "swap", preload: false });
-const knda = Noto_Sans_Kannada({ subsets: ["kannada"], weight: ["400", "600"], variable: "--font-knda", display: "swap", preload: false });
-const taml = Noto_Sans_Tamil({ subsets: ["tamil"], weight: ["400", "600"], variable: "--font-taml", display: "swap", preload: false });
-const telu = Noto_Sans_Telugu({ subsets: ["telugu"], weight: ["400", "600"], variable: "--font-telu", display: "swap", preload: false });
+// Files live in the repo so the production image does not call Google Fonts at build time.
+const sans = localFont({
+  src: [
+    { path: "../fonts/inter-400.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/inter-500.woff2", weight: "500", style: "normal" },
+    { path: "../fonts/inter-600.woff2", weight: "600", style: "normal" },
+    { path: "../fonts/inter-700.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-sans",
+  display: "swap",
+});
+const display = localFont({
+  src: [{ path: "../fonts/cormorant-600.woff2", weight: "600", style: "normal" }],
+  variable: "--font-display",
+  display: "swap",
+});
+const deva = localFont({
+  src: [
+    { path: "../fonts/deva-400.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/deva-600.woff2", weight: "600", style: "normal" },
+  ],
+  variable: "--font-deva",
+  display: "swap",
+  preload: false,
+});
+const knda = localFont({
+  src: [
+    { path: "../fonts/knda-400.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/knda-600.woff2", weight: "600", style: "normal" },
+  ],
+  variable: "--font-knda",
+  display: "swap",
+  preload: false,
+});
+const taml = localFont({
+  src: [
+    { path: "../fonts/taml-400.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/taml-600.woff2", weight: "600", style: "normal" },
+  ],
+  variable: "--font-taml",
+  display: "swap",
+  preload: false,
+});
+const telu = localFont({
+  src: [
+    { path: "../fonts/telu-400.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/telu-600.woff2", weight: "600", style: "normal" },
+  ],
+  variable: "--font-telu",
+  display: "swap",
+  preload: false,
+});
 
 export const viewport: Viewport = {
   width: "device-width",
