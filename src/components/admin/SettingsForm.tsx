@@ -13,6 +13,7 @@ export function SettingsForm({
   selfId,
   showTryOn = true,
   showDomain = false,
+  showGst = false,
   salonModeUrl = "",
 }: {
   initial: {
@@ -48,6 +49,7 @@ export function SettingsForm({
   selfId: string;
   showTryOn?: boolean;
   showDomain?: boolean;
+  showGst?: boolean;
   salonModeUrl?: string;
 }) {
   const [form, setForm] = useState(initial);
@@ -161,11 +163,13 @@ export function SettingsForm({
         <label className="text-sm">City<input className="field mt-1" value={form.city} onChange={(event) => set("city", event.target.value)} /></label>
         <fieldset className="grid gap-2 text-sm">
           <legend className="font-medium">Looks on the customer screen</legend>
-          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Bridal" checked={form.productBridal} onChange={(event) => set("productBridal", event.target.checked)} /> Bridal. On by default. Off hides the Bridal tab.</label>
-          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Groom" checked={form.productGroom} onChange={(event) => set("productGroom", event.target.checked)} /> Groom. Off by default. On shows hair, beard, grooming, and his own clothes.</label>
-          <label className="text-sm">Bridal and groom tries per visit
-            <input className="field mt-1" type="number" min={1} max={20} aria-label="Tries per visit" value={form.visitTryLimit} onChange={(event) => set("visitTryLimit", Number(event.target.value))} />
-          </label>
+          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Bridal" checked={form.productBridal} onChange={(event) => set("productBridal", event.target.checked)} /> Bridal</label>
+          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Groom" checked={form.productGroom} onChange={(event) => set("productGroom", event.target.checked)} /> Groom</label>
+          {form.productBridal || form.productGroom ? (
+            <label className="text-sm">Tries per visit
+              <input className="field narrow mt-1" type="number" min={1} max={20} aria-label="Tries per visit" value={form.visitTryLimit} onChange={(event) => set("visitTryLimit", Number(event.target.value))} />
+            </label>
+          ) : null}
         </fieldset>
         {showTryOn ? <>
         <fieldset className="grid gap-2 text-sm">
@@ -193,7 +197,7 @@ export function SettingsForm({
                 <input className="mt-1 h-10 w-full" type="color" aria-label="Accent" value={form.accentColor} onChange={(event) => set("accentColor", event.target.value)} />
               </label>
             </div>
-            <label className="text-sm">GSTIN<input className="field mt-1" value={form.gstin} onChange={(event) => set("gstin", event.target.value)} /></label>
+            {showGst ? <label className="text-sm">GSTIN<input className="field mt-1" value={form.gstin} onChange={(event) => set("gstin", event.target.value)} /></label> : null}
             {showTryOn && enabledTools.includes("brows") ? (
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.toolBrows} onChange={(event) => set("toolBrows", event.target.checked)} /> Eyebrow mapping</label>
             ) : null}
@@ -262,7 +266,7 @@ export function SettingsForm({
       </form>
       </section>
       {message && <p className="text-sm" role="status">{message}</p>}
-      <VisitUnlock />
+      <VisitUnlock show={form.productBridal || form.productGroom} />
     </div>
   );
 }

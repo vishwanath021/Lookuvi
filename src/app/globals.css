@@ -593,6 +593,11 @@ textarea { min-height: 48px; }
   color: var(--ink);
   font-size: 16px;
 }
+.field.narrow {
+  width: 6.5rem;
+  min-height: 44px;
+  padding: 0.4rem 0.55rem;
+}
 .tab {
   min-height: 44px;
   padding: 8px 12px;

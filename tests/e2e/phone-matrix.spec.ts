@@ -219,7 +219,7 @@ test("owner: change a lead, add a service, open QR, and use More", async ({ page
   await expect(row.getByRole("button", { name: /Status Contacted/ })).toBeVisible();
 
   await page.goto("/admin/services");
-  await expect(page.getByRole("heading", { name: "Your services" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Prices" })).toBeVisible();
   await expect(page.getByText("Haircut")).toBeVisible();
   const serviceName = `Matrix Cut ${Date.now().toString(36)}`;
   await page.getByLabel("Service name").fill(serviceName);
@@ -229,11 +229,11 @@ test("owner: change a lead, add a service, open QR, and use More", async ({ page
 
   await page.goto("/admin/qr");
   await expect(page.getByRole("heading", { name: /QR/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: "View try-on" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View try-on" })).toHaveCount(0);
 
   const nav = await openNav(page);
   await nav.locator("summary", { hasText: "More" }).click();
-  for (const label of ["Styles", "Services", "Settings", "Team", "Billing", "Security"]) {
+  for (const label of ["Prices", "Settings", "Team", "Billing", "Security"]) {
     await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
   }
 
@@ -362,8 +362,8 @@ test("super-admin: change plan, confirm a credit adjustment, and confirm suspend
   await page.getByText(name, { exact: true }).click();
   const sheet = page.getByRole("dialog", { name });
   await sheet.getByRole("tab", { name: "Plan & credits" }).click();
-  await sheet.getByRole("button", { name: "Adjust credits" }).click();
-  const credits = page.getByRole("dialog", { name: "Adjust credits" });
+  await sheet.getByRole("button", { name: "Adjust try-ons" }).click();
+  const credits = page.getByRole("dialog", { name: "Adjust try-ons" });
   await expect(credits.getByRole("button", { name: "Confirm adjustment" })).toBeDisabled();
   await credits.getByLabel("Credit reason").fill("Phone matrix check");
   await credits.getByLabel("Credit amount").fill("10");
@@ -371,7 +371,7 @@ test("super-admin: change plan, confirm a credit adjustment, and confirm suspend
   await expect(page.getByRole("link", { name: slug })).toBeVisible({ timeout: 20_000 });
   await page.getByLabel("Search salons").fill(slug);
   const credited = page.getByRole("row", { name: new RegExp(slug) });
-  await expect(credited.getByRole("cell", { name: "910", exact: true })).toBeVisible();
+  await expect(credited.getByRole("cell", { name: "30", exact: true })).toBeVisible();
 
   await page.getByText(name, { exact: true }).click();
   const reopened = page.getByRole("dialog", { name });

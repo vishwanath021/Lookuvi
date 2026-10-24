@@ -13,7 +13,7 @@ export default function TermsPage() {
       <h2 className="mt-6 font-serif text-2xl">Previews</h2>
       <p>Previews are a guide for a conversation with a stylist. We do not claim that a preview matches a future haircut, measures a face, or is appropriate for every hair type. The salon confirms the service and the price.</p>
       <h2 className="mt-6 font-serif text-2xl">Plans and GST</h2>
-      <p>Prices in the product are INR, exclusive of GST. Invoices add 18% GST. Annual billing is ten times the monthly price. Credit packs add credits to the balance. A failed preview returns the credit.</p>
+      <p>Prices in the product are in rupees. GST is not charged until Agentic Build Works has a GSTIN. A receipt is not a tax invoice. Annual billing is ten times the monthly price. Try-on packs add to the balance. A failed preview returns the try-on.</p>
       <h2 className="mt-6 font-serif text-2xl">Acceptable use</h2>
       <p>Do not upload a photo of someone who has not agreed, do not use the tool on a minor without a parent present, and do not attempt to store or resell guest photos. We may suspend a salon that misuses the tool.</p>
       <h2 className="mt-6 font-serif text-2xl">Privacy roles</h2>

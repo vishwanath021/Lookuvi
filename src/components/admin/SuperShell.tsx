@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/toaster";
 const LINKS = [
   { href: "/super", label: "Overview" },
   { href: "/super/salons", label: "Salons" },
+  { href: "/super/styles", label: "Styles" },
   { href: "/super/ai", label: "AI" },
   { href: "/super/costs", label: "Spend & costs" },
   { href: "/super/security", label: "Security" },

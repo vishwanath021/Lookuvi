@@ -123,3 +123,75 @@ Date of this review: 24 October 2026. Scope: the seven-salon launch on top of re
 **Product owner.** If a control we promised the seven salons was never tried, add that case and run it. If the shortfall is the same click counted three ways, or a gesture that only exists in the browser, say so in the sheet. Do not call the estimate a failure of the run.
 
 **Decision.** The runner gained the P0 cases that named a behaviour the first pass did not execute. They are run on the same mock server. The second execution is 221 pass, 0 fail, 4 untested, 225 cases. The test plan lists every P0 and P1 id whose executed count is still below the inventory column, and why. We do not add filler rows to reach 340 or 483. Production TOTP, k6, Razorpay, and the nails face check stay UNTESTED for the same reasons as D12.
+
+## D14. Trial end is EXPIRED, not a free resume
+
+**Architect.** Reusing SUSPENDED for a finished trial collapses two different events. A founder who filters Suspended would see shops that simply ran out of the 14 days, and Resume would turn a lapsed trial into a paying salon without a payment. The guest block can share one check. The status must stay distinct.
+
+**Product owner.** After 14 days the customer page should say the trial ended. The owner can still sign in and choose a plan. Mark paid is what makes the salon active. A suspended salon is a different action, taken by a founder, and Resume still fits that one.
+
+**Decision.** `expireTrials` sets `TRIAL` rows with `trialEndsAt` in the past to `EXPIRED`. It does not touch `ACTIVE` or `SUSPENDED`. `EXPIRED` blocks new try-ons and new queue joins the same way `SUSPENDED` does. The owner can sign in. Resume is only offered for `SUSPENDED`. Mark paid sets `ACTIVE`.
+
+**Rationale.** Filters stay meaningful at 1,000 salons. A missed payment cannot be undone by the Resume button.
+
+**Not done.** We do not email the owner when the trial ends. The nightly retention job is the clock.
+
+## D15. One try-on is one credit
+
+**Architect.** `HD_CREDIT_COST` was 2 and no generation path charged it. Guest images already reserve 1. Keeping a second price in the copy would bill a conversation the code does not run. Per-density generated images would multiply provider spend for a picker that already filters the catalogue.
+
+**Product owner.** The owner thinks in try-ons, not credits and not HD. The hair-type picker stays. We do not generate a new photo for each density.
+
+**Decision.** `STANDARD_CREDIT_COST` is 1. The HD double charge is removed from plans and from the six language strings. The sidebar says "try-ons left". Super admin says the same. The hair-type picker is unchanged.
+
+## D16. Basic, Standard, and Pro, with a 20-try-on trial
+
+**Architect.** Stored plan ids stay `LITE`, `STARTER`, and `PRO` so existing rows do not need a rewrite. Display names change. Style caps are removed (`styleLimit` null) because the catalogue is platform data and every salon sees every style. `applyPlanChange` used to mint the gap between plans. That is a free grant. A payment reference is the grant. The same reference must not grant twice. A new reference grants the full plan allowance on top of whatever is left, including unused trial try-ons.
+
+**Product owner.** Basic ₹799 / 50, Standard ₹1,499 / 120, Pro ₹2,499 / 220. Annual is 10× monthly. Packs are 25 for ₹299, 60 for ₹649, 150 for ₹1,499. A new salon gets 14 days and 20 try-ons, not a full plan. Pro stays, because remove-branding, three outlets, and lead export are the reason a chain pays. Changing the plan in the founder table must not add try-ons. The default new salon is Basic.
+
+**Decision.** Those prices and allowances are in `src/data/plans.ts`. New salons start on Basic unless the founder picks another plan. Trial grant is 20, `includedCreditMark` is 0, `dailyCap` is the plan allowance. `applyPlanChange` updates plan and daily cap only. `activatePlan` adds the plan allowance once per payment reference and sets `ACTIVE`.
+
+**Rationale.** At 1,000 salons a plan click cannot be a mint. The leftover trial balance is kept on purpose so a salon that paid on day 3 is not punished.
+
+**Not done.** We did not claw back unused trial try-ons at payment.
+
+## D17. No GST, UPI pending, receipt not a tax invoice
+
+**Architect.** There is no GSTIN. Showing 18% on a receipt would be a false tax document. Confirming payment by reading SMS or email needs access we will not take. Razorpay already works when its keys are set and should stay behind those keys. A receipt number from `count()+1` races. A single `ReceiptSeq` row incremented with `ON CONFLICT` is race-safe on SQLite and Postgres. A UPI reference is unique, so one reference cannot pay two requests. If the process dies after the grant and before `PAID`, the row stays `PAYING`. That is acceptable. The unique reference stops a second grant.
+
+**Product owner.** Choose must be visible and must not activate the plan for free. The owner sees Payment pending, the UPI id, and a QR. If `LOOKUVI_UPI_ID` is unset, the placeholder `lookuvi@upi` is shown with a warning, not a silent fake payee. The founder types the UPI reference, Mark paid, and downloads a receipt PDF. GST stays off until `GST_ENABLED` is set.
+
+**Decision.** `GST_ENABLED` defaults off. `withGst` returns 0 GST. Invoices are `RECEIPT` until the flag is on, then `TAX_INVOICE`. Owner Choose calls `openUpiPayment` unless Razorpay is configured and owner self-serve is allowed. Mock billing creates a pending request and does not grant. Mark paid is `POST /api/v1/super/payments`.
+
+## D18. Styles are platform data. Prices are one owner page.
+
+**Architect.** Per-salon style switches and a style cap fight the catalogue. Density and texture belong in one platform JSON (`catalog_suitability`), edited by a super admin. The owner catalogue PUT returns 403. Bridal packages were upserted on every Prices page load, so a deleted package came back at ₹0. Create them only when bridal turns from off to on and none of the three keys exist. New salons default bridal off. Existing rows keep their flag. Staff editing prices was wider than the settings rule. Prices are owner-only.
+
+**Product owner.** Remove Styles from the owner menu. Show every style. Prices is one optional page: name, a small rupee field, an on/off switch, delete behind a ⋯ menu. No helper hints. When bridal is off, hide bridal rows and the visit-unlock block. The recent-visit list comes first. The code field is second. The hair-type picker stays as it is.
+
+**Decision.** That is what shipped. Duration is not edited on the row. A new service has no duration, so the queue uses the salon average. Deleting all three bridal packages and toggling bridal off and on creates them again at ₹0. That edge is accepted.
+
+## D19. Customers, QR, and the visit list
+
+**Architect.** The Customers page mixed a pilot target, a try-on sentence, raw links, and a textarea import. None of that is how a phone owner adds a person. The QR page showed several downloads plus an embed snippet the owner does not paste. Visit codes are still how a bridal or groom guest continues after the cap. They are noise when both products are off.
+
+**Product owner.** Customers shows four counters and one banner only while WhatsApp is not connected. Add customer is phone plus name. A CSV file is optional. QR is the code and one Download / Print button. If there is no public address, say so in one sentence and do not print a localhost URL.
+
+**Decision.** Shipped as above. The embed route stays in the product and off the owner QR page.
+
+## D20. AI keys, spend, and costs
+
+**Architect.** Three engine radios, an Enable fal checkbox, a fal billing key, a calibration sentence, and an Advanced block are operator internals. Nightly billing sync already has a server key path. The Test button must call the provider, including fal (`GET https://api.fal.ai/v1/models?limit=1`), and must not generate an image. Cost maths had a hardcoded ₹0.60 fallback that is not the guest price. The guest price list is `MODEL_PRICES`: OpenAI sunburst medium ₹7 primary, fal FLUX.3 standard ₹4 fallback. Ledger actuals still win for a billed image. Calibration tier maths stays in code so existing tier tests keep their numbers. It is not shown.
+
+**Product owner.** Two compact rows. Saved shows the last 4 characters. One model is In use. The other is the fallback, switched with Use. Spend cap is a bar, plus the per-salon cap, plus an 80% line. Spend & costs is three tiles (month spend, images, average rupees per image from this month's data, or a dash when there are no images) and a sortable salon table: plan, paid, try-ons used, AI cost, margin, loss in red. No sync button and no paragraph. The image log moves behind a link and keeps paging.
+
+**Decision.** Shipped. The fal billing key stays in the database and in the nightly job. It is not on the screen. `AI_SALON_SPEND_CAP_INR` is the per-salon cap. Unset means no per-salon cap, which is how local tests already behave.
+
+## D21. What this pass does not promise
+
+**Architect.** Magic-link login has an API and no screen. Login is email, password, and an optional authenticator. Production super-admin pages still redirect to Security until the authenticator is on. Feature flags stay off. We do not turn on guest hub, bookings, or embed for this pass. Daily preview caps and the monthly counters already use Asia/Kolkata midnight from an earlier decision. Do not invent a second clock.
+
+**Product owner.** Do not deploy. Do not spend on a real image provider. Do not read SMS or email to confirm a payment. A real phone, a real UPI payment, and a real WhatsApp handset stay outside this build.
+
+**Decision.** No production deploy. Mock AI and mock WhatsApp only. Razorpay remains behind its keys. The product guide and the browser pass, when they run, use the merged master, a real Postgres database, and the real screens.

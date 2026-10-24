@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireMembership } from "@/lib/session";
+import { requireOwner } from "@/lib/session";
 
 const schema = z.object({
   key: z.string().min(2).max(40).regex(/^[a-z0-9-]+$/),
@@ -11,7 +11,7 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const access = await requireMembership();
+  const access = await requireOwner();
   if ("error" in access && access.error) return access.error;
   if (!("tenant" in access)) return NextResponse.json({ error: "NO_TENANT" }, { status: 403 });
   const parsed = schema.safeParse(await req.json().catch(() => null));

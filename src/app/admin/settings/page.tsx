@@ -1,4 +1,5 @@
 import { SettingsForm } from "@/components/admin/SettingsForm";
+import { gstEnabled } from "@/lib/pricing";
 import { planById } from "@/data/plans";
 import { ownerFeatures } from "@/lib/features";
 import { prisma } from "@/lib/prisma";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const { tenant, membership } = await pageTenant();
   if (membership.role !== "OWNER") {
-    return <main><h1 className="page-title">Settings</h1><p className="mt-2">Staff can edit the catalogue and leads. Brand and billing stay with the owner.</p></main>;
+    return <main><h1 className="page-title">Settings</h1><p className="mt-2">Staff cannot change settings or prices.</p></main>;
   }
   const members = await prisma.membership.findMany({
     where: { tenantId: tenant.id },
@@ -32,6 +33,7 @@ export default async function SettingsPage() {
         enabledTools={[...enabledTools()]}
         showTryOn={tenant.productTryOn}
         showDomain={ownerFeatures().customDomain}
+        showGst={gstEnabled()}
         initial={{
           name: tenant.name,
           primaryColor: tenant.primaryColor,

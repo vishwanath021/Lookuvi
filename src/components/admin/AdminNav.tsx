@@ -30,7 +30,19 @@ export function AdminNav({
 }) {
   const [open, setOpen] = useState(false);
   const [ready, setReady] = useState(false);
+  const [left, setLeft] = useState(credits);
   useEffect(() => setReady(true), []);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void fetch("/api/v1/admin/balance")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (typeof data?.credits === "number") setLeft(data.credits);
+        })
+        .catch(() => undefined);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
   const links = ownerNav({ role, slug, productTryOn, productQueue, features, onboardingDone });
   const main = links.filter((link) => link.section === "main");
   const more = links.filter((link) => link.section === "more");
@@ -42,7 +54,7 @@ export function AdminNav({
       <aside id="salon-nav" data-ready={ready ? "yes" : "no"} className={`${open ? "block" : "hidden"} nav-side h-fit rounded-[14px] p-4 md:block`}>
         <p className="text-sm uppercase tracking-[0.14em] text-[#d8cbe4]">{role}</p>
         <p className="font-serif text-2xl leading-tight">{name}</p>
-        <p className="text-sm text-[#d8cbe4]">{credits.toLocaleString("en-IN")} try-ons left</p>
+        <p className="text-sm text-[#d8cbe4]">{left.toLocaleString("en-IN")} try-ons left</p>
         {salons.length > 1 && (
           <label className="mt-3 block text-xs text-[#d8cbe4]">Salon
             <select

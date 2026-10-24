@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { BRIDAL_PACKAGES, BRIDAL_PACKAGE_KEYS } from "@/data/bridal";
+import { BRIDAL_PACKAGE_KEYS } from "@/data/bridal";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type Row = { id: string; key: string; name: string; priceInr: number; durationMin: number | null; active: boolean };
 
@@ -10,127 +11,107 @@ function serviceKey(name: string) {
   return key.length >= 2 ? key : "service";
 }
 
-export function ServiceEditor({ initial }: { initial: Row[] }) {
-  const [rows, setRows] = useState(initial);
+export function ServiceEditor({ initial, bridal, canEdit }: { initial: Row[]; bridal: boolean; canEdit: boolean }) {
+  const [rows, setRows] = useState(initial.filter((row) => bridal || !BRIDAL_PACKAGE_KEYS.has(row.key)));
   const [name, setName] = useState("");
-  const [price, setPrice] = useState(499);
+  const [price, setPrice] = useState("");
   const [message, setMessage] = useState("");
 
   async function add(event: React.FormEvent) {
     event.preventDefault();
     const key = serviceKey(name);
+    const priceInr = Math.max(0, Math.round(Number(price) || 0));
     const res = await fetch("/api/v1/admin/services", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ key, name, priceInr: price }),
+      body: JSON.stringify({ key, name, priceInr }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.id) {
-      setMessage("Could not save that service.");
+      setMessage(data.message || "Could not save that price.");
       return;
     }
-    setRows((current) => [...current.filter((row) => row.key !== key), { id: data.id, key, name, priceInr: price, durationMin: null, active: true }]);
+    setRows((current) => [...current.filter((row) => row.key !== key), { id: data.id, key, name, priceInr, durationMin: null, active: true }]);
     setName("");
+    setPrice("");
     setMessage("Saved.");
   }
 
-  async function setActive(row: Row, active: boolean) {
+  async function patch(row: Row, body: Record<string, unknown>, next: Partial<Row>) {
     const res = await fetch(`/api/v1/admin/services/${row.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ active }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
-      setMessage("Could not update that service.");
+      setMessage("Could not update that price.");
       return;
     }
-    setRows((current) => current.map((item) => (item.id === row.id ? { ...item, active } : item)));
-    setMessage(active ? "Service is visible again." : "Service hidden from the try-on.");
+    setRows((current) => current.map((item) => (item.id === row.id ? { ...item, ...next } : item)));
   }
 
   async function remove(row: Row) {
     const res = await fetch(`/api/v1/admin/services/${row.id}`, { method: "DELETE" });
     if (!res.ok) {
-      setMessage("Could not delete that service.");
+      setMessage("Could not delete that price.");
       return;
     }
     setRows((current) => current.filter((item) => item.id !== row.id));
-    setMessage("Service deleted.");
-  }
-
-  async function update(row: Row, priceInr: number) {
-    await fetch(`/api/v1/admin/services/${row.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ priceInr }),
-    });
-    setRows((current) => current.map((item) => (item.id === row.id ? { ...item, priceInr } : item)));
-  }
-
-  const packages = BRIDAL_PACKAGES.map((pack) => rows.find((row) => row.key === pack.key)).filter((row): row is Row => Boolean(row));
-  const everyday = rows.filter((row) => !BRIDAL_PACKAGE_KEYS.has(row.key));
-
-  async function savePackage(row: Row, name: string, priceRaw: string) {
-    const priceInr = priceRaw.trim() === "" ? 0 : Math.max(0, Math.round(Number(priceRaw)));
-    const nextName = name.trim().length >= 2 ? name.trim() : row.name;
-    const res = await fetch(`/api/v1/admin/services/${row.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: nextName, priceInr }),
-    });
-    if (!res.ok) {
-      setMessage("Could not save that package.");
-      return;
-    }
-    setRows((current) => current.map((item) => (item.id === row.id ? { ...item, name: nextName, priceInr } : item)));
-    setMessage(priceInr > 0 ? "Package saved. Brides can see it." : "Package hidden until it has a price.");
   }
 
   return (
     <div>
-      <h2 className="mb-2 font-serif text-2xl">Bridal packages</h2>
-      <p className="mb-3 text-sm text-muted">Add a price to show a package before booking. Leave the price empty to hide it.</p>
-      <ul className="space-y-2" aria-label="Bridal packages">
-        {packages.map((row) => {
-          const hint = BRIDAL_PACKAGES.find((pack) => pack.key === row.key)?.hint;
-          return (
-            <li key={row.id} className="card grid gap-2 p-3 text-sm">
-              <label>Name
-                <input className="field mt-1" aria-label={`${row.name} package name`} defaultValue={row.name} onBlur={(event) => void savePackage(row, event.target.value, String(row.priceInr || ""))} />
-              </label>
-              <label>Price in rupees
-                <input className="field mt-1" inputMode="numeric" aria-label={`${row.name} price`} placeholder="Empty hides it" defaultValue={row.priceInr > 0 ? row.priceInr : ""} onBlur={(event) => void savePackage(row, row.name, event.target.value)} />
-              </label>
-              {hint ? <p className="text-xs text-muted">{hint}</p> : null}
-            </li>
-          );
-        })}
-      </ul>
-      <h2 className="mb-2 mt-8 font-serif text-2xl">Your services</h2>
-      {everyday.length === 0 ? <p className="text-sm text-muted">No services yet.</p> : null}
-      <ul className="space-y-2" data-service-count={everyday.length}>
-        {everyday.map((row) => (
-          <li key={row.id} className="card flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
-            <span>
-              {row.name}
-              {!row.active ? <span className="ml-2 rounded-full bg-[#f3ece4] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted">hidden</span> : null}
-            </span>
-            <span className="flex flex-wrap items-center gap-2">
-              <label className="text-xs">₹
-                <input className="field ml-1 w-28" type="number" defaultValue={row.priceInr} onBlur={(event) => void update(row, Number(event.target.value))} />
-              </label>
-              <button className="btn secondary" type="button" onClick={() => void setActive(row, !row.active)}>{row.active ? "Hide" : "Unhide"}</button>
-              <button className="btn secondary" type="button" onClick={() => void remove(row)}>Delete</button>
-            </span>
+      {rows.length === 0 ? <p className="text-sm text-muted">No prices yet.</p> : null}
+      <ul className="grid gap-2" data-service-count={rows.length}>
+        {rows.map((row) => (
+          <li key={row.id} className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-sm">
+            <span className="min-w-0 flex-1 truncate font-medium">{row.name}</span>
+            {canEdit ? (
+              <label className="sr-only" htmlFor={`price-${row.id}`}>Price for {row.name}</label>
+            ) : null}
+            <span className="text-muted">₹</span>
+            <input
+              id={`price-${row.id}`}
+              className="field narrow"
+              inputMode="numeric"
+              aria-label={`${row.name} price`}
+              defaultValue={row.priceInr}
+              disabled={!canEdit}
+              onBlur={(event) => {
+                if (!canEdit) return;
+                const priceInr = Math.max(0, Math.round(Number(event.target.value) || 0));
+                void patch(row, { priceInr }, { priceInr });
+              }}
+            />
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label={`${row.name} on`}
+              checked={row.active}
+              disabled={!canEdit}
+              onChange={(event) => void patch(row, { active: event.target.checked }, { active: event.target.checked })}
+            />
+            {canEdit ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="btn secondary px-2" type="button" aria-label={`More for ${row.name}`}>⋯</button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onSelect={() => void remove(row)}>Delete</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
           </li>
         ))}
       </ul>
-      <form className="card mt-4 grid gap-2 p-4 sm:grid-cols-3" onSubmit={add}>
-        <input className="field" placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} required aria-label="Service name" />
-        <input className="field" type="number" value={price} onChange={(event) => setPrice(Number(event.target.value))} aria-label="Price in rupees" />
-        <button className="btn" type="submit">Add</button>
-      </form>
-      {message && <p className="mt-2 text-sm" role="status">{message}</p>}
+      {canEdit ? (
+        <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={add}>
+          <input className="field min-w-0 flex-1" placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} required aria-label="Service name" />
+          <input className="field narrow" inputMode="numeric" placeholder="₹" value={price} onChange={(event) => setPrice(event.target.value)} aria-label="Price in rupees" />
+          <button className="btn" type="submit">Add</button>
+        </form>
+      ) : <p className="mt-3 text-sm text-muted">Only the owner can change prices.</p>}
+      {message ? <p className="mt-2 text-sm" role="status">{message}</p> : null}
     </div>
   );
 }

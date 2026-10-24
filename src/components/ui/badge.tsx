@@ -16,6 +16,6 @@ export function Badge({ children, tone = "neutral" }: { children: React.ReactNod
 export function statusTone(status: string): keyof typeof tones {
   if (status === "ACTIVE") return "good";
   if (status === "TRIAL") return "warn";
-  if (status === "SUSPENDED") return "bad";
+  if (status === "SUSPENDED" || status === "EXPIRED") return "bad";
   return "neutral";
 }

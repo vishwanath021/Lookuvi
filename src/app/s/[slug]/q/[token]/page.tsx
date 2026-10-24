@@ -1,3 +1,4 @@
+import { isBlockedStatus } from "@/lib/salon-status";
 import { notFound } from "next/navigation";
 import { QueueTicket } from "@/components/guest/QueueTicket";
 import { SalonPaused } from "@/components/guest/SalonPaused";
@@ -18,7 +19,7 @@ export default async function QueueStatusPage({ params }: { params: Promise<{ sl
       </main>
     );
   }
-  if (tenant.status === "SUSPENDED") return <SalonPaused name={tenant.name} />;
+  if (isBlockedStatus(tenant.status)) return <SalonPaused name={tenant.name} trialEnded={tenant.status === "EXPIRED"} />;
   try {
     const ticket = await guestTicket(tenant.slug, token);
     return (

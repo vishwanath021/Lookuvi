@@ -9,6 +9,7 @@ import { usingDemoProvider } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { verifySalonToken } from "@/lib/preview-access";
 import { loadTenantByHost, loadTenantBySlug, toSalonConfig } from "@/lib/salon";
+import { isBlockedStatus } from "@/lib/salon-status";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -35,12 +36,12 @@ export default async function SalonPage({
   const host = headerList.get("x-tenant-host") || headerList.get("host") || "";
   const tenant = slug === "by-host" ? await loadTenantByHost(host.split(":")[0] || "") : await loadTenantBySlug(slug);
   if (!tenant) notFound();
-  if (tenant.status === "SUSPENDED") return <SalonPaused name={tenant.name} />;
+  if (isBlockedStatus(tenant.status)) return <SalonPaused name={tenant.name} trialEnded={tenant.status === "EXPIRED"} />;
   if (!tenant.productTryOn && !tenant.productBridal && !tenant.productGroom) {
     if (tenant.productQueue) redirect(`/s/${tenant.slug}/queue`);
     return <TryOnUnavailable name={tenant.name} />;
   }
-  const config = toSalonConfig(tenant);
+  const config = await toSalonConfig(tenant);
   const salonMode = verifySalonToken(query.salon || "", tenant.id, tenant.salonNonce);
   const session = await auth();
   let demoHint = false;

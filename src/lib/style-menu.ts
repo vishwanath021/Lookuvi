@@ -19,17 +19,9 @@ export async function ensureCatalogueStyles(tenantId: string) {
 }
 
 /**
- * The guest menu and generate use this together.
- * A brand-new catalogue style is enabled, and the row is written so the owner can turn it off later.
+ * Every catalogue style is available at every salon.
+ * Density and texture live on the platform catalogue, not a per-salon switch.
  */
-export async function styleEnabledForTenant(tenantId: string, styleId: string) {
-  if (!styleById(styleId)) return false;
-  const row = await prisma.tenantStyle.findUnique({ where: { tenantId_styleId: { tenantId, styleId } } });
-  if (!row) {
-    await prisma.tenantStyle.create({
-      data: { tenantId, styleId, enabled: true, serviceIds: "[]" },
-    }).catch(() => undefined);
-    return true;
-  }
-  return row.enabled;
+export async function styleEnabledForTenant(_tenantId: string, styleId: string) {
+  return Boolean(styleById(styleId));
 }

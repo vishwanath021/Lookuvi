@@ -9,6 +9,7 @@ import { tooMany } from "@/lib/http/guard";
 import { ImageError, sanitizeSelfie } from "@/lib/images";
 import { ensurePhotoConsent } from "@/lib/photo-consent";
 import { loadTenantBySlug, toSalonConfig } from "@/lib/salon";
+import { blockedGuestMessage, isBlockedStatus } from "@/lib/salon-status";
 import { prisma } from "@/lib/prisma";
 import { isSuperSession } from "@/lib/session";
 import type { Gender } from "@/data/styles";
@@ -42,8 +43,8 @@ export async function POST(req: Request) {
 
   const tenant = await loadTenantBySlug(slug);
   if (!tenant) return NextResponse.json({ error: "TENANT", message: "Salon not found." }, { status: 404 });
-  if (tenant.status === "SUSPENDED") {
-    return NextResponse.json({ error: "SUSPENDED", message: "This salon's try-on is paused." }, { status: 403 });
+  if (isBlockedStatus(tenant.status)) {
+    return NextResponse.json({ error: "SUSPENDED", message: blockedGuestMessage(tenant.status) }, { status: 403 });
   }
   if (!tenant.productTryOn) {
     return NextResponse.json({ error: "PRODUCT", message: "Try-on is not available for this salon." }, { status: 404 });
@@ -76,7 +77,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: code, message: "Use a JPEG, PNG, or WebP selfie under 2 MB." }, { status: 400 });
   }
 
-  const config = toSalonConfig(tenant);
+  const config = await toSalonConfig(tenant);
   const audience = gender.data as Gender;
   const styles = config.styles.filter((style) => style.gender === audience);
   const result = await runHairSuggest({

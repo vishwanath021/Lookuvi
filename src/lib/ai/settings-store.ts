@@ -356,6 +356,30 @@ export async function markCalibration(ok: boolean) {
   await putSetting("platform_ai_calibration_ok", ok ? "true" : "false");
 }
 
+export async function storedFalKey() {
+  const cipher = await setting("platform_fal_key_cipher");
+  if (!cipher) return "";
+  try {
+    return decryptSecret(cipher);
+  } catch {
+    return "";
+  }
+}
+
+/** Auth check only. This does not call an image model and does not charge the spend cap. */
+export async function testFalKey(apiKey: string) {
+  try {
+    const response = await fetch("https://api.fal.ai/v1/models?limit=1", {
+      headers: { authorization: `Key ${apiKey}` },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!response.ok) return { ok: false as const, message: "fal rejected that key." };
+    return { ok: true as const, message: "Connected." };
+  } catch {
+    return { ok: false as const, message: "Could not reach fal." };
+  }
+}
+
 /** Auth check only. This does not call an image model and does not charge the spend cap. */
 export async function testProviderKey(provider: "openai" | "gemini", apiKey: string) {
   try {

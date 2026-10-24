@@ -1,4 +1,5 @@
 import { QueueDesk } from "@/components/admin/QueueDesk";
+import { kolkataMonthStart } from "@/lib/ai/spend";
 import { prisma } from "@/lib/prisma";
 import { deskSnapshot } from "@/lib/queue/service";
 import { pageTenant } from "@/lib/session";
@@ -15,7 +16,7 @@ export default async function QueuePage() {
       </main>
     );
   }
-  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const since = kolkataMonthStart();
   const [desk, tryOns] = await Promise.all([
     deskSnapshot(tenant.id),
     prisma.tryOn.count({ where: { tenantId: tenant.id, status: "SUCCEEDED", createdAt: { gte: since } } }),
@@ -25,7 +26,7 @@ export default async function QueuePage() {
       <h1 className="page-title">Queue</h1>
       <p className="mt-1 text-sm text-muted">{tryOns.toLocaleString("en-IN")} try-ons this month</p>
       <p className="mt-1 text-sm text-muted">Open the line, tap NEXT, then Done when the guest leaves.</p>
-      <QueueDesk initial={desk} lang={tenant.defaultLang} />
+      <QueueDesk initial={desk} lang={tenant.defaultLang} showVisits={tenant.productBridal || tenant.productGroom} />
     </main>
   );
 }

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { storedKey, testProviderKey } from "@/lib/ai/settings-store";
+import { storedFalKey, storedKey, testFalKey, testProviderKey } from "@/lib/ai/settings-store";
 import { requireSuper } from "@/lib/session";
 
 const schema = z.object({
-  provider: z.enum(["openai", "gemini"]),
-  apiKey: z.string().max(300).optional().default(""),
+  provider: z.enum(["openai", "gemini", "fal"]),
+  apiKey: z.string().max(400).optional().default(""),
 });
 
 export async function POST(req: Request) {
@@ -17,13 +17,18 @@ export async function POST(req: Request) {
   let apiKey = pasted.startsWith("•") || pasted === "" ? "" : pasted;
   if (!apiKey) {
     try {
-      const saved = await storedKey("platform");
-      if (saved && saved.provider === parsed.data.provider) apiKey = saved.apiKey;
+      if (parsed.data.provider === "fal") apiKey = await storedFalKey();
+      else {
+        const saved = await storedKey("platform");
+        if (saved && saved.provider === parsed.data.provider) apiKey = saved.apiKey;
+      }
     } catch {
       apiKey = "";
     }
   }
   if (!apiKey) return NextResponse.json({ ok: false, message: "Paste a key first." }, { status: 400 });
-  const result = await testProviderKey(parsed.data.provider, apiKey);
+  const result = parsed.data.provider === "fal"
+    ? await testFalKey(apiKey)
+    : await testProviderKey(parsed.data.provider, apiKey);
   return NextResponse.json(result, { status: result.ok ? 200 : 400 });
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { planById } from "@/data/plans";
+import { ensureBridalPackages } from "@/lib/bridal-packages";
 import { isLocale, LOCALES } from "@/data/i18n";
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/session";
@@ -77,6 +78,9 @@ export async function PUT(req: Request) {
     for (const field of ["toolColour", "toolStyle", "toolBrows", "toolBeard", "toolNails", "hairPickerOn", "hairSuggestOn", "hairSuggestUsesCredits", "anonDailyCap", "memberDailyCap", "monthlyTryAllowance", "requireLoginToBook"] as const) {
       delete rest[field];
     }
+  }
+  if (data.productBridal === true && !access.tenant.productBridal) {
+    await ensureBridalPackages(access.tenant.id);
   }
   const tenant = await prisma.tenant.update({
     where: { id: access.tenant.id },

@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { PLANS, type PlanId } from "@/data/plans";
+import { useEffect, useMemo, useState } from "react";
+import { LOW_TRYONS, PLANS, type PlanId } from "@/data/plans";
 import type { SalonRecord } from "@/lib/super/directory";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -31,11 +31,19 @@ function slugFromName(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
 
-export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
+function trialEndingSoon(row: SalonRecord) {
+  if (row.status !== "TRIAL" || !row.trialEndsAt) return false;
+  const end = new Date(row.trialEndsAt).getTime();
+  const now = Date.now();
+  return end >= now && end - now <= 7 * 24 * 60 * 60 * 1000;
+}
+
+export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonRecord[]; aiReady?: boolean }) {
   const [rows, setRows] = useState(initial);
   const [query, setQuery] = useState("");
   const [plan, setPlan] = useState("");
   const [status, setStatus] = useState("");
+  const [focus, setFocus] = useState("");
   const [selected, setSelected] = useState<SalonRecord | null>(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -46,7 +54,10 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
-  const [createPlan, setCreatePlan] = useState<PlanId>("STARTER");
+  const [createPlan, setCreatePlan] = useState<PlanId>("LITE");
+  const [payOpen, setPayOpen] = useState(false);
+  const [upiRef, setUpiRef] = useState("");
+  const [payId, setPayId] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerPassword, setOwnerPassword] = useState("");
   const [nextPlan, setNextPlan] = useState<PlanId>("STARTER");
@@ -59,10 +70,27 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
     return rows.filter((row) => {
       if (plan && row.plan !== plan) return false;
       if (status && row.status !== status) return false;
+      if (focus === "trial7" && !trialEndingSoon(row)) return false;
+      if (focus === "low" && row.credits > LOW_TRYONS) return false;
       if (!needle) return true;
       return row.name.toLowerCase().includes(needle) || row.slug.toLowerCase().includes(needle);
     });
-  }, [rows, query, plan, status]);
+  }, [rows, query, plan, status, focus]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void fetch("/api/v1/super/tenants")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (!Array.isArray(data?.salons)) return;
+          const next = data.salons as SalonRecord[];
+          setRows(next);
+          setSelected((current) => (current ? next.find((row) => row.id === current.id) || current : current));
+        })
+        .catch(() => undefined);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   function say(text: string, ok = true) {
     setNotice(text);
@@ -90,6 +118,38 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
   function openSuspend(row: SalonRecord) {
     setSelected(row);
     setSuspendOpen(true);
+  }
+
+  function openPay(row: SalonRecord) {
+    setSelected(row);
+    setUpiRef("");
+    setPayId("");
+    setPayOpen(true);
+  }
+
+  async function markPaid(event: React.FormEvent) {
+    event.preventDefault();
+    if (!selected) return;
+    setBusy(true);
+    const res = await fetch("/api/v1/super/payments", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        tenantId: selected.id,
+        paymentId: payId || undefined,
+        upiRef,
+        plan: payId ? undefined : selected.plan,
+        interval: "monthly",
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      say(data.message || "Could not mark that payment.", false);
+      return;
+    }
+    say("Marked paid. The plan is active and the receipt is ready.");
+    window.location.reload();
   }
 
   async function createSalon(event: React.FormEvent) {
@@ -124,9 +184,7 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
       return false;
     }
     const text = data.plan
-      ? data.creditsGranted
-        ? `Plan set to ${data.plan}. ${data.creditsGranted} included tries added.`
-        : `Plan set to ${data.plan}. No extra tries. This plan was already covered.`
+      ? `Plan set to ${data.plan}. Try-ons are added when the payment is marked paid.`
       : "Updated.";
     say(text);
     const structural = Boolean(body.plan) || body.creditDelta !== undefined || Boolean(body.status);
@@ -148,6 +206,7 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
         </div>
         <button className="btn" type="button" onClick={() => setCreateOpen(true)}>New salon</button>
       </div>
+      {!aiReady ? <p className="mt-3 rounded-xl border border-line bg-sand px-3 py-2 text-sm" role="status">No AI key is saved. Customers see sample images.</p> : null}
       {notice ? <p className="mt-3 text-sm" role="status">{notice}</p> : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <input className="field max-w-xs" aria-label="Search salons" placeholder="Search name or slug" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -160,6 +219,12 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
           <option value="TRIAL">Trial</option>
           <option value="ACTIVE">Active</option>
           <option value="SUSPENDED">Suspended</option>
+          <option value="EXPIRED">Expired</option>
+        </select>
+        <select className="field max-w-[14rem]" aria-label="Attention" value={focus} onChange={(event) => setFocus(event.target.value)}>
+          <option value="">All salons</option>
+          <option value="trial7">Trial ending in 7 days</option>
+          <option value="low">Low try-ons left</option>
         </select>
       </div>
       {filtered.length === 0 ? (
@@ -170,11 +235,11 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
             <thead>
               <tr className="text-xs uppercase text-muted">
                 <th className="py-2 pr-3">Name</th>
-                <th className="py-2 pr-3">Slug</th>
+                <th className="py-2 pr-3">Link</th>
                 <th className="py-2 pr-3">Plan</th>
                 <th className="py-2 pr-3">Status</th>
-                <th className="py-2 pr-3">Credits</th>
-                <th className="py-2 pr-3">Previews this month</th>
+                <th className="py-2 pr-3">Try-ons left</th>
+                <th className="py-2 pr-3">Try-ons this month</th>
                 <th className="py-2 pr-3">Trial ends</th>
                 <th className="py-2 pr-3">Created</th>
                 <th className="py-2"></th>
@@ -201,7 +266,8 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
                       <DropdownMenuContent>
                         <DropdownMenuItem onSelect={() => openSalon(row)}>Open</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => openPlan(row)}>Change plan</DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => openCredits(row)}>Adjust credits</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => openPay(row)}>Mark paid</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => openCredits(row)}>Adjust try-ons</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => openSuspend(row)}>{row.status === "SUSPENDED" ? "Resume" : "Suspend"}</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -213,7 +279,7 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
         </div>
       )}
 
-      <Sheet open={Boolean(selected) && !planOpen && !creditOpen && !suspendOpen} onOpenChange={(open) => { if (!open) setSelected(null); }} title={selected?.name || "Salon"} description={selected ? selected.slug : undefined}>
+      <Sheet open={Boolean(selected) && !planOpen && !creditOpen && !suspendOpen && !payOpen} onOpenChange={(open) => { if (!open) setSelected(null); }} title={selected?.name || "Salon"} description={selected ? selected.slug : undefined}>
         {selected ? (
           <Tabs defaultValue="profile">
             <TabsList>
@@ -236,7 +302,7 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
                 <button className="btn w-fit" type="submit" disabled={busy}>{busy ? "Saving…" : "Save name"}</button>
               </form>
               <dl className="mt-4 grid gap-2 text-sm">
-                <div><dt className="text-muted">Slug</dt><dd><a className="underline" href={`/s/${selected.slug}`}>{selected.slug}</a></dd></div>
+                <div><dt className="text-muted">Link</dt><dd><a className="underline" href={`/s/${selected.slug}`}>{selected.slug}</a></dd></div>
                 <div><dt className="text-muted">Owner</dt><dd>{selected.ownerName || "—"}{selected.ownerEmail ? ` · ${selected.ownerEmail}` : ""}</dd></div>
                 <div><dt className="text-muted">Web address</dt><dd>{selected.host || "None verified"}<span className="block text-xs text-muted">The salon’s own site, after DNS is checked. Until then, guests use the Lookuvi link.</span></dd></div>
                 <div><dt className="text-muted">Created</dt><dd>{when(selected.createdAt)}</dd></div>
@@ -248,7 +314,7 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
                 <Badge tone="neutral">{selected.planName}</Badge>
                 <Badge tone={statusTone(selected.status)}>{selected.status}</Badge>
               </div>
-              <p className="mt-3 text-sm">{selected.credits} credits</p>
+              <p className="mt-3 text-sm">{selected.credits} try-ons left</p>
               <fieldset className="mt-4 grid gap-2">
                 <legend className="text-sm font-medium">Products</legend>
                 <label className="flex min-h-11 items-center gap-2 text-sm">
@@ -290,13 +356,14 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
               </fieldset>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button className="btn secondary" type="button" onClick={() => openPlan(selected)}>Change plan</button>
-                <button className="btn secondary" type="button" onClick={() => openCredits(selected)}>Adjust credits</button>
+                <button className="btn secondary" type="button" onClick={() => openPay(selected)}>Mark paid</button>
+                <button className="btn secondary" type="button" onClick={() => openCredits(selected)}>Adjust try-ons</button>
                 <button className="btn secondary" type="button" onClick={() => openSuspend(selected)}>{selected.status === "SUSPENDED" ? "Resume" : "Suspend"}</button>
               </div>
             </TabsContent>
             <TabsContent value="usage">
               <dl className="grid gap-2 text-sm">
-                <div><dt className="text-muted">Previews this month</dt><dd className="font-medium">{selected.previewsThisMonth}</dd></div>
+                <div><dt className="text-muted">Try-ons this month</dt><dd className="font-medium">{selected.previewsThisMonth}</dd></div>
                 <div><dt className="text-muted">Leads</dt><dd className="font-medium">{selected.leads}</dd></div>
                 <div><dt className="text-muted">In the queue today</dt><dd className="font-medium">{selected.queueToday}</dd></div>
               </dl>
@@ -306,7 +373,7 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
       </Sheet>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent title="New salon" description="Starts a trial with the Starter credit grant.">
+        <DialogContent title="New salon" description="14-day trial, 20 try-ons.">
           <form className="grid gap-3" onSubmit={createSalon}>
             <label className="text-sm">Name
               <input className="field mt-1" value={name} onChange={(event) => {
@@ -322,7 +389,7 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
             <label className="text-sm">Plan
               <select className="field mt-1" aria-label="New salon plan" value={createPlan} onChange={(event) => setCreatePlan(event.target.value as PlanId)}>
                 {Object.values(PLANS).map((item) => (
-                  <option key={item.id} value={item.id}>{item.name}{item.id === "STARTER" ? " trial" : ""}</option>
+                  <option key={item.id} value={item.id}>{item.name}</option>
                 ))}
               </select>
             </label>
@@ -339,7 +406,7 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
       </Dialog>
 
       <Dialog open={planOpen} onOpenChange={setPlanOpen}>
-        <DialogContent title="Change plan" description="Moving up adds only the tries the new plan includes above what this salon was already given. Moving down does not take tries away. MRR counts only while the salon is active.">
+        <DialogContent title="Change plan" description="Sets the plan. It does not add try-ons. Mark paid does that.">
           <form
             className="grid gap-3"
             onSubmit={(event) => {
@@ -361,7 +428,7 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
       </Dialog>
 
       <Dialog open={creditOpen} onOpenChange={(open) => { setCreditOpen(open); if (!open) setGoodwillConfirm(false); }}>
-        <DialogContent title="Adjust credits" description="1 credit is 1 AI preview. The credits are free to the salon. The reason is saved on the credit ledger and the audit log.">
+        <DialogContent title="Adjust try-ons" description="1 try-on is 1 credit. The try-ons are free to the salon. The reason is saved on the ledger and the audit log.">
           <form
             className="grid gap-3"
             onSubmit={(event) => {
@@ -407,6 +474,17 @@ export function SalonsBoard({ rows: initial }: { rows: SalonRecord[] }) {
                 </button>
               )}
             </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={payOpen} onOpenChange={setPayOpen}>
+        <DialogContent title="Mark paid" description="Enter the UPI reference. This activates the plan and adds the try-ons.">
+          <form className="grid gap-3" onSubmit={markPaid}>
+            <label className="text-sm">UPI reference
+              <input className="field mt-1" aria-label="UPI reference" value={upiRef} onChange={(event) => setUpiRef(event.target.value)} required minLength={6} maxLength={32} />
+            </label>
+            <button className="btn" type="submit" disabled={busy || !selected}>{busy ? "Saving…" : "Mark paid"}</button>
           </form>
         </DialogContent>
       </Dialog>

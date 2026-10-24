@@ -1,3 +1,4 @@
+import { isBlockedStatus } from "@/lib/salon-status";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { GuestHub } from "@/components/guest/GuestHub";
@@ -22,10 +23,11 @@ export default async function MePage({
   const tenant = slug === "by-host" ? await loadTenantByHost(host.split(":")[0] || "") : await loadTenantBySlug(slug);
   if (!ownerFeatures().guestHub) notFound();
   if (!tenant) notFound();
-  if (tenant.status === "SUSPENDED") return <SalonPaused name={tenant.name} />;
+  if (isBlockedStatus(tenant.status)) return <SalonPaused name={tenant.name} trialEnded={tenant.status === "EXPIRED"} />;
+  const config = await toSalonConfig(tenant);
   return (
     <GuestHub
-      config={toSalonConfig(tenant)}
+      config={config}
       book={query.book === "1"}
       look={query.look}
       styleId={query.styleId}

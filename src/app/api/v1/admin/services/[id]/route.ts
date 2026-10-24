@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireMembership } from "@/lib/session";
+import { requireOwner } from "@/lib/session";
 
 const schema = z.object({
   name: z.string().min(2).max(80).optional(),
@@ -11,7 +11,7 @@ const schema = z.object({
 });
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const access = await requireMembership();
+  const access = await requireOwner();
   if ("error" in access && access.error) return access.error;
   if (!("tenant" in access)) return NextResponse.json({ error: "NO_TENANT" }, { status: 403 });
   const { id } = await ctx.params;
@@ -23,7 +23,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const access = await requireMembership();
+  const access = await requireOwner();
   if ("error" in access && access.error) return access.error;
   if (!("tenant" in access)) return NextResponse.json({ error: "NO_TENANT" }, { status: 403 });
   const { id } = await ctx.params;

@@ -80,8 +80,14 @@ describe("prompts", () => {
 });
 
 describe("pricing", () => {
-  it("adds 18% GST and prices a year as ten months", () => {
+  it("adds 18% GST only when GST is enabled, and prices a year as ten months", () => {
+    const previous = process.env.GST_ENABLED;
+    delete process.env.GST_ENABLED;
+    expect(withGst(799)).toEqual({ exGstInr: 799, gstInr: 0, totalInr: 799 });
+    process.env.GST_ENABLED = "true";
     expect(withGst(799)).toEqual({ exGstInr: 799, gstInr: 144, totalInr: 943 });
+    if (previous === undefined) delete process.env.GST_ENABLED;
+    else process.env.GST_ENABLED = previous;
     expect(annualExGst(799)).toBe(7990);
     expect(annualExGst(1999)).toBe(19990);
     expect(breakEvenAccounts(30000, 935)).toBe(33);
@@ -312,13 +318,17 @@ describe("openai quality and spend cap", () => {
 });
 
 describe("plans and production mock billing", () => {
-  it("prices Lite, Starter, and Pro ex-GST and adds 18% GST", () => {
-    expect(PLANS.LITE).toMatchObject({ name: "Lite", monthlyExGst: 2999, credits: 300 });
-    expect(PLANS.STARTER).toMatchObject({ name: "Starter", monthlyExGst: 5999, credits: 900 });
-    expect(PLANS.PRO).toMatchObject({ name: "Pro", monthlyExGst: 10999, credits: 1800 });
-    expect(withGst(2999)).toEqual({ exGstInr: 2999, gstInr: 540, totalInr: 3539 });
-    expect(withGst(5999)).toEqual({ exGstInr: 5999, gstInr: 1080, totalInr: 7079 });
-    expect(withGst(10999)).toEqual({ exGstInr: 10999, gstInr: 1980, totalInr: 12979 });
+  it("prices Basic, Standard, and Pro with GST off", () => {
+    const previous = process.env.GST_ENABLED;
+    delete process.env.GST_ENABLED;
+    expect(PLANS.LITE).toMatchObject({ name: "Basic", monthlyExGst: 799, credits: 50 });
+    expect(PLANS.STARTER).toMatchObject({ name: "Standard", monthlyExGst: 1499, credits: 120 });
+    expect(PLANS.PRO).toMatchObject({ name: "Pro", monthlyExGst: 2499, credits: 220 });
+    expect(withGst(799)).toEqual({ exGstInr: 799, gstInr: 0, totalInr: 799 });
+    expect(withGst(1499)).toEqual({ exGstInr: 1499, gstInr: 0, totalInr: 1499 });
+    expect(withGst(2499)).toEqual({ exGstInr: 2499, gstInr: 0, totalInr: 2499 });
+    if (previous === undefined) delete process.env.GST_ENABLED;
+    else process.env.GST_ENABLED = previous;
     expect(planById("CHAIN").id).toBe("PRO");
     expect(ownerSelfServeBlocked({ NODE_ENV: "production", BILLING_PROVIDER: "mock" } as NodeJS.ProcessEnv)).toBe(true);
     expect(ownerSelfServeBlocked({ NODE_ENV: "development", BILLING_PROVIDER: "mock" } as NodeJS.ProcessEnv)).toBe(false);
@@ -330,18 +340,17 @@ describe("plans and production mock billing", () => {
     expect(assign).toContain('action: "CREDIT_ADJUST"');
     expect(assign).toContain("The balance can't go below zero.");
     expect(readFileSync("src/app/api/v1/admin/leads/export/route.ts", "utf8")).toContain("leadExport");
-    expect(readFileSync("src/app/admin/leads/page.tsx", "utf8")).toContain("Lead export is included with Starter and Pro.");
+    expect(readFileSync("src/app/admin/leads/page.tsx", "utf8")).toContain("Lead export is included with Standard and Pro.");
     expect(readFileSync("docker-entrypoint.sh", "utf8")).toContain("npx prisma migrate deploy");
     expect(readFileSync("docker-compose.prod.yml", "utf8")).toContain("prisma migrate deploy");
     expect(readFileSync("Dockerfile", "utf8")).toContain('CMD ["./docker-entrypoint.sh"]');
     expect(readFileSync("DEPLOY.md", "utf8")).toContain("ubuntu-24-04-x64");
     const locked = renderToStaticMarkup(createElement(BillingPanel, { plan: "STARTER", status: "TRIAL", credits: 1, provider: "mock", locked: true }));
-    expect(locked).toContain("Contact Lookuvi to activate your plan");
-    expect(locked).not.toContain(">Choose<");
+    expect(locked).toContain(">Choose<");
     const open = renderToStaticMarkup(createElement(BillingPanel, { plan: "STARTER", status: "TRIAL", credits: 1, provider: "mock" }));
     expect(open).toContain(">Choose<");
-    expect(open).toContain("Lite");
-    expect(open).toContain("Starter");
+    expect(open).toContain("Basic");
+    expect(open).toContain("Standard");
     expect(open).toContain("Pro");
   });
 });

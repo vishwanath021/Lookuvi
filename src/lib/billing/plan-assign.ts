@@ -1,5 +1,4 @@
 import { planById } from "@/data/plans";
-import { grantCredits } from "@/lib/credits";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -21,19 +20,23 @@ export function dailyCapAfterPlanChange(currentDailyCap: number, previousPlanId:
   return planById(nextPlanId).credits;
 }
 
+/**
+ * Changes the plan name and the daily cap. It does not add try-ons and does not
+ * mark the salon paid. Try-ons are added by Mark paid, a pack, or Adjust try-ons.
+ */
 export async function applyPlanChange(tenantId: string, nextPlanId: string) {
   const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
   const next = planById(nextPlanId);
-  const creditsGranted = planUpgradeCredits(tenant.includedCreditMark, next.id);
   const dailyCap = dailyCapAfterPlanChange(tenant.dailyCap, tenant.plan, next.id);
-  const includedCreditMark = Math.max(tenant.includedCreditMark, next.credits);
   await prisma.tenant.update({
     where: { id: tenantId },
-    data: { plan: next.id, dailyCap, includedCreditMark },
+    data: { plan: next.id, dailyCap },
   });
-  let balance = tenant.creditBalance;
-  if (creditsGranted > 0) {
-    balance = await grantCredits(tenantId, creditsGranted, "PLAN_ASSIGN", `plan:${tenant.plan}->${next.id}`);
-  }
-  return { plan: next.id, creditsGranted, dailyCap, balance, includedCreditMark };
+  return {
+    plan: next.id,
+    creditsGranted: 0,
+    dailyCap,
+    balance: tenant.creditBalance,
+    includedCreditMark: tenant.includedCreditMark,
+  };
 }

@@ -46,9 +46,8 @@ function money(value: number) {
 
 export function SuperCostPanel({ initial }: { initial: Report }) {
   const [report, setReport] = useState(initial);
-  const [images, setImages] = useState(initial.imagesPerMonth);
+  const [images] = useState(initial.imagesPerMonth);
   const [since, setSince] = useState("");
-  const [notice, setNotice] = useState("");
   const [page, setPage] = useState(initial.page || 1);
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
@@ -90,14 +89,6 @@ export function SuperCostPanel({ initial }: { initial: Report }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [images]);
 
-  async function syncFal() {
-    setNotice("Reading fal billing events…");
-    const res = await fetch("/api/v1/super/ai/costs/sync-fal", { method: "POST" });
-    const data = (await res.json().catch(() => ({}))) as { message?: string };
-    setNotice(data.message || "fal billing sync did not finish.");
-    if (res.ok && since) await load(since, images, page, draft);
-  }
-
   function applyFilters(event: React.FormEvent) {
     event.preventDefault();
     setDraft({ provider, model, from, to });
@@ -130,7 +121,6 @@ export function SuperCostPanel({ initial }: { initial: Report }) {
         Last image: {last ? (last.actualKnown ? `${money(last.costInr)} (${last.sourceLabel}, ${last.status})` : `no actual yet (${last.sourceLabel}, ${last.status})`) : "none yet"}.
         {" "}Session {money(report.sessionInr)} · today {money(report.dayInr)} · month {money(report.monthInr)} · cap {money(report.spentInr)} of {money(report.capInr)}.
       </p>
-      {report.usingEstimate && <p className="text-sm text-muted">No billed image yet. The projection uses the selected tier estimate.</p>}
       <form className="grid gap-3 sm:grid-cols-2" onSubmit={applyFilters}>
         <label className="text-sm">Provider
           <select className="field mt-1" value={provider} onChange={(event) => setProvider(event.target.value)}>
@@ -161,21 +151,6 @@ export function SuperCostPanel({ initial }: { initial: Report }) {
           </ul>
         )}
       </div>
-      <label className="text-sm">Estimate only: images per month
-        <input className="field mt-1 max-w-[8rem]" type="number" min={0} value={images} onChange={(event) => setImages(Math.max(0, Number(event.target.value) || 0))} />
-      </label>
-      <p className="text-sm text-muted">This number is only for the projection below. It limits nothing.</p>
-      <p className="text-sm">Projected cost {money(report.plans[0]?.projectedInr ?? 0)} at {money(report.averageInr)} average.</p>
-      <ul className="text-sm">
-        {report.plans.map((plan) => (
-          <li key={plan.id}>{plan.name} ₹{plan.priceInr} · projected cost {money(plan.projectedInr)} · margin {money(plan.marginInr)}</li>
-        ))}
-      </ul>
-      <div className="flex flex-wrap items-center gap-3">
-        <button className="btn secondary" type="button" onClick={() => void syncFal()}>Sync real cost from fal</button>
-        <p className="text-sm text-muted">Uses the fal billing key when one is saved, otherwise the generation key. Billing events need a read-only BILLING preset. An API-scoped generation key is refused.</p>
-      </div>
-      {notice && <p className="text-sm" role="status">{notice}</p>}
       <p className="text-sm">{totalCount} {totalCount === 1 ? "image" : "images"}</p>
       <ul className="grid gap-3 md:hidden">
         {report.calls.map((row) => (

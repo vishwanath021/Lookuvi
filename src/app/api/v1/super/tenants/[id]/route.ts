@@ -8,7 +8,7 @@ import { requireSuper } from "@/lib/session";
 
 const schema = z.object({
   name: z.string().trim().min(2).max(80).optional(),
-  status: z.enum(["TRIAL", "ACTIVE", "SUSPENDED"]).optional(),
+  status: z.enum(["TRIAL", "ACTIVE", "SUSPENDED", "EXPIRED"]).optional(),
   plan: z.string().optional(),
   creditDelta: z.number().int().min(-100000).max(100000).optional(),
   note: z.string().max(200).optional(),

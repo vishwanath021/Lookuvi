@@ -94,11 +94,11 @@ test("owner nav lands on the queue, keeps three items, and hides internal wordin
   await expect(nav.getByRole("link", { name: "View try-on", exact: true })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Onboarding", exact: true })).toHaveCount(0);
   await nav.locator("summary", { hasText: "More" }).click();
-  await expect(nav.getByRole("link", { name: "Styles", exact: true })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Services", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Prices", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Styles", exact: true })).toHaveCount(0);
   await expect(nav.getByText(/try-ons left/)).toBeVisible();
   await page.goto("/admin/services");
-  await expect(page.getByRole("heading", { name: "Your services" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Prices" })).toBeVisible();
   await expect(page.getByText("Haircut")).toBeVisible();
   await expect(page.getByLabel("Service key")).toHaveCount(0);
   await page.goto("/admin/settings");
@@ -109,7 +109,7 @@ test("owner nav lands on the queue, keeps three items, and hides internal wordin
   await expect(page.locator("main").getByText(/try-ons left/)).toBeVisible();
   await expect(page.getByText(/Billing provider/i)).toHaveCount(0);
   await page.goto("/admin/qr");
-  await expect(page.getByRole("link", { name: "View try-on" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View try-on" })).toHaveCount(0);
   } finally {
     const done = await salonDb();
     await done.tenant.update({ where: { slug: "demo" }, data: { productQueue: false } });
