@@ -29,7 +29,7 @@ lines.append("Executed on 24 October 2026 against the local server. AI provider 
 lines.append("")
 lines.append(f"Result: **{summary['pass']} pass**, **{summary['fail']} fail**, **{summary['untested']} untested**, {summary['total']} cases.")
 lines.append("")
-lines.append("The inventory counts from the approval note were sizing estimates. This sheet is the case list that was actually written and run. A case that was not run is UNTESTED with a reason. Nothing here is a silent pass.")
+lines.append("The inventory counts from the approval note were sizing estimates. The column itself sums to 483 (P0 321, P1 162). The approval note rounded P0+P1 to about 340. This sheet is the case list that was actually written and run. A case that was not run is UNTESTED with a reason. Nothing here is a silent pass.")
 lines.append("")
 lines.append("## Onboarding checklist")
 lines.append("")
@@ -76,6 +76,95 @@ for func, rows in by_func.items():
     failed = sum(1 for row in rows if row["status"] == "FAIL")
     untested = sum(1 for row in rows if row["status"] == "UNTESTED")
     lines.append(f"| {func} | {passed} | {failed} | {untested} |")
+lines.append("")
+planned = {
+    "C1": 6, "C2": 3, "C3": 22, "C4": 12, "C5": 10, "C6": 18, "C7": 12, "C9": 8, "C10": 16,
+    "C11": 14, "C12": 8, "C13": 4, "C14": 6, "C17": 4,
+    "S1": 4, "S2": 12, "S3": 4, "S4": 4, "S5": 6, "S6": 3, "S7": 8, "S8": 4, "S9": 4,
+    "O1": 6, "O2": 8, "O3": 6, "O4": 8, "O5": 8, "O6": 4, "O7": 4, "O8": 6, "O9": 8,
+    "O10": 8, "O11": 8, "O12": 6, "O13": 6, "O14": 8, "O15": 4,
+    "A1": 4, "A2": 10, "A3": 10, "A4": 6, "A5": 12, "A8": 6, "A10": 4,
+    "P1": 8, "P2": 12, "P3": 8, "P4": 6, "P5": 8, "P6": 6, "P7": 8, "P8": 5, "P13": 3,
+    "X1": 10, "X2": 8, "X3": 8, "X4": 6, "X5": 4, "X6": 8, "X7": 4, "X8": 8, "X9": 3,
+    "X10": 8, "X11": 4, "X12": 6,
+}
+reasons = {
+    "C3": "Five tools each have a success case, and one case turns colour, brows, beard, and nails off. The estimate also counted a bad id and a hide for every tool, plus gallery taps. Women, men, and kids flags are saved in one case. ENABLED_TOOLS is a process setting, so it was not flipped on a running server.",
+    "C4": "Consent, a short session, an unknown salon, and a file over 2 MB are run. Camera, retake, pinch, and HEIC are in the browser. The nails face check is UNTESTED: the portrait was refused as a look that is not on the menu, so the hand classifier did not run.",
+    "C5": "The mock response is a labelled JPEG and the credit balance does not move. The before/after slider, pinch zoom, and the WhatsApp share sheet are on-screen gestures, covered by the customer video, not by a second HTTP row.",
+    "C6": "Bridal and mehendi refusals, bridal turned off, the trial form, and the six-look ceiling are run. Makeup chips, live colour on the phone, and compare-two are client state.",
+    "C7": "P1. Own-look refuses a paid call with no OpenAI key, requires a selfie, and follows the bridal switch. Each jewellery slot is the same upload path.",
+    "C9": "Default 3, the 1–20 bound, the cap message, and a cached look that does not call the generator are run. Staff bonus tries are S6. Groom shares the same counter and stays off unless the owner turns it on.",
+    "C10": "Salon daily, anonymous daily, a zero anonymous cap, monthly allowance, a demo row that does not count, and a zero-balance credit reserve are run. Hourly abuse limits and the rupee spend caps need a paid provider, which this cycle does not call. A mock preview never reaches reserveCredits.",
+    "C11": "Join, validation, pause, one open token, cancel, product off, the STOP sentence, and On the way are run. Polling is the same status read the ticket already uses.",
+    "C12": "Date, future slot, past date, and a second request for the same phone are run. Confirm, decline, and Mark visited are S5. The wait figure is omitted because request mode does not return one.",
+    "C13": "P1. The welcome page is the QR target and it renders. A printed sheet and a phone camera are not a local HTTP case.",
+    "C14": "A lead and a wa.me link, a style that is not on the menu, a suspended salon, and a missing WhatsApp number are run. Phone-login-before-book is O6 and is off for the guest hub.",
+    "S2": "Open, pause, next, an empty line, a busy chair, no-show, start, and done are run. One card per chair and the 2.5s poll are the same snapshot.",
+    "S5": "Confirm, decline, and Mark visited are run. Repeating those verbs on a closed card is the same state machine.",
+    "O1": "The owner can finish, and staff see the link until then. The wizard's earlier steps save the same settings fields as O2.",
+    "O2": "Name, colours, WhatsApp, address, a bad colour, and GSTIN are run. Logo and maps use the same save. Deleting the salon from the owner API is refused.",
+    "O3": "Groom stays off until the owner turns it on, and that switch can be turned back off. Visit tries are C9. Bridal off is C6.",
+    "O4": "P1. The hair-suggestion toggles save. Each everyday tool switch is the C3 hide case.",
+    "O5": "Bounds above 500 and 5000 are rejected. Zero anonymous previews are accepted and then block. Live colour does not use that cap.",
+    "O6": "P1. Starter cannot remove branding. Require-phone-to-book can be turned on. The guest hub behind that switch is off for launch.",
+    "O7": "P1. Rotating the salon link changes the token. A second rotation is the same write.",
+    "O8": "P1. A short staff password, removing the last owner, and inviting a super-admin email are refused.",
+    "O9": "Price and duration bounds, and hiding a service from the join list, are run. Bridal package prices use the same service row.",
+    "O10": "P1. Disabling one style removes it from booking. The Lite ceiling of 25 is X11. Sort and rename are the same catalogue save.",
+    "O11": "Chair count, average minutes, and the 0–120 alert window are run. Live versus request mode is C12 and X3. The place label is X4.",
+    "O12": "P1. The owner can set the switch, the 28–42 day gap, and the WhatsApp cap. Staff cannot, which is S7.",
+    "O13": "P1. An offer is refused when WhatsApp is off, a two-character offer is rejected, and 200 characters are stored as 180. No message is sent to Meta.",
+    "O14": "P1. A desk stop can be resumed and a STOP reply cannot. The month stats are the same customers payload.",
+    "O15": "The QR page loads, and localhost printing returns LOCAL_DOMAIN. The embed snippet is behind FEATURE_EMBED, which is off.",
+    "A1": "P1. The overview lists salons. An owner opening /super gets the shell and a redirect, with no salon data. The spend figure needs a paid month.",
+    "A2": "Queue on, one trial grant, slug rules, a short password, a 14-day trial, and a full style copy are run. City and WhatsApp on create are the same form.",
+    "A3": "Upgrade, repeat upgrade, downgrade, a custom daily cap, and turning one salon's queue off are run. Rename and status use the same salon update.",
+    "A4": "Goodwill does not move the plan mark, a balance cannot go below zero, a zero delta writes nothing, and a note is stored. The +50 button is the same delta.",
+    "A5": "P1. A saved key is not echoed. Changing the guest engine, approving medium, and the spend cap are production key operations and were not done with a live key.",
+    "A8": "P1. Costs are readable by the super admin only. fal billing sync would call the provider.",
+    "A10": "P1. Development does not require an authenticator. The production redirect is UNTESTED because this server is not production.",
+    "P1": "Wrong password, the email form, forgot-password privacy, the reset screen, and the absence of a magic-link form are run. The 8-per-email and 30-per-IP limits are the shared limiter the login route calls. Hammering the login IP would lock the rest of this sheet.",
+    "P2": "Staff cannot save settings, an owner cannot call super APIs, an anonymous admin call is rejected, and a cross-site POST is rejected. A demotion is the same membership check on the next request.",
+    "P3": "A lead from another salon cannot be updated, staff cannot read owner settings, and another salon's waiting guest is not on this desk. Customer search isolation is X12.",
+    "P4": "Health and the guest page do not name a provider. Readiness checks the database. Mock is the only generate path in this run.",
+    "P5": "P1. With templates unset, a queue alert is not sent to Meta. A live handset was not used.",
+    "P6": "P1. The inventory's 'one STOP blocks every salon' was wrong and was fixed: plain STOP is per salon, STOPALL is global. Signature, verify, and the parser are run. The sheet has more cases than the estimate because that fix needed them.",
+    "P7": "P1. Cron without the secret is rejected, cron with the secret does not call Meta, and a due reminder uses the injected sender.",
+    "P8": "P1. Both cron routes use the same secret rule. Liveness is the health check in P4.",
+    "P13": "The secret scan is clean. Provider keys are not stored in this run. Log redaction is covered by the same scan and by not printing request bodies.",
+    "X1": "Wait maths, the order of people ahead, a service duration, and token numbering are run. The per-salon day boundary is the same token rule.",
+    "X2": "Next and no-show show on the public ticket. Pause blocking a join is C11. Start and done showing on the ticket are S2.",
+    "X3": "Switching mode does not convert old tokens. Walk-in and next in request mode are C12.",
+    "X4": "The place label is on the public board. Chair bounds are O11. Wait maths for more chairs are X1.",
+    "X5": "P1. A 45 minute service is listed. The active flag hiding a service is O9.",
+    "X6": "P1. A return link on join is attributed. Mark visited starting the clock is S5.",
+    "X7": "The saved name and the saved colour are on the public page. WhatsApp on Book this look is C14.",
+    "X8": "Customers follows the queue product. Try-on off sending guests to the queue is C3. Groom off is O3.",
+    "X9": "The owner can still sign in while the salon is suspended, and resume clears the paused page. The guest paused page itself is C2.",
+    "X10": "Customers shows the allowance the owner saved. The blocks themselves are C10 and O5, so they are not copied into a second id.",
+    "X11": "P1. The Lite cap names Lite. Enabling and disabling a style is O10.",
+    "X12": "Customer search does not cross salons, and the demo salon is left on Pro with the queue on. The desk isolation case is P3.",
+}
+lines.append("## Coverage against the inventory")
+lines.append("")
+lines.append("Executed counts below are cases in this sheet. Planned counts are the inventory column from the approval note. Where this sheet has fewer, the reason is the one agreed in D13: a repeated click was not added to make the column match.")
+lines.append("")
+lines.append("| Id | Priority | Planned | Executed | Why it is lower |")
+lines.append("| --- | --- | ---: | ---: | --- |")
+priority_of = {}
+for row in results:
+    priority_of.setdefault(row["functionality"], row["priority"])
+for func, plan in planned.items():
+    rows = by_func.get(func, [])
+    done = len(rows)
+    if done >= plan:
+        continue
+    pri = priority_of.get(func, "P0")
+    why = reasons.get(func, "The inventory number was a sizing estimate. The named behaviour is already covered by the cases for this id.")
+    lines.append(f"| {func} | {pri} | {plan} | {done} | {why} |")
+lines.append("")
+lines.append("Ids at or above the inventory column are omitted from this table. P2 and P3 rows were out of scope. OFF, K6, and P10 are launch notes, not inventory rows: flag-off routes, the k6 script, and Razorpay.")
 lines.append("")
 lines.append("## Cases")
 lines.append("")
@@ -157,6 +246,16 @@ for func, rows in by_func.items():
         sum(1 for row in rows if row["status"] == "PASS"),
         sum(1 for row in rows if row["status"] == "FAIL"),
         sum(1 for row in rows if row["status"] == "UNTESTED"),
+    ))
+body.append("</table><h2>Coverage against the inventory</h2>")
+body.append("<p>Planned counts are the inventory column. About 340 was the rounded P0+P1 figure. The column sums to 483. A lower executed count is explained here and is not a silent pass.</p>")
+body.append("<table><tr><th>Id</th><th>Priority</th><th>Planned</th><th>Executed</th><th>Why it is lower</th></tr>")
+for func, plan in planned.items():
+    rows = by_func.get(func, [])
+    if len(rows) >= plan:
+        continue
+    body.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(
+        esc(func), esc(priority_of.get(func, "P0")), plan, len(rows), esc(reasons.get(func, "")),
     ))
 body.append("</table><h2>Cases</h2>")
 for row in results:

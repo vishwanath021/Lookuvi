@@ -114,4 +114,12 @@ Date of this review: 24 October 2026. Scope: the seven-salon launch on top of re
 
 **Product owner.** Every agreed functionality id still has to appear, with Given / When / Then and a result a co-founder can read. Missing k6, a production authenticator, a live WhatsApp handset, or a payment must be visible as not run, not as a pass.
 
-**Decision.** `docs/test-plan/` is the case list that was executed on the local mock server: 193 pass, 0 fail, 4 untested. The four are production TOTP, the k6 script (k6 is not installed), Razorpay (billing is off for launch), and the nails face check (the portrait was not accepted as a nails look, so the hand check did not run). Six short videos cover the customer, staff, owner, super admin, platform, and cross-screen paths after those paths succeeded.
+**Decision.** `docs/test-plan/` is the case list that was executed on the local mock server. The first pass was 193 pass, 0 fail, 4 untested. The four are production TOTP, the k6 script (k6 is not installed), Razorpay (billing is off for launch), and the nails face check (the portrait was not accepted as a nails look, so the hand check did not run). Six short videos cover the customer, staff, owner, super admin, platform, and cross-screen paths after those paths succeeded. D13 adds the named P0 behaviours that pass skipped.
+
+## D13. Fill skipped P0 behaviours, do not pad the estimate
+
+**Architect.** The inventory column sums to 483. The approval note rounded P0+P1 to about 340. Both numbers were sizing, not a case catalogue. A second pass that repeats a join ten times to match a column will not find a new bug. A named behaviour with no case is a real skip: start and done, a walk-in with no phone, localhost QR, a zero daily cap, the same bridal look served from cache, a credit reserve at a zero balance.
+
+**Product owner.** If a control we promised the seven salons was never tried, add that case and run it. If the shortfall is the same click counted three ways, or a gesture that only exists in the browser, say so in the sheet. Do not call the estimate a failure of the run.
+
+**Decision.** The runner gained the P0 cases that named a behaviour the first pass did not execute. They are run on the same mock server. The second execution is 221 pass, 0 fail, 4 untested, 225 cases. The test plan lists every P0 and P1 id whose executed count is still below the inventory column, and why. We do not add filler rows to reach 340 or 483. Production TOTP, k6, Razorpay, and the nails face check stay UNTESTED for the same reasons as D12.

@@ -2,9 +2,9 @@
 
 Executed on 24 October 2026 against the local server. AI provider is mock. WhatsApp is not a live handset: webhook signatures use a local secret, and reminder sends use an injected sender that never calls Meta. `OPENAI_API_KEY` was removed from the process. Demo logins only.
 
-Result: **193 pass**, **0 fail**, **4 untested**, 197 cases.
+Result: **221 pass**, **0 fail**, **4 untested**, 225 cases.
 
-The inventory counts from the approval note were sizing estimates. This sheet is the case list that was actually written and run. A case that was not run is UNTESTED with a reason. Nothing here is a silent pass.
+The inventory counts from the approval note were sizing estimates. The column itself sums to 483 (P0 321, P1 162). The approval note rounded P0+P1 to about 340. This sheet is the case list that was actually written and run. A case that was not run is UNTESTED with a reason. Nothing here is a silent pass.
 
 ## Onboarding checklist
 
@@ -44,61 +44,61 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 | --- | --- | --- | --- |
 | C1 | 7 | 0 | 0 |
 | C2 | 4 | 0 | 0 |
-| C3 | 11 | 0 | 0 |
-| C4 | 5 | 0 | 1 |
+| C3 | 12 | 0 | 0 |
+| C4 | 6 | 0 | 1 |
 | C5 | 3 | 0 | 0 |
-| C6 | 4 | 0 | 0 |
+| C6 | 6 | 0 | 0 |
 | C7 | 3 | 0 | 0 |
-| C9 | 3 | 0 | 0 |
-| C10 | 5 | 0 | 0 |
-| C11 | 11 | 0 | 0 |
-| C12 | 4 | 0 | 0 |
+| C9 | 4 | 0 | 0 |
+| C10 | 7 | 0 | 0 |
+| C11 | 12 | 0 | 0 |
+| C12 | 5 | 0 | 0 |
 | C13 | 2 | 0 | 0 |
 | C14 | 4 | 0 | 0 |
 | C17 | 4 | 0 | 0 |
-| S1 | 3 | 0 | 0 |
-| S2 | 5 | 0 | 0 |
-| S3 | 2 | 0 | 0 |
+| S1 | 4 | 0 | 0 |
+| S2 | 6 | 0 | 0 |
+| S3 | 4 | 0 | 0 |
 | S5 | 3 | 0 | 0 |
 | S4 | 1 | 0 | 0 |
 | S7 | 5 | 0 | 0 |
 | S8 | 4 | 0 | 0 |
 | P2 | 4 | 0 | 0 |
-| P3 | 2 | 0 | 0 |
+| P3 | 3 | 0 | 0 |
 | S9 | 2 | 0 | 0 |
-| O2 | 4 | 0 | 0 |
+| O2 | 5 | 0 | 0 |
 | O6 | 2 | 0 | 0 |
-| O3 | 1 | 0 | 0 |
+| O3 | 2 | 0 | 0 |
 | O8 | 3 | 0 | 0 |
-| O9 | 3 | 0 | 0 |
-| O11 | 2 | 0 | 0 |
+| O9 | 4 | 0 | 0 |
+| O11 | 3 | 0 | 0 |
 | O12 | 2 | 0 | 0 |
 | O13 | 3 | 0 | 0 |
 | O14 | 1 | 0 | 0 |
 | A1 | 2 | 0 | 0 |
-| A2 | 4 | 0 | 0 |
+| A2 | 5 | 0 | 0 |
 | A3 | 5 | 0 | 0 |
-| A4 | 3 | 0 | 0 |
+| A4 | 4 | 0 | 0 |
 | A5 | 1 | 0 | 0 |
 | A8 | 1 | 0 | 0 |
 | A10 | 1 | 0 | 1 |
-| P1 | 5 | 0 | 0 |
-| P4 | 2 | 0 | 0 |
+| P1 | 6 | 0 | 0 |
+| P4 | 3 | 0 | 0 |
 | P5 | 1 | 0 | 0 |
 | P6 | 10 | 0 | 0 |
 | P7 | 3 | 0 | 0 |
 | P8 | 2 | 0 | 0 |
 | P13 | 1 | 0 | 0 |
 | X1 | 4 | 0 | 0 |
-| X2 | 1 | 0 | 0 |
+| X2 | 2 | 0 | 0 |
 | X3 | 1 | 0 | 0 |
-| X7 | 1 | 0 | 0 |
+| X7 | 2 | 0 | 0 |
 | X8 | 2 | 0 | 0 |
-| X9 | 1 | 0 | 0 |
+| X9 | 2 | 0 | 0 |
 | X10 | 1 | 0 | 0 |
 | X11 | 1 | 0 | 0 |
 | X12 | 2 | 0 | 0 |
-| O1 | 1 | 0 | 0 |
+| O1 | 2 | 0 | 0 |
 | O7 | 1 | 0 | 0 |
 | S6 | 1 | 0 | 0 |
 | X6 | 1 | 0 | 0 |
@@ -106,11 +106,79 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 | P10 | 0 | 0 | 1 |
 | K6 | 0 | 0 | 1 |
 | O4 | 1 | 0 | 0 |
-| O15 | 1 | 0 | 0 |
-| O5 | 2 | 0 | 0 |
+| O15 | 2 | 0 | 0 |
+| O5 | 3 | 0 | 0 |
 | O10 | 1 | 0 | 0 |
 | X4 | 1 | 0 | 0 |
 | X5 | 1 | 0 | 0 |
+
+## Coverage against the inventory
+
+Executed counts below are cases in this sheet. Planned counts are the inventory column from the approval note. Where this sheet has fewer, the reason is the one agreed in D13: a repeated click was not added to make the column match.
+
+| Id | Priority | Planned | Executed | Why it is lower |
+| --- | --- | ---: | ---: | --- |
+| C3 | P0 | 22 | 12 | Five tools each have a success case, and one case turns colour, brows, beard, and nails off. The estimate also counted a bad id and a hide for every tool, plus gallery taps. Women, men, and kids flags are saved in one case. ENABLED_TOOLS is a process setting, so it was not flipped on a running server. |
+| C4 | P0 | 12 | 7 | Consent, a short session, an unknown salon, and a file over 2 MB are run. Camera, retake, pinch, and HEIC are in the browser. The nails face check is UNTESTED: the portrait was refused as a look that is not on the menu, so the hand classifier did not run. |
+| C5 | P0 | 10 | 3 | The mock response is a labelled JPEG and the credit balance does not move. The before/after slider, pinch zoom, and the WhatsApp share sheet are on-screen gestures, covered by the customer video, not by a second HTTP row. |
+| C6 | P0 | 18 | 6 | Bridal and mehendi refusals, bridal turned off, the trial form, and the six-look ceiling are run. Makeup chips, live colour on the phone, and compare-two are client state. |
+| C7 | P1 | 12 | 3 | P1. Own-look refuses a paid call with no OpenAI key, requires a selfie, and follows the bridal switch. Each jewellery slot is the same upload path. |
+| C9 | P0 | 8 | 4 | Default 3, the 1–20 bound, the cap message, and a cached look that does not call the generator are run. Staff bonus tries are S6. Groom shares the same counter and stays off unless the owner turns it on. |
+| C10 | P0 | 16 | 7 | Salon daily, anonymous daily, a zero anonymous cap, monthly allowance, a demo row that does not count, and a zero-balance credit reserve are run. Hourly abuse limits and the rupee spend caps need a paid provider, which this cycle does not call. A mock preview never reaches reserveCredits. |
+| C11 | P0 | 14 | 12 | Join, validation, pause, one open token, cancel, product off, the STOP sentence, and On the way are run. Polling is the same status read the ticket already uses. |
+| C12 | P0 | 8 | 5 | Date, future slot, past date, and a second request for the same phone are run. Confirm, decline, and Mark visited are S5. The wait figure is omitted because request mode does not return one. |
+| C13 | P1 | 4 | 2 | P1. The welcome page is the QR target and it renders. A printed sheet and a phone camera are not a local HTTP case. |
+| C14 | P0 | 6 | 4 | A lead and a wa.me link, a style that is not on the menu, a suspended salon, and a missing WhatsApp number are run. Phone-login-before-book is O6 and is off for the guest hub. |
+| S2 | P0 | 12 | 6 | Open, pause, next, an empty line, a busy chair, no-show, start, and done are run. One card per chair and the 2.5s poll are the same snapshot. |
+| S4 | P1 | 4 | 1 | The inventory number was a sizing estimate. The named behaviour is already covered by the cases for this id. |
+| S5 | P0 | 6 | 3 | Confirm, decline, and Mark visited are run. Repeating those verbs on a closed card is the same state machine. |
+| S6 | P1 | 3 | 1 | The inventory number was a sizing estimate. The named behaviour is already covered by the cases for this id. |
+| S7 | P1 | 8 | 5 | The inventory number was a sizing estimate. The named behaviour is already covered by the cases for this id. |
+| S9 | P1 | 4 | 2 | The inventory number was a sizing estimate. The named behaviour is already covered by the cases for this id. |
+| O1 | P0 | 6 | 2 | The owner can finish, and staff see the link until then. The wizard's earlier steps save the same settings fields as O2. |
+| O2 | P0 | 8 | 5 | Name, colours, WhatsApp, address, a bad colour, and GSTIN are run. Logo and maps use the same save. Deleting the salon from the owner API is refused. |
+| O3 | P0 | 6 | 2 | Groom stays off until the owner turns it on, and that switch can be turned back off. Visit tries are C9. Bridal off is C6. |
+| O4 | P1 | 8 | 1 | P1. The hair-suggestion toggles save. Each everyday tool switch is the C3 hide case. |
+| O5 | P0 | 8 | 3 | Bounds above 500 and 5000 are rejected. Zero anonymous previews are accepted and then block. Live colour does not use that cap. |
+| O6 | P1 | 4 | 2 | P1. Starter cannot remove branding. Require-phone-to-book can be turned on. The guest hub behind that switch is off for launch. |
+| O7 | P1 | 4 | 1 | P1. Rotating the salon link changes the token. A second rotation is the same write. |
+| O8 | P1 | 6 | 3 | P1. A short staff password, removing the last owner, and inviting a super-admin email are refused. |
+| O9 | P0 | 8 | 4 | Price and duration bounds, and hiding a service from the join list, are run. Bridal package prices use the same service row. |
+| O10 | P1 | 8 | 1 | P1. Disabling one style removes it from booking. The Lite ceiling of 25 is X11. Sort and rename are the same catalogue save. |
+| O11 | P0 | 8 | 3 | Chair count, average minutes, and the 0–120 alert window are run. Live versus request mode is C12 and X3. The place label is X4. |
+| O12 | P1 | 6 | 2 | P1. The owner can set the switch, the 28–42 day gap, and the WhatsApp cap. Staff cannot, which is S7. |
+| O13 | P1 | 6 | 3 | P1. An offer is refused when WhatsApp is off, a two-character offer is rejected, and 200 characters are stored as 180. No message is sent to Meta. |
+| O14 | P1 | 8 | 1 | P1. A desk stop can be resumed and a STOP reply cannot. The month stats are the same customers payload. |
+| O15 | P0 | 4 | 2 | The QR page loads, and localhost printing returns LOCAL_DOMAIN. The embed snippet is behind FEATURE_EMBED, which is off. |
+| A1 | P1 | 4 | 2 | P1. The overview lists salons. An owner opening /super gets the shell and a redirect, with no salon data. The spend figure needs a paid month. |
+| A2 | P0 | 10 | 5 | Queue on, one trial grant, slug rules, a short password, a 14-day trial, and a full style copy are run. City and WhatsApp on create are the same form. |
+| A3 | P0 | 10 | 5 | Upgrade, repeat upgrade, downgrade, a custom daily cap, and turning one salon's queue off are run. Rename and status use the same salon update. |
+| A4 | P0 | 6 | 4 | Goodwill does not move the plan mark, a balance cannot go below zero, a zero delta writes nothing, and a note is stored. The +50 button is the same delta. |
+| A5 | P1 | 12 | 1 | P1. A saved key is not echoed. Changing the guest engine, approving medium, and the spend cap are production key operations and were not done with a live key. |
+| A8 | P1 | 6 | 1 | P1. Costs are readable by the super admin only. fal billing sync would call the provider. |
+| A10 | P1 | 4 | 2 | P1. Development does not require an authenticator. The production redirect is UNTESTED because this server is not production. |
+| P1 | P0 | 8 | 6 | Wrong password, the email form, forgot-password privacy, the reset screen, and the absence of a magic-link form are run. The 8-per-email and 30-per-IP limits are the shared limiter the login route calls. Hammering the login IP would lock the rest of this sheet. |
+| P2 | P0 | 12 | 4 | Staff cannot save settings, an owner cannot call super APIs, an anonymous admin call is rejected, and a cross-site POST is rejected. A demotion is the same membership check on the next request. |
+| P3 | P0 | 8 | 3 | A lead from another salon cannot be updated, staff cannot read owner settings, and another salon's waiting guest is not on this desk. Customer search isolation is X12. |
+| P4 | P0 | 6 | 3 | Health and the guest page do not name a provider. Readiness checks the database. Mock is the only generate path in this run. |
+| P5 | P1 | 8 | 1 | P1. With templates unset, a queue alert is not sent to Meta. A live handset was not used. |
+| P7 | P1 | 8 | 3 | P1. Cron without the secret is rejected, cron with the secret does not call Meta, and a due reminder uses the injected sender. |
+| P8 | P1 | 5 | 2 | P1. Both cron routes use the same secret rule. Liveness is the health check in P4. |
+| P13 | P0 | 3 | 1 | The secret scan is clean. Provider keys are not stored in this run. Log redaction is covered by the same scan and by not printing request bodies. |
+| X1 | P0 | 10 | 4 | Wait maths, the order of people ahead, a service duration, and token numbering are run. The per-salon day boundary is the same token rule. |
+| X2 | P0 | 8 | 2 | Next and no-show show on the public ticket. Pause blocking a join is C11. Start and done showing on the ticket are S2. |
+| X3 | P0 | 8 | 1 | Switching mode does not convert old tokens. Walk-in and next in request mode are C12. |
+| X4 | P0 | 6 | 1 | The place label is on the public board. Chair bounds are O11. Wait maths for more chairs are X1. |
+| X5 | P1 | 4 | 1 | P1. A 45 minute service is listed. The active flag hiding a service is O9. |
+| X6 | P1 | 8 | 1 | P1. A return link on join is attributed. Mark visited starting the clock is S5. |
+| X7 | P0 | 4 | 2 | The saved name and the saved colour are on the public page. WhatsApp on Book this look is C14. |
+| X8 | P0 | 8 | 2 | Customers follows the queue product. Try-on off sending guests to the queue is C3. Groom off is O3. |
+| X9 | P0 | 3 | 2 | The owner can still sign in while the salon is suspended, and resume clears the paused page. The guest paused page itself is C2. |
+| X10 | P0 | 8 | 1 | Customers shows the allowance the owner saved. The blocks themselves are C10 and O5, so they are not copied into a second id. |
+| X11 | P1 | 4 | 1 | P1. The Lite cap names Lite. Enabling and disabling a style is O10. |
+| X12 | P0 | 6 | 2 | Customer search does not cross salons, and the demo salon is left on Pro with the queue on. The desk isolation case is P3. |
+
+Ids at or above the inventory column are omitted from this table. P2 and P3 rows were out of scope. OFF, K6, and P10 are launch notes, not inventory rows: flag-off routes, the k6 script, and Razorpay.
 
 ## Cases
 
@@ -274,6 +342,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: All three audience flags are set
 - Then: They are stored
 
+#### C3-12 Each everyday tool can be turned off on its own (PASS)
+
+- Priority: P0. Area: customer. Method: http.
+- Given: Colour, brows, beard, and nails are on
+- When: The owner turns one tool off and a guest requests it
+- Then: That tool returns TOOL and the others still run after they are turned back on
+
 ### C4
 
 #### C4-01 Photo notice requires the age gate (PASS)
@@ -318,6 +393,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - Given: No salon with that slug
 - When: A preview is posted
 - Then: The API returns TENANT 404
+
+#### C4-07 A photo over 2 MB is refused before it is decoded (PASS)
+
+- Priority: P0. Area: customer. Method: http.
+- Given: A file larger than 2 MB
+- When: It is posted as the selfie
+- Then: The API returns SIZE and does not spend a credit
 
 ### C5
 
@@ -372,6 +454,20 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: tool=mehendi and styleId is incomplete
 - Then: STYLE
 
+#### C6-05 Book bridal trial stores a bridal lead and a WhatsApp link (PASS)
+
+- Priority: P0. Area: customer. Method: http.
+- Given: Bridal is on and the salon has a WhatsApp number
+- When: The guest posts a name, a wedding date, and one look
+- Then: A BRIDAL lead is stored and the response has a wa.me link
+
+#### C6-06 A bridal trial accepts at most six looks (PASS)
+
+- Priority: P0. Area: customer. Method: http.
+- Given: Seven look ids
+- When: The trial is posted
+- Then: The API returns 400
+
 ### C7
 
 #### C7-01 Own saree route refuses a paid call when no OpenAI key is set (PASS)
@@ -418,6 +514,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: The same session requests another bridal preview
 - Then: The API returns 429
 
+#### C9-04 The same bridal look is shown again without spending another try (PASS)
+
+- Priority: P0. Area: customer. Method: library.
+- Given: A look is already in the visit cache
+- When: The same photo and the same selections are requested
+- Then: The saved picture is returned and the generator is not called
+
 ### C10
 
 #### C10-01 Salon daily cap counts succeeded previews from Kolkata midnight (PASS)
@@ -454,6 +557,20 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - Given: dailyCap is 1 and only DEMO rows exist
 - When: Another mock preview runs
 - Then: It is still allowed, because the cap counts SUCCEEDED
+
+#### C10-06 An anonymous daily cap of zero blocks the next preview (PASS)
+
+- Priority: P0. Area: customer. Method: http.
+- Given: anonDailyCap is 0
+- When: A guest requests a hairstyle
+- Then: The API returns CAP and the cap is restored to 8
+
+#### C10-07 A paid preview cannot reserve a credit when the balance is zero (PASS)
+
+- Priority: P0. Area: customer. Method: library.
+- Given: The isolation salon balance is set to 0
+- When: reserveCredits asks for one credit
+- Then: It throws INSUFFICIENT and the balance stays 0
 
 ### C11
 
@@ -534,6 +651,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: GET /s/qalaunch505a/queue
 - Then: The page mentions the queue
 
+#### C11-12 On the way is stored on the ticket (PASS)
+
+- Priority: P0. Area: customer. Method: http.
+- Given: A live token
+- When: The guest posts action way
+- Then: onTheWay is true
+
 ### C12
 
 #### C12-01 Time request requires a date and slot (PASS)
@@ -563,6 +687,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - Given: Mode was returned to LIVE
 - When: The public board is read
 - Then: mode is LIVE
+
+#### C12-05 A second request for the same phone returns the open request (PASS)
+
+- Priority: P0. Area: customer. Method: http.
+- Given: The salon is in time-request mode and one request exists
+- When: The same phone asks again
+- Then: The token does not increase
 
 ### C13
 
@@ -663,6 +794,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: GET /admin/queue
 - Then: 200
 
+#### S1-04 Sign out drops the staff session (PASS)
+
+- Priority: P0. Area: staff. Method: http.
+- Given: Staff is signed in
+- When: They sign out
+- Then: The queue desk redirects to login
+
 ### S2
 
 #### S2-01 Next calls the first waiting guest (PASS)
@@ -700,6 +838,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: Staff taps next with nobody waiting
 - Then: The API returns EMPTY
 
+#### S2-06 Start and Done move a called guest through the chair (PASS)
+
+- Priority: P0. Area: staff. Method: http.
+- Given: One waiting guest and a free chair
+- When: Staff taps next, start, then done
+- Then: The public ticket goes to IN_SERVICE and then DONE
+
 ### S3
 
 #### S3-01 Walk-in joins the live line (PASS)
@@ -715,6 +860,20 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - Given: The desk is in REQUEST mode
 - When: Staff adds a walk-in
 - Then: The API returns STATE
+
+#### S3-03 A walk-in can be added with no phone (PASS)
+
+- Priority: P0. Area: staff. Method: http.
+- Given: The live line is open
+- When: Staff adds a name and leaves the phone empty
+- Then: The waiting card has that name and no phone
+
+#### S3-04 A walk-in with a short phone is refused (PASS)
+
+- Priority: P0. Area: staff. Method: http.
+- Given: The live line
+- When: The phone is 12345
+- Then: The API returns 400
 
 ### S5
 
@@ -861,6 +1020,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: GET /api/v1/admin/settings
 - Then: 403
 
+#### P3-03 Another salon's waiting guest is not on this desk (PASS)
+
+- Priority: P0. Area: platform. Method: http+db.
+- Given: The isolation salon has a waiting guest named Iso Desk Only
+- When: QA staff load their desk
+- Then: That name is absent
+
 ### S9
 
 #### S9-01 Salon switch refuses a salon the user does not belong to (PASS)
@@ -907,6 +1073,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: DELETE /api/v1/admin/settings
 - Then: 405 and the salon remains
 
+#### O2-05 GSTIN is saved and shown back (PASS)
+
+- Priority: P0. Area: owner. Method: http.
+- Given: The owner is signed in
+- When: gstin is set
+- Then: Settings returns that value
+
 ### O6
 
 #### O6-01 Starter cannot remove Lookuvi branding (PASS)
@@ -931,6 +1104,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - Given: A new salon
 - When: productGroom is read
 - Then: It is false, and the owner can turn it on
+
+#### O3-02 The owner can turn groom on and back off (PASS)
+
+- Priority: P0. Area: owner. Method: http.
+- Given: Groom is off
+- When: productGroom is saved true, then false
+- Then: The row follows both saves
 
 ### O8
 
@@ -978,6 +1158,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: durationMin is 4 and then 481
 - Then: Both return 400
 
+#### O9-04 An inactive service disappears from the public join list (PASS)
+
+- Priority: P0. Area: owner. Method: http.
+- Given: A service named Hidden Cut 505a
+- When: The owner marks it inactive
+- Then: The public board no longer lists it
+
 ### O11
 
 #### O11-01 Queue settings reject a chair count outside 1 to 30 (PASS)
@@ -993,6 +1180,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - Given: The owner is signed in
 - When: avgMinutes is 4
 - Then: The API returns 400
+
+#### O11-03 Almost-your-turn minutes must be from 0 to 120 (PASS)
+
+- Priority: P0. Area: owner. Method: http.
+- Given: The live desk
+- When: alertLeadMin is 121, then 0
+- Then: 121 is rejected and 0 is stored
 
 ### O12
 
@@ -1088,6 +1282,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: slug is 'Bad Slug'
 - Then: 400
 
+#### A2-05 A new salon gets a 14-day trial and a copy of the styles (PASS)
+
+- Priority: P0. Area: super. Method: db.
+- Given: The isolation salon was created by the super admin
+- When: The row and its styles are read
+- Then: Trial end is 14 days out and every catalogue style was copied
+
 ### A3
 
 #### A3-01 Upgrading Starter to Pro grants only the gap (PASS)
@@ -1147,6 +1348,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - Given: The current ledger count
 - When: The body includes creditDelta 0 and a name change
 - Then: No new ADJUSTMENT row is created
+
+#### A4-04 A credit note is stored with the adjustment (PASS)
+
+- Priority: P0. Area: super. Method: http+db.
+- Given: The super admin adjusts by 7
+- When: The note is launch note 505a
+- Then: The ledger row has that note and delta 7
 
 ### A5
 
@@ -1220,6 +1428,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: The login HTML is read
 - Then: It does not offer to email a magic link
 
+#### P1-06 Login allows 8 attempts per email and 30 per IP in 15 minutes (PASS)
+
+- Priority: P0. Area: platform. Method: library.
+- Given: A fresh email bucket with a limit of 8
+- When: The ninth attempt arrives
+- Then: The shared limiter refuses, and the login route is wired to those two limits
+
 ### P4
 
 #### P4-01 Health does not name a provider (PASS)
@@ -1235,6 +1450,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - Given: SQLite is reachable
 - When: GET /api/ready
 - Then: ok and db are true
+
+#### P4-03 The guest page does not name a model or a provider (PASS)
+
+- Priority: P0. Area: platform. Method: http.
+- Given: Mock AI
+- When: A guest opens the demo salon
+- Then: The HTML has no OpenAI, gpt, or fal model name
 
 ### P5
 
@@ -1404,6 +1626,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: Staff calls next
 - Then: The public status for that ref is CALLED
 
+#### X2-02 No-show on the desk shows on the guest ticket (PASS)
+
+- Priority: P0. Area: cross. Method: http.
+- Given: One waiting guest and a free chair
+- When: Staff call next and then no-show
+- Then: The public ticket status is NO_SHOW
+
 ### X3
 
 #### X3-01 Switching mode does not convert existing tokens (PASS)
@@ -1421,6 +1650,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - Given: The QA salon name is QA Launch Salon
 - When: A guest opens the public page
 - Then: The HTML contains that name
+
+#### X7-02 The saved brand colour is on the welcome page (PASS)
+
+- Priority: P0. Area: cross. Method: http.
+- Given: The owner sets the primary colour
+- When: A guest opens the welcome page
+- Then: That colour is in the page style
 
 ### X8
 
@@ -1446,6 +1682,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - Given: The other salon is suspended
 - When: Its owner opens settings
 - Then: The API returns 200
+
+#### X9-02 Resuming a salon removes the paused page (PASS)
+
+- Priority: P0. Area: cross. Method: http.
+- Given: The isolation salon is suspended
+- When: Status returns to trial
+- Then: The public page no longer says the salon is paused
 
 ### X10
 
@@ -1489,6 +1732,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - Given: onboardingDone is false
 - When: The owner sets onboardingDone true
 - Then: The flag is stored
+
+#### O1-02 Staff still see onboarding until the owner finishes it (PASS)
+
+- Priority: P0. Area: owner. Method: http.
+- Given: onboardingDone is false
+- When: Staff open the queue desk
+- Then: The onboarding link is present, and it is gone after Finish
 
 ### O7
 
@@ -1592,6 +1842,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - When: The owner opens /admin/qr
 - Then: The page returns 200
 
+#### O15-02 Printing the QR on localhost is refused (PASS)
+
+- Priority: P0. Area: owner. Method: http.
+- Given: The public URL is still this machine
+- When: GET /api/v1/qr for the demo salon
+- Then: The API returns LOCAL_DOMAIN
+
 ### O5
 
 #### O5-01 Member daily cap of 501 is rejected (PASS)
@@ -1607,6 +1864,13 @@ Performance: `scripts/k6/guest-browse.js` loads health, the welcome page, and th
 - Given: The owner is signed in
 - When: monthlyTryAllowance is 5001
 - Then: The API returns 400
+
+#### O5-03 Zero is accepted as an anonymous cap and blocks that group (PASS)
+
+- Priority: P0. Area: owner. Method: http.
+- Given: The owner saves anonDailyCap 0
+- When: A guest requests a preview
+- Then: The save succeeds and the preview returns CAP
 
 ### O10
 

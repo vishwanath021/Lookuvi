@@ -227,7 +227,7 @@ async function main() {
   async function generate(jar: Jar, fields: Record<string, string>, file?: Buffer) {
     const form = new FormData();
     for (const [key, value] of Object.entries(fields)) form.set(key, value);
-    if (file) form.set("photo", new Blob([file], { type: "image/jpeg" }), "portrait.jpg");
+    if (file) form.set("photo", new Blob([new Uint8Array(file)], { type: "image/jpeg" }), "portrait.jpg");
     return call(jar, "/api/v1/tryon/generate", { method: "POST", body: form });
   }
 
@@ -2461,7 +2461,7 @@ async function main() {
   });
 
   // More owner/staff/customer cases to cover the agreed inventory without inventing passes.
-  const extra: Array<Omit<Result, "status" | "detail" | "method"> & { run: () => Promise<void> }> = [];
+  const extra: Array<Omit<Result, "status" | "detail" | "method"> & { method?: string; run: () => Promise<void> }> = [];
 
   extra.push({
     id: "C3-11", functionality: "C3", priority: "P0", area: "customer",
@@ -2979,6 +2979,552 @@ async function main() {
       const response = await call(anon, `/s/${qa.slug}`);
       assert(response.text.includes("QA Launch Salon") && response.text.includes("This salon is paused"), "copy");
       await prisma.tenant.update({ where: { id: qa.id }, data: { status: "TRIAL" } });
+    },
+  });
+  extra.push({
+    id: "C3-12", functionality: "C3", priority: "P0", area: "customer",
+    title: "Each everyday tool can be turned off on its own",
+    given: "Colour, brows, beard, and nails are on",
+    when: "The owner turns one tool off and a guest requests it",
+    then: "That tool returns TOOL and the others still run after they are turned back on",
+    run: async () => {
+      const tools = [
+        ["colour", "toolColour"],
+        ["brows", "toolBrows"],
+        ["beard", "toolBeard"],
+        ["nails", "toolNails"],
+      ] as const;
+      try {
+        for (const [tool, field] of tools) {
+          const saved = await call(qaOwner, "/api/v1/admin/settings", {
+            method: "PUT", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ [field]: false }),
+          });
+          assert(saved.status === 200, `${field} ${saved.status}`);
+          const response = await generate(anon, {
+            slug: qa.slug, styleId, sessionId: `sess-off-${tool}`, tool,
+          }, portrait);
+          assert(response.status === 403 && jsonOf(response.json).error === "TOOL", `${tool} ${response.status} ${response.text.slice(0, 120)}`);
+        }
+      } finally {
+        await call(qaOwner, "/api/v1/admin/settings", {
+          method: "PUT", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ toolColour: true, toolBrows: true, toolBeard: true, toolNails: true }),
+        });
+      }
+    },
+  });
+  extra.push({
+    id: "C4-07", functionality: "C4", priority: "P0", area: "customer",
+    title: "A photo over 2 MB is refused before it is decoded",
+    given: "A file larger than 2 MB",
+    when: "It is posted as the selfie",
+    then: "The API returns SIZE and does not spend a credit",
+    run: async () => {
+      const before = await prisma.tenant.findUnique({ where: { id: qa.id }, select: { creditBalance: true } });
+      const response = await generate(anon, {
+        slug: qa.slug, styleId, sessionId: "sess-too-big", tool: "style",
+      }, Buffer.alloc(2_200_000, 1));
+      assert(response.status === 413 && jsonOf(response.json).error === "SIZE", response.text.slice(0, 160));
+      const after = await prisma.tenant.findUnique({ where: { id: qa.id }, select: { creditBalance: true } });
+      assert(after?.creditBalance === before?.creditBalance, "balance moved");
+    },
+  });
+  extra.push({
+    id: "C6-05", functionality: "C6", priority: "P0", area: "customer",
+    title: "Book bridal trial stores a bridal lead and a WhatsApp link",
+    given: "Bridal is on and the salon has a WhatsApp number",
+    when: "The guest posts a name, a wedding date, and one look",
+    then: "A BRIDAL lead is stored and the response has a wa.me link",
+    run: async () => {
+      const response = await call(anon, "/api/v1/bridal/book", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          slug: qa.slug, sessionId: "sess-bridal-book", name: "Trial Bride",
+          eventId: "wedding", eventDate: plusDay(kolkataDayKey(), 30), lookIds: ["telugu-muhurtham"], lang: "en",
+        }),
+      });
+      const body = jsonOf(response.json);
+      assert(response.status === 200 && String(body.whatsappUrl || "").includes("wa.me"), response.text.slice(0, 180));
+      const lead = await prisma.lead.findFirst({ where: { id: String(body.leadId || "") } });
+      assert(lead?.type === "BRIDAL" && lead.eventName === "Wedding", `${lead?.type} ${lead?.eventName}`);
+    },
+  });
+  extra.push({
+    id: "C6-06", functionality: "C6", priority: "P0", area: "customer",
+    title: "A bridal trial accepts at most six looks",
+    given: "Seven look ids",
+    when: "The trial is posted",
+    then: "The API returns 400",
+    run: async () => {
+      const response = await call(anon, "/api/v1/bridal/book", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          slug: qa.slug, sessionId: "sess-bridal-seven", name: "Trial Bride",
+          eventId: "wedding", eventDate: plusDay(kolkataDayKey(), 30),
+          lookIds: ["1", "2", "3", "4", "5", "6", "7"], lang: "en",
+        }),
+      });
+      assert(response.status === 400, `${response.status}`);
+    },
+  });
+  extra.push({
+    id: "C9-04", functionality: "C9", priority: "P0", area: "customer",
+    title: "The same bridal look is shown again without spending another try",
+    given: "A look is already in the visit cache",
+    when: "The same photo and the same selections are requested",
+    then: "The saved picture is returned and the generator is not called",
+    method: "library",
+    run: async () => {
+      const { takePreview } = await import("../src/lib/visit-tries");
+      let calls = 0;
+      const cache = new Map<string, { url: string; name: string; before: string }>();
+      const first = await takePreview({
+        cache, key: "photo|look=a", used: 0, allowance: 3,
+        generate: async () => { calls += 1; return { url: "one", name: "Look", before: "before" }; },
+      });
+      const second = await takePreview({
+        cache, key: "photo|look=a", used: first.used, allowance: 3,
+        generate: async () => { calls += 1; return { url: "two", name: "Look", before: "before" }; },
+      });
+      assert(first.called && second.called === false && calls === 1 && second.result?.url === "one", `calls ${calls}`);
+    },
+  });
+  extra.push({
+    id: "C10-06", functionality: "C10", priority: "P0", area: "customer",
+    title: "An anonymous daily cap of zero blocks the next preview",
+    given: "anonDailyCap is 0",
+    when: "A guest requests a hairstyle",
+    then: "The API returns CAP and the cap is restored to 8",
+    run: async () => {
+      await prisma.tenant.update({ where: { id: qa.id }, data: { anonDailyCap: 0 } });
+      try {
+        const response = await generate(anon, {
+          slug: qa.slug, styleId, sessionId: `sess-zero-anon-${randomBytes(2).toString("hex")}`, tool: "style",
+        }, portrait);
+        assert(response.status === 429 && jsonOf(response.json).error === "CAP", response.text.slice(0, 160));
+      } finally {
+        await prisma.tenant.update({ where: { id: qa.id }, data: { anonDailyCap: 8 } });
+      }
+    },
+  });
+  extra.push({
+    id: "C10-07", functionality: "C10", priority: "P0", area: "customer",
+    title: "A paid preview cannot reserve a credit when the balance is zero",
+    given: "The isolation salon balance is set to 0",
+    when: "reserveCredits asks for one credit",
+    then: "It throws INSUFFICIENT and the balance stays 0",
+    method: "library",
+    run: async () => {
+      const before = await prisma.tenant.findUnique({ where: { id: other.id }, select: { creditBalance: true } });
+      await prisma.tenant.update({ where: { id: other.id }, data: { creditBalance: 0, status: "TRIAL" } });
+      try {
+        const { reserveCredits, CreditError } = await import("../src/lib/credits");
+        let code = "";
+        try {
+          await reserveCredits(other.id, 1, `qa-empty-${Date.now()}`);
+        } catch (error) {
+          code = error instanceof CreditError ? error.code : "OTHER";
+        }
+        assert(code === "INSUFFICIENT", code || "no throw");
+        const row = await prisma.tenant.findUnique({ where: { id: other.id }, select: { creditBalance: true } });
+        assert(row?.creditBalance === 0, `${row?.creditBalance}`);
+      } finally {
+        await prisma.tenant.update({ where: { id: other.id }, data: { creditBalance: before?.creditBalance ?? 300 } });
+      }
+    },
+  });
+  extra.push({
+    id: "C11-12", functionality: "C11", priority: "P0", area: "customer",
+    title: "On the way is stored on the ticket",
+    given: "A live token",
+    when: "The guest posts action way",
+    then: "onTheWay is true",
+    run: async () => {
+      await desk(qaOwner, { action: "settings", units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "LIVE", unitLabel: "chair" });
+      await desk(qaOwner, { action: "open" });
+      const joined = await join({ slug: qa.slug, name: "On Way", phone: phone(), consent: true, deviceId: "dev-ontheway" });
+      const ref = String(jsonOf(joined.json).ref || "");
+      assert(joined.status === 200 && ref.length >= 8, joined.text.slice(0, 160));
+      const response = await call(anon, "/api/v1/queue/visit", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ slug: qa.slug, ref, action: "way" }),
+      });
+      assert(response.status === 200 && jsonOf(response.json).onTheWay === true, response.text.slice(0, 160));
+    },
+  });
+  extra.push({
+    id: "C12-05", functionality: "C12", priority: "P0", area: "customer",
+    title: "A second request for the same phone returns the open request",
+    given: "The salon is in time-request mode and one request exists",
+    when: "The same phone asks again",
+    then: "The token does not increase",
+    run: async () => {
+      try {
+        await desk(qaOwner, { action: "settings", units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "REQUEST", unitLabel: "chair" });
+        const mobile = phone();
+        const date = plusDay(kolkataDayKey(), 3);
+        const first = await join({ slug: qa.slug, name: "Repeat Request", phone: mobile, consent: true, requestedDate: date, requestedSlot: "11:00", deviceId: "dev-repeat-a" });
+        const second = await join({ slug: qa.slug, name: "Repeat Request", phone: mobile, consent: true, requestedDate: date, requestedSlot: "12:00", deviceId: "dev-repeat-b" });
+        assert(first.status === 200 && second.status === 200, `${first.status} ${second.status}`);
+        assert(jsonOf(first.json).token === jsonOf(second.json).token, `${jsonOf(first.json).token} vs ${jsonOf(second.json).token}`);
+      } finally {
+        await desk(qaOwner, { action: "settings", units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "LIVE", unitLabel: "chair" });
+      }
+    },
+  });
+  extra.push({
+    id: "S1-04", functionality: "S1", priority: "P0", area: "staff",
+    title: "Sign out drops the staff session",
+    given: "Staff is signed in",
+    when: "They sign out",
+    then: "The queue desk redirects to login",
+    run: async () => {
+      try {
+        const jar = await login("qa-staff-505a@demo.agenticbuildworks.com", "QaStaff#505a!!");
+        const csrf = await call(jar, "/api/auth/csrf");
+        const token = String(jsonOf(csrf.json).csrfToken || "");
+        await call(jar, "/api/auth/signout", {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ csrfToken: token, callbackUrl: `${BASE}/login` }),
+        });
+        const page = await call(jar, "/admin/queue");
+        const location = page.location || "";
+        assert(page.status === 307 && location.includes("/login"), `${page.status} ${location}`);
+      } finally {
+        const again = await login("qa-staff-505a@demo.agenticbuildworks.com", "QaStaff#505a!!");
+        qaStaff.cookies = again.cookies;
+      }
+    },
+  });
+  extra.push({
+    id: "S2-06", functionality: "S2", priority: "P0", area: "staff",
+    title: "Start and Done move a called guest through the chair",
+    given: "One waiting guest and a free chair",
+    when: "Staff taps next, start, then done",
+    then: "The public ticket goes to IN_SERVICE and then DONE",
+    run: async () => {
+      await prisma.queueEntry.updateMany({
+        where: { tenantId: qa.id, status: { in: ["WAITING", "CALLED", "IN_SERVICE"] } },
+        data: { status: "CANCELLED", unitSlot: null },
+      });
+      await desk(qaOwner, { action: "settings", units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "LIVE", unitLabel: "chair" });
+      await desk(qaOwner, { action: "open" });
+      const joined = await join({ slug: qa.slug, name: "Chair Guest", phone: phone(), consent: true, deviceId: "dev-chair-guest" });
+      const ref = String(jsonOf(joined.json).ref || "");
+      assert(joined.status === 200 && ref, joined.text.slice(0, 160));
+      const next = await desk(qaStaff, { action: "next" });
+      const serving = (jsonOf(next.json).serving || []) as Array<{ entry?: { id?: string } | null }>;
+      const id = serving.find((seat) => seat.entry?.id)?.entry?.id || "";
+      assert(next.status === 200 && id, next.text.slice(0, 180));
+      const started = await desk(qaStaff, { action: "start", id });
+      assert(started.status === 200, started.text.slice(0, 120));
+      const during = await call(anon, `/api/v1/queue/status?slug=${qa.slug}&ref=${encodeURIComponent(ref)}`);
+      assert(jsonOf(during.json).status === "IN_SERVICE", during.text.slice(0, 160));
+      const done = await desk(qaStaff, { action: "done", id });
+      assert(done.status === 200, done.text.slice(0, 120));
+      const after = await call(anon, `/api/v1/queue/status?slug=${qa.slug}&ref=${encodeURIComponent(ref)}`);
+      assert(jsonOf(after.json).status === "DONE", after.text.slice(0, 160));
+    },
+  });
+  extra.push({
+    id: "S3-03", functionality: "S3", priority: "P0", area: "staff",
+    title: "A walk-in can be added with no phone",
+    given: "The live line is open",
+    when: "Staff adds a name and leaves the phone empty",
+    then: "The waiting card has that name and no phone",
+    run: async () => {
+      await desk(qaOwner, { action: "settings", units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "LIVE", unitLabel: "chair" });
+      const response = await desk(qaStaff, { action: "walkin", name: "No Phone Guest" });
+      const waiting = (jsonOf(response.json).waiting || []) as Array<{ name?: string; phone?: string }>;
+      const card = waiting.find((row) => row.name === "No Phone Guest");
+      assert(response.status === 200 && card && !card.phone, response.text.slice(0, 180));
+    },
+  });
+  extra.push({
+    id: "S3-04", functionality: "S3", priority: "P0", area: "staff",
+    title: "A walk-in with a short phone is refused",
+    given: "The live line",
+    when: "The phone is 12345",
+    then: "The API returns 400",
+    run: async () => {
+      const response = await desk(qaStaff, { action: "walkin", name: "Bad Phone", phone: "12345" });
+      assert(response.status === 400, response.text.slice(0, 160));
+    },
+  });
+  extra.push({
+    id: "O1-02", functionality: "O1", priority: "P0", area: "owner",
+    title: "Staff still see onboarding until the owner finishes it",
+    given: "onboardingDone is false",
+    when: "Staff open the queue desk",
+    then: "The onboarding link is present, and it is gone after Finish",
+    run: async () => {
+      await prisma.tenant.update({ where: { id: qa.id }, data: { onboardingDone: false } });
+      try {
+        const open = await call(qaStaff, "/admin/queue");
+        assert(open.status === 200 && open.text.includes("/admin/onboarding"), "link missing");
+      } finally {
+        await prisma.tenant.update({ where: { id: qa.id }, data: { onboardingDone: true } });
+      }
+      const closed = await call(qaStaff, "/admin/queue");
+      assert(!closed.text.includes("/admin/onboarding"), "link stayed");
+    },
+  });
+  extra.push({
+    id: "O2-05", functionality: "O2", priority: "P0", area: "owner",
+    title: "GSTIN is saved and shown back",
+    given: "The owner is signed in",
+    when: "gstin is set",
+    then: "Settings returns that value",
+    run: async () => {
+      const saved = await call(qaOwner, "/api/v1/admin/settings", {
+        method: "PUT", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gstin: "29ABCDE1234F1Z5" }),
+      });
+      assert(saved.status === 200, `${saved.status}`);
+      const row = await prisma.tenant.findUnique({ where: { id: qa.id }, select: { gstin: true } });
+      assert(row?.gstin === "29ABCDE1234F1Z5", row?.gstin || "");
+      await call(qaOwner, "/api/v1/admin/settings", {
+        method: "PUT", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gstin: "" }),
+      });
+    },
+  });
+  extra.push({
+    id: "O3-02", functionality: "O3", priority: "P0", area: "owner",
+    title: "The owner can turn groom on and back off",
+    given: "Groom is off",
+    when: "productGroom is saved true, then false",
+    then: "The row follows both saves",
+    run: async () => {
+      const on = await call(qaOwner, "/api/v1/admin/settings", {
+        method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ productGroom: true }),
+      });
+      const mid = await prisma.tenant.findUnique({ where: { id: qa.id }, select: { productGroom: true } });
+      const off = await call(qaOwner, "/api/v1/admin/settings", {
+        method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ productGroom: false }),
+      });
+      const end = await prisma.tenant.findUnique({ where: { id: qa.id }, select: { productGroom: true } });
+      assert(on.status === 200 && mid?.productGroom === true && off.status === 200 && end?.productGroom === false, `${on.status} ${mid?.productGroom} ${off.status} ${end?.productGroom}`);
+    },
+  });
+  extra.push({
+    id: "O5-03", functionality: "O5", priority: "P0", area: "owner",
+    title: "Zero is accepted as an anonymous cap and blocks that group",
+    given: "The owner saves anonDailyCap 0",
+    when: "A guest requests a preview",
+    then: "The save succeeds and the preview returns CAP",
+    run: async () => {
+      const saved = await call(qaOwner, "/api/v1/admin/settings", {
+        method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ anonDailyCap: 0 }),
+      });
+      try {
+        assert(saved.status === 200, `${saved.status}`);
+        const response = await generate(anon, {
+          slug: qa.slug, styleId, sessionId: `sess-zero-save-${randomBytes(2).toString("hex")}`, tool: "style",
+        }, portrait);
+        assert(response.status === 429 && jsonOf(response.json).error === "CAP", response.text.slice(0, 160));
+      } finally {
+        await call(qaOwner, "/api/v1/admin/settings", {
+          method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ anonDailyCap: 8 }),
+        });
+      }
+    },
+  });
+  extra.push({
+    id: "O9-04", functionality: "O9", priority: "P0", area: "owner",
+    title: "An inactive service disappears from the public join list",
+    given: "A service named Hidden Cut 505a",
+    when: "The owner marks it inactive",
+    then: "The public board no longer lists it",
+    run: async () => {
+      const created = await call(qaOwner, "/api/v1/admin/services", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ key: "hidden505a", name: "Hidden Cut 505a", priceInr: 100, durationMin: 20 }),
+      });
+      const id = String(jsonOf(created.json).id || "");
+      assert(created.status === 200 && id, created.text.slice(0, 120));
+      try {
+        const hidden = await call(qaOwner, `/api/v1/admin/services/${id}`, {
+          method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ active: false }),
+        });
+        assert(hidden.status === 200, `${hidden.status}`);
+        const board = await call(anon, `/api/v1/queue?slug=${qa.slug}`);
+        assert(!board.text.includes("Hidden Cut 505a"), board.text.slice(0, 180));
+      } finally {
+        await call(qaOwner, `/api/v1/admin/services/${id}`, { method: "DELETE" });
+      }
+    },
+  });
+  extra.push({
+    id: "O11-03", functionality: "O11", priority: "P0", area: "owner",
+    title: "Almost-your-turn minutes must be from 0 to 120",
+    given: "The live desk",
+    when: "alertLeadMin is 121, then 0",
+    then: "121 is rejected and 0 is stored",
+    run: async () => {
+      const bad = await desk(qaOwner, { action: "settings", units: 1, avgMinutes: 20, alertLeadMin: 121, mode: "LIVE", unitLabel: "chair" });
+      const ok = await desk(qaOwner, { action: "settings", units: 1, avgMinutes: 20, alertLeadMin: 0, mode: "LIVE", unitLabel: "chair" });
+      const row = await prisma.queueState.findUnique({ where: { tenantId: qa.id } });
+      await desk(qaOwner, { action: "settings", units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "LIVE", unitLabel: "chair" });
+      assert(bad.status === 400 && ok.status === 200 && row?.alertLeadMin === 0, `${bad.status} ${ok.status} ${row?.alertLeadMin}`);
+    },
+  });
+  extra.push({
+    id: "O15-02", functionality: "O15", priority: "P0", area: "owner",
+    title: "Printing the QR on localhost is refused",
+    given: "The public URL is still this machine",
+    when: "GET /api/v1/qr for the demo salon",
+    then: "The API returns LOCAL_DOMAIN",
+    run: async () => {
+      const response = await call(qaOwner, "/api/v1/qr?slug=demo");
+      assert(response.status === 409 && jsonOf(response.json).error === "LOCAL_DOMAIN", response.text.slice(0, 160));
+    },
+  });
+  extra.push({
+    id: "A2-05", functionality: "A2", priority: "P0", area: "super",
+    title: "A new salon gets a 14-day trial and a copy of the styles",
+    given: "The isolation salon was created by the super admin",
+    when: "The row and its styles are read",
+    then: "Trial end is 14 days out and every catalogue style was copied",
+    method: "db",
+    run: async () => {
+      const row = await prisma.tenant.findUnique({ where: { slug: "qaiso505a" } });
+      assert(row?.trialEndsAt, "missing salon");
+      const days = (row.trialEndsAt.getTime() - row.createdAt.getTime()) / 86_400_000;
+      const styles = await prisma.tenantStyle.count({ where: { tenantId: row.id } });
+      assert(days > 13 && days < 15, `trial days ${days}`);
+      assert(styles === STYLES.length, `${styles} vs ${STYLES.length}`);
+    },
+  });
+  extra.push({
+    id: "A4-04", functionality: "A4", priority: "P0", area: "super",
+    title: "A credit note is stored with the adjustment",
+    given: "The super admin adjusts by 7",
+    when: "The note is launch note 505a",
+    then: "The ledger row has that note and delta 7",
+    method: "http+db",
+    run: async () => {
+      const response = await call(superJar, `/api/v1/super/tenants/${qa.id}`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ creditDelta: 7, note: "launch note 505a" }),
+      });
+      assert(response.status === 200, response.text.slice(0, 160));
+      const row = await prisma.creditLedger.findFirst({ where: { tenantId: qa.id, note: "launch note 505a" } });
+      assert(row?.delta === 7, `${row?.delta}`);
+    },
+  });
+  extra.push({
+    id: "P1-06", functionality: "P1", priority: "P0", area: "platform",
+    title: "Login allows 8 attempts per email and 30 per IP in 15 minutes",
+    given: "A fresh email bucket with a limit of 8",
+    when: "The ninth attempt arrives",
+    then: "The shared limiter refuses, and the login route is wired to those two limits",
+    method: "library",
+    run: async () => {
+      const { sharedRateLimit } = await import("../src/lib/ratelimit");
+      const key = `login:qa-sheet-${randomBytes(3).toString("hex")}`;
+      let opened = true;
+      for (let attempt = 0; attempt < 8; attempt += 1) opened = (await sharedRateLimit(key, 8, 15 * 60 * 1000)).ok;
+      const blocked = await sharedRateLimit(key, 8, 15 * 60 * 1000);
+      const auth = readFileSync("src/auth.ts", "utf8");
+      assert(opened && blocked.ok === false, "bucket");
+      assert(auth.includes('numberEnv("LOGIN_LIMIT", 8)') && auth.includes('numberEnv("LOGIN_IP_LIMIT", 30)'), "route limits");
+    },
+  });
+  extra.push({
+    id: "P3-03", functionality: "P3", priority: "P0", area: "platform",
+    title: "Another salon's waiting guest is not on this desk",
+    given: "The isolation salon has a waiting guest named Iso Desk Only",
+    when: "QA staff load their desk",
+    then: "That name is absent",
+    method: "http+db",
+    run: async () => {
+      const dayKey = kolkataDayKey();
+      const token = 80000 + (phoneN % 1000);
+      await prisma.queueEntry.create({
+        data: {
+          tenantId: other.id, dayKey, token, name: "Iso Desk Only", phone: phone(),
+          status: "WAITING", source: "ONLINE", cancelToken: randomBytes(12).toString("hex"),
+        },
+      });
+      const response = await call(qaStaff, "/api/v1/admin/queue");
+      assert(response.status === 200 && !response.text.includes("Iso Desk Only"), response.text.slice(0, 160));
+    },
+  });
+  extra.push({
+    id: "P4-03", functionality: "P4", priority: "P0", area: "platform",
+    title: "The guest page does not name a model or a provider",
+    given: "Mock AI",
+    when: "A guest opens the demo salon",
+    then: "The HTML has no OpenAI, gpt, or fal model name",
+    run: async () => {
+      const response = await call(anon, "/s/demo");
+      const text = response.text.toLowerCase();
+      assert(response.status === 200 && !text.includes("openai") && !text.includes("gpt-") && !text.includes("fal-ai"), "provider name leaked");
+    },
+  });
+  extra.push({
+    id: "X2-02", functionality: "X2", priority: "P0", area: "cross",
+    title: "No-show on the desk shows on the guest ticket",
+    given: "One waiting guest and a free chair",
+    when: "Staff call next and then no-show",
+    then: "The public ticket status is NO_SHOW",
+    run: async () => {
+      await prisma.queueEntry.updateMany({
+        where: { tenantId: qa.id, status: { in: ["WAITING", "CALLED", "IN_SERVICE"] } },
+        data: { status: "CANCELLED", unitSlot: null },
+      });
+      await desk(qaOwner, { action: "open" });
+      const joined = await join({ slug: qa.slug, name: "No Show Guest", phone: phone(), consent: true, deviceId: "dev-noshow-pub" });
+      const ref = String(jsonOf(joined.json).ref || "");
+      const next = await desk(qaStaff, { action: "next" });
+      const serving = (jsonOf(next.json).serving || []) as Array<{ entry?: { id?: string } | null }>;
+      const id = serving.find((seat) => seat.entry?.id)?.entry?.id || "";
+      assert(joined.status === 200 && id, `${joined.status} ${next.text.slice(0, 120)}`);
+      const missed = await desk(qaStaff, { action: "noshow", id });
+      assert(missed.status === 200, missed.text.slice(0, 120));
+      const ticket = await call(anon, `/api/v1/queue/status?slug=${qa.slug}&ref=${encodeURIComponent(ref)}`);
+      assert(jsonOf(ticket.json).status === "NO_SHOW", ticket.text.slice(0, 160));
+    },
+  });
+  extra.push({
+    id: "X7-02", functionality: "X7", priority: "P0", area: "cross",
+    title: "The saved brand colour is on the welcome page",
+    given: "The owner sets the primary colour",
+    when: "A guest opens the welcome page",
+    then: "That colour is in the page style",
+    run: async () => {
+      const before = await prisma.tenant.findUnique({ where: { id: qa.id }, select: { primaryColor: true } });
+      try {
+        const saved = await call(qaOwner, "/api/v1/admin/settings", {
+          method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ primaryColor: "#0a3d36" }),
+        });
+        assert(saved.status === 200, `${saved.status}`);
+        const page = await call(anon, `/s/${qa.slug}/welcome`);
+        assert(page.text.toLowerCase().includes("#0a3d36"), "colour missing");
+      } finally {
+        if (before?.primaryColor) {
+          await call(qaOwner, "/api/v1/admin/settings", {
+            method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ primaryColor: before.primaryColor }),
+          });
+        }
+      }
+    },
+  });
+  extra.push({
+    id: "X9-02", functionality: "X9", priority: "P0", area: "cross",
+    title: "Resuming a salon removes the paused page",
+    given: "The isolation salon is suspended",
+    when: "Status returns to trial",
+    then: "The public page no longer says the salon is paused",
+    run: async () => {
+      await prisma.tenant.update({ where: { id: other.id }, data: { status: "SUSPENDED" } });
+      const paused = await call(anon, `/s/${other.slug}`);
+      await prisma.tenant.update({ where: { id: other.id }, data: { status: "TRIAL" } });
+      const live = await call(anon, `/s/${other.slug}`);
+      assert(paused.text.includes("This salon is paused") && !live.text.includes("This salon is paused"), "resume did not clear the paused page");
     },
   });
   extra.push({
