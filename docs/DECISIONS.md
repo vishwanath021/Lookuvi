@@ -89,3 +89,21 @@ Date of this review: 24 October 2026. Scope: the seven-salon launch on top of re
 **Product owner.** Do not touch the live demo. Do not spend on AI. Use the seeded demo logins only.
 
 **Decision.** No deploy. No paid provider call. Fixes merge only after local tests, the schema-drift check, and GitHub CI are green.
+
+## D10. Lite does not download the lead file
+
+**Architect.** `plans.ts` sets `leadExport: false` on Lite and true on Starter and Pro. The leads API and the Download CSV button never read that flag, so a Lite salon can export every lead. The on-screen list is a different thing: the desk still has to work today's bookings. The gate belongs on the API, with the button hidden so the founder does not click a link that 403s.
+
+**Product owner.** Export is part of why a shop moves from Lite to Starter. If the file downloads on Lite, that conversation is false. Staff and the owner of a Starter or Pro salon both need the file. Hiding the rows as well would stop the desk working.
+
+**Decision.** `GET /api/v1/admin/leads/export` returns 403 when the salon's plan does not include lead export. The button is hidden in that case. The on-screen list stays for every plan.
+
+**Rationale.** The price list already said this. The code did not. A Lite shop can still read and update leads in the browser.
+
+## D11. A credit adjustment below zero is a refusal, not a crash
+
+**Architect.** `grantCredits` throws `CreditError` inside a transaction, so the balance rolls back. The salon route did not catch it, and the founder received a 500. The ledger must stay unchanged. The response should be a 400 with a sentence the founder can read.
+
+**Product owner.** Adjust credits is how goodwill and corrections are made. Typing a number that is larger than the balance should say the balance cannot go below zero. It must not look like the platform broke, and it must not leave a half-applied change.
+
+**Decision.** The salon update route catches `CreditError` and returns 400 with "The balance can't go below zero." The balance and the ledger stay as they were.
