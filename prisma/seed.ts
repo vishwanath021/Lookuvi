@@ -23,6 +23,7 @@ async function main() {
     where: { slug },
     update: {
       creditBalance: PLANS.PRO.credits,
+      includedCreditMark: PLANS.PRO.credits,
       status: "TRIAL",
       plan: "PRO",
       trialEndsAt: trialEnds,
@@ -53,6 +54,7 @@ async function main() {
       status: "TRIAL",
       trialEndsAt: trialEnds,
       creditBalance: PLANS.PRO.credits,
+      includedCreditMark: PLANS.PRO.credits,
       dailyCap: PLANS.PRO.credits,
       removeBranding: false,
       onboardingDone: true,

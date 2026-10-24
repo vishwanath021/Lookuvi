@@ -55,6 +55,7 @@ export async function POST(req: Request) {
       status: "TRIAL",
       trialEndsAt: trialEnds,
       creditBalance: plan.credits,
+      includedCreditMark: plan.credits,
       dailyCap: plan.credits,
       productQueue: true,
       city: parsed.data.city || "",

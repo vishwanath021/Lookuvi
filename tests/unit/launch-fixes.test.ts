@@ -14,28 +14,41 @@ describe("Asia/Kolkata day boundary", () => {
 });
 
 describe("plan change", () => {
-  it("moves the daily cap with the plan only while it still matches the old plan, and grants no credits", () => {
+  it("moves the daily cap with the plan only while it still matches the old plan", () => {
     expect(dailyCapAfterPlanChange(300, "LITE", "PRO")).toBe(1800);
     expect(dailyCapAfterPlanChange(1800, "PRO", "LITE")).toBe(300);
     expect(dailyCapAfterPlanChange(40, "LITE", "PRO")).toBe(40);
     expect(dailyCapAfterPlanChange(900, "STARTER", "STARTER")).toBe(900);
   });
 
-  it("does not add credits when a super-admin changes the plan", async () => {
+  it("grants only the gap above the mark, and does not grant it again", async () => {
     const tenant = await prisma.tenant.create({
-      data: { slug: `plan-${Date.now()}`, name: "Plan change", plan: "LITE", creditBalance: 300, dailyCap: 300 },
+      data: {
+        slug: `plan-${Date.now()}`,
+        name: "Plan change",
+        plan: "LITE",
+        creditBalance: 300,
+        includedCreditMark: 300,
+        dailyCap: 300,
+      },
     });
     const upgraded = await applyPlanChange(tenant.id, "PRO");
-    expect(upgraded.creditsGranted).toBe(0);
+    expect(upgraded.creditsGranted).toBe(1500);
     expect(upgraded.dailyCap).toBe(1800);
     const row = await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id } });
     expect(row.plan).toBe("PRO");
-    expect(row.creditBalance).toBe(300);
-    expect(row.dailyCap).toBe(1800);
-    await prisma.tenant.update({ where: { id: tenant.id }, data: { dailyCap: 12 } });
-    const again = await applyPlanChange(tenant.id, "LITE");
-    expect(again.dailyCap).toBe(12);
-    expect((await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id } })).creditBalance).toBe(300);
+    expect(row.creditBalance).toBe(1800);
+    expect(row.includedCreditMark).toBe(1800);
+    const down = await applyPlanChange(tenant.id, "LITE");
+    expect(down.creditsGranted).toBe(0);
+    expect(down.dailyCap).toBe(300);
+    const repeat = await applyPlanChange(tenant.id, "PRO");
+    expect(repeat.creditsGranted).toBe(0);
+    expect((await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id } })).creditBalance).toBe(1800);
+    await prisma.tenant.update({ where: { id: tenant.id }, data: { plan: "LITE", dailyCap: 12, includedCreditMark: 300 } });
+    const custom = await applyPlanChange(tenant.id, "PRO");
+    expect(custom.dailyCap).toBe(12);
+    expect(custom.creditsGranted).toBe(1500);
     await prisma.tenant.delete({ where: { id: tenant.id } });
   });
 });

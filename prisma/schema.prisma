@@ -50,6 +50,8 @@ model Tenant {
   removeBranding      Boolean   @default(false)
   allowedOrigins      String    @default("[]")
   creditBalance       Int       @default(0)
+  /** Highest plan inclusion already granted. An upgrade grants only the gap above this. */
+  includedCreditMark  Int       @default(0)
   dailyCap            Int       @default(100)
   showMen             Boolean   @default(true)
   showWomen           Boolean   @default(true)

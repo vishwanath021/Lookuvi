@@ -1,15 +1,14 @@
 import { planById } from "@/data/plans";
+import { grantCredits } from "@/lib/credits";
 import { prisma } from "@/lib/prisma";
 
 /**
- * Super-admin plan change does not grant credits.
- * The trial grant at salon creation is the first assignment.
- * A paid renewal grants one period through activatePlan, once per payment id.
- * To add the difference after an upgrade, use Adjust credits.
- * A downgrade never removes tries already on the salon.
+ * Tries added when the plan moves up. The mark is the highest plan inclusion
+ * already granted, so a downgrade and a second upgrade add nothing.
+ * Goodwill and other adjustments do not change the mark.
  */
-export function planUpgradeCredits() {
-  return 0;
+export function planUpgradeCredits(includedCreditMark: number, nextPlanId: string) {
+  return Math.max(0, planById(nextPlanId).credits - Math.max(0, includedCreditMark));
 }
 
 /**
@@ -25,10 +24,16 @@ export function dailyCapAfterPlanChange(currentDailyCap: number, previousPlanId:
 export async function applyPlanChange(tenantId: string, nextPlanId: string) {
   const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
   const next = planById(nextPlanId);
+  const creditsGranted = planUpgradeCredits(tenant.includedCreditMark, next.id);
   const dailyCap = dailyCapAfterPlanChange(tenant.dailyCap, tenant.plan, next.id);
+  const includedCreditMark = Math.max(tenant.includedCreditMark, next.credits);
   await prisma.tenant.update({
     where: { id: tenantId },
-    data: { plan: next.id, dailyCap },
+    data: { plan: next.id, dailyCap, includedCreditMark },
   });
-  return { plan: next.id, creditsGranted: planUpgradeCredits(), dailyCap, balance: tenant.creditBalance };
+  let balance = tenant.creditBalance;
+  if (creditsGranted > 0) {
+    balance = await grantCredits(tenantId, creditsGranted, "PLAN_ASSIGN", `plan:${tenant.plan}->${next.id}`);
+  }
+  return { plan: next.id, creditsGranted, dailyCap, balance, includedCreditMark };
 }

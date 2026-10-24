@@ -21,3 +21,14 @@ DROP TABLE "public"."WhatsAppOptOut_old";
 
 CREATE UNIQUE INDEX "WhatsAppOptOut_phone_tenantId_key" ON "public"."WhatsAppOptOut"("phone", "tenantId");
 CREATE INDEX "WhatsAppOptOut_phone_idx" ON "public"."WhatsAppOptOut"("phone");
+
+-- Highest plan inclusion already granted. Backfill from the current plan so the next
+-- plan click does not grant that plan's whole pack again.
+ALTER TABLE "public"."Tenant" ADD COLUMN "includedCreditMark" INTEGER NOT NULL DEFAULT 0;
+UPDATE "public"."Tenant" SET "includedCreditMark" = CASE "plan"
+  WHEN 'LITE' THEN 300
+  WHEN 'STARTER' THEN 900
+  WHEN 'PRO' THEN 1800
+  WHEN 'CHAIN' THEN 1800
+  ELSE 300
+END;

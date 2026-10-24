@@ -28,6 +28,7 @@ export async function activatePlan(input: {
       status: "ACTIVE",
       removeBranding: plan.removeBranding,
       dailyCap: dailyCapAfterPlanChange(current.dailyCap, current.plan, plan.id),
+      includedCreditMark: Math.max(current.includedCreditMark, plan.credits),
       trialEndsAt: null,
     },
   });
