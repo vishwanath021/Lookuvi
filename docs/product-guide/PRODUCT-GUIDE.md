@@ -73,6 +73,18 @@ The tool tabs are Style, Colour, Brows, Nails, and Beard. Style is the cut. Colo
 
 ![Style, colour, brows, nails, and beard](screenshots/guest-tabs.png)
 
+## Colour strength
+
+*Customer*
+
+After a photo is in, the Colour tab shows a strength slider. It runs from 20 to 100 and the number next to it is the strength the next colour preview will use. Moving it does not spend a try-on by itself. The preview spends one only when a provider key is live and the guest generates.
+
+**Next.** Open Colour, set the strength, then pick a shade.
+
+**Rule.** With no AI key the result is still a sample. The slider is there so the salon can see the control the guest will use.
+
+![Colour strength](screenshots/guest-colour.png)
+
 ## Photo notice and the result
 
 *Customer*
@@ -337,6 +349,18 @@ Security is where the owner turns on an authenticator for their own sign-in and 
 
 ![Owner security](screenshots/owner-security.png)
 
+## Staff desk, walk-in, and confirm
+
+*Staff*
+
+On the desk a staff member can add a walk-in with a name and an optional mobile number, call NEXT, tap Start, tap Done, and mark No-show. In request mode the waiting card has Confirm time and Decline. Confirm time moves that guest under Confirmed, with Mark visited for when they arrive. The name stays on the desk so the booking is not lost.
+
+**Next.** Add the walk-in at the chair. Confirm a requested time before the guest is told to come.
+
+**Rule.** Confirming does not take a try-on. It only moves the queue.
+
+![Staff desk, walk-in, and confirm](screenshots/staff-desk.png)
+
 ## What staff can and cannot do
 
 *Staff*
@@ -360,6 +384,30 @@ Founder sign-in asks for the email, the password, and the six-digit authenticato
 **Rule.** The table says when no AI key is saved. Customers see sample images until a key is saved and tested.
 
 ![Founder home and the nine salons](screenshots/super-home.png)
+
+## Trial, low try-ons, and expired
+
+*Super admin*
+
+Attention has two filters. Trial ending in 7 days lists only those trials. Low try-ons left lists salons with 10 or fewer. Status Expired lists only ended trials, and it hides the live salons. Suspended is its own status. Expired is not the same row as suspended.
+
+**Next.** Use the filter before calling a salon. Clear it before the next search.
+
+**Rule.** A trial that ends moves to Expired. Resume does not bring it back. Mark paid does.
+
+![Trial, low try-ons, and expired](screenshots/super-filters.png)
+
+## Adjust try-ons
+
+*Super admin*
+
+Adjust try-ons asks for an amount and a reason. One try-on is one credit. The amount can be negative. The reason is saved on the ledger and the audit log. The new number shows on the salons table and on the owner menu together. A sample image does not move this number. This adjustment does.
+
+**Next.** Type the amount, write the reason, and confirm. Then look at the owner's menu to see the same number.
+
+**Rule.** Adjust try-ons does not activate a plan and it does not write a receipt. Mark paid does those.
+
+![Adjust try-ons](screenshots/super-adjust.png)
 
 ## Change plan, new salon, suspend
 
