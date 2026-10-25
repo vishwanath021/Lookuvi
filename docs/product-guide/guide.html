@@ -1,135 +1,47 @@
-<!doctype html><html><head><meta charset='utf-8'><title>Lookuvi product guide</title>
-<style>body{font-family:Georgia,serif;max-width:880px;margin:28px auto;color:#1c1c1c;line-height:1.45;padding:0 16px}img{max-width:100%;border:1px solid #ddd}table{border-collapse:collapse;width:100%;font-size:13px}td,th{border:1px solid #ccc;padding:6px;vertical-align:top}th{background:#1F3A34;color:#fff}code{font-family:ui-monospace,monospace;font-size:0.92em}h1,h2,h3{font-family:Palatino,serif}</style></head><body>
-<h1>Lookuvi product guide</h1>
-<p>This is the founder’s guide for the seven-salon launch. It is written from the screens and the rules in the code, checked against the local seeded demo on 24 October 2026. The AI engine in that run was mock. No live WhatsApp handset was used, and nothing here was deployed.</p>
-<p>Return visits, reminders, offers, and STOP are in the product (merged as PR #28). Queue-on for new salons, plan credits, per-salon STOP, and the Kolkata day are in PR #29. Lite lead export and the credit-floor message are in PR #30. The review that settled those choices is in <code>docs/DECISIONS.md</code>.</p>
-<p>Demo sign-in, local database only:</p>
-<table><tr><th>Who</th><th>Email</th><th>Password</th></tr>
-<tr><td>Owner</td><td>owner@demo.agenticbuildworks.com</td><td>DemoSalon#2026</td></tr>
-<tr><td>Staff</td><td>staff@demo.agenticbuildworks.com</td><td>DemoStaff#2026</td></tr>
-<tr><td>Super admin</td><td>super@agenticbuildworks.com</td><td>SuperAdmin#2026</td></tr>
-</table>
-<p>The public demo is <code>/s/demo</code>. The demo WhatsApp number on the seed is 919800011122. It is not a live phone.</p>
-<h2>Off for this launch</h2>
-<p>These exist in the code and stay off until their flag is turned on. Do not promise them.</p>
-<table><tr><th>Feature</th><th>Flag</th><th>What the guest or owner sees while it is off</th></tr>
-<tr><td>Guest hub and phone OTP</td><td><code>FEATURE_GUEST_HUB</code></td><td><code>/s/{slug}/me</code> is a 404</td></tr>
-<tr><td>Bookings calendar</td><td><code>FEATURE_BOOKINGS</code></td><td><code>/admin/bookings</code> is a 404</td></tr>
-<tr><td>Custom domain and outlets</td><td><code>FEATURE_CUSTOM_DOMAIN</code>, <code>FEATURE_OUTLETS</code></td><td>No domain or outlet controls</td></tr>
-<tr><td>Salon’s own AI key</td><td><code>FEATURE_SALON_AI</code></td><td>No AI settings page for the owner</td></tr>
-<tr><td>Embed and in-salon guide</td><td><code>FEATURE_EMBED</code>, <code>FEATURE_GUIDE</code></td><td><code>/embed/{slug}</code> and <code>/s/{slug}/guide</code> are 404s</td></tr>
-<tr><td>Owner self-serve billing</td><td>Production with mock billing</td><td>The owner sees “Contact Lookuvi to activate your plan.” Local development does not apply that lock.</td></tr>
-<tr><td>Guest OTP login</td><td><code>OTP_PROVIDER</code></td><td>Not a sign-in method</td></tr>
-</table>
-<p>Groom try-on is a product switch, default off. It is not one of the flags above. Turn it on only for a salon that asked for it.</p>
-<p>Lite’s “2 languages” is also not enforced. An owner on Lite can save more than two languages. Say that out loud if a salon asks. It is a known gap, not a silent limit.</p>
-<h2>How an address works</h2>
-<p>A guest opens <code>https://{slug}.try.{your domain}</code> or <code>/s/{slug}</code>. On this machine the salon host is <code>{slug}.localhost</code>, which rewrites to <code>/s/{slug}</code>. A custom host rewrites to <code>/s/by-host</code>. Unknown slugs are a 404.</p>
-<p>If the salon is suspended, every public page is the paused screen: the salon name, “This salon is paused”, and a line to call or message them. The owner can still sign in.</p>
-<p>If try-on, bridal, and groom are all off, and the queue is on, <code>/s/{slug}</code> redirects to the queue. If the queue is off as well, the page says try-on is not available.</p>
-<figure><img src='screenshots/guest-tryon.png' alt='Guest try-on'><figcaption>Guest try-on</figcaption></figure>
-<h2>Customer</h2>
-<h3>Everyday try-on</h3>
-<p>The tabs follow the salon. Everyday tools are hairstyle, live colour, brows, nails, and beard. Each tool can be turned off. Colour is free of the credit pack: a mock or provider preview of colour still has to pass the daily and monthly caps, and a mock sample is labelled rather than billed.</p>
-<p>The guest picks women, men, or kids when those audiences are on, picks a look, adds a photo, and runs it. Hair suggestions are an owner switch. The try-on uses the salon’s default language. There is no guest language switcher in this launch.</p>
-<p>A photo must be JPEG, PNG, or WebP, under 2 MB, at least 64 pixels on the short side. Sending the photo is the consent. The photo notice API still refuses a submission that does not accept the notice and the age gate. Nails and mehendi reject a picture the classifier calls a face. Brows, beard, and colour can refuse a pose when the browser sends face landmarks.</p>
-<p>The result is a before/after, a zoom, a JPEG download, and a WhatsApp share. With no provider key the image is a labelled sample (<code>x-demo-reason: no-key</code>). The credit balance does not move, and the row is stored as DEMO, so it does not count toward the succeeded caps.</p>
-<h3>Bridal</h3>
-<p>Bridal is on by default. The stepper is event, makeup, hair, and mehendi, then the bride’s own saree, blouse, jewellery, and other optional slots. “My looks” is stored in that browser only, up to six, and can compare two. It does not sync to the salon.</p>
-<p>Bridal and groom previews share a visit budget. The default is 3 tries for that browser session. The owner can set 1 to 20. Staff can add a bonus from the desk with the session code. The bonus is on top of the limit. A mock sample does not consume the budget, because the budget counts succeeded previews. A real provider success does.</p>
-<p>Own saree and jewellery call OpenAI only. With no key the API says to add one, and it does not fall through to another model. This launch run had no key, so that path was refused before any paid call.</p>
-<h3>Book this look</h3>
-<p>The button creates a lead and opens WhatsApp with the look name, shade, and services. If the salon has no WhatsApp number, the guest is told to ask the salon to add one. Suspended salons do not take leads.</p>
-<p><code>requireLoginToBook</code> makes the guest sign in with a phone before the request. It is off by default, so Book opens WhatsApp. Phone login itself is off for this launch, so leave the switch off unless that flag is on.</p>
-<p>Lead status on the desk moves New → Contacted → Booked → Closed → New. The list keeps up to 40 dated bridal leads and 80 recent leads. Download CSV is Starter and Pro. Lite keeps the list and does not get the file.</p>
-<h3>The queue, from the guest’s phone</h3>
-<figure><img src='screenshots/guest-queue.png' alt='Join from home'><figcaption>Join from home</figcaption></figure>
-<p>The line is either live or by request, never both. A live join needs a name, a 10-digit Indian mobile, and the consent tick. The tick says the salon may send one WhatsApp reminder after the visit, and that STOP opts out. The same phone keeps one open token for that salon day instead of taking a second number.</p>
-<p>The token is one higher than the highest token that salon already issued for the day. People ahead are anyone in a chair, then anyone already called, then earlier waiting tokens. The wait is the sum of their minutes, divided by the number of chairs, rounded up. A service with a duration uses that duration. Otherwise the salon average is used (default 20, range 5–240).</p>
-<p>Joins are limited to 60 per connection per hour, 4 per phone per hour, and 8 per device per hour. A paused line refuses a join and tells the guest to ask at the desk.</p>
-<p>The ticket page polls. The guest can say they are on the way, or cancel, until the visit is in service or done.</p>
-<p>Time-request mode asks for today or a later date and a time. The desk confirms or declines. Walk-in and Next do not exist in this mode.</p>
-<figure><img src='screenshots/guest-welcome.png' alt='Welcome'><figcaption>Welcome</figcaption></figure>
-<p>The printed QR points at <code>/s/{slug}/welcome</code>, not straight at the try-on. On localhost the QR API refuses to draw a code and says to set a real domain first. Do not print the local page.</p>
-<figure><img src='screenshots/guest-queue-phone.png' alt='Queue on a phone'><figcaption>Queue on a phone</figcaption></figure>
-<h3>Privacy</h3>
-<p><code>/privacy</code> and <code>/terms</code> are public. A guest can ask for access, deletion, or withdrawal of a session. Withdrawal removes that session’s leads when a consent row exists. Preview files follow the retention job. The privacy page includes the reminder sentence from the queue consent.</p>
-<figure><img src='screenshots/privacy.png' alt='Privacy'><figcaption>Privacy</figcaption></figure>
-<h2>Staff</h2>
-<p>Staff sign in on the same page as the owner. There is no magic-link form. Forgot password asks for an email and does not say whether the account exists. In local development, when mail is not configured, the reset response can include a dev link. Production does not.</p>
-<p>With the queue on, <code>/admin</code> opens the queue desk. With the queue off, it opens leads.</p>
-<figure><img src='screenshots/staff-queue.png' alt='Staff desk'><figcaption>Staff desk</figcaption></figure>
-<p>On a live desk the staff can open or pause the line, call Next, start a called guest, mark Done, or mark no-show. The desk polls about every 2.5 seconds. Next does nothing useful when nobody is waiting. Next is refused while every chair is busy: “Every place is busy. Mark one done first.”</p>
-<p>A walk-in can omit the phone. A bad phone is refused. Walk-in is refused in request mode.</p>
-<p>The WhatsApp button on a card opens <code>wa.me</code> on the staff phone with the token and the join and try-on links. It is not a platform send and it does not use the monthly WhatsApp cap. The call link is <code>tel:</code>.</p>
-<p>In request mode the staff confirm, decline, or mark visited. Mark visited and Done both record a customer visit and arm the reminder, unless that phone is already stopped.</p>
-<p>Staff can add a customer, import up to 500 lines, search (the list shows at most 100), and stop reminders at the desk. They cannot turn a desk stop back on, send an offer, or change the reminder settings. Those are owner actions. A real STOP cannot be undone by anyone at the salon.</p>
-<p>Staff cannot save settings, team, or billing. They can open Security to change their own password. They cannot enroll the platform authenticator.</p>
-<p>If a person belongs to more than one salon, the switcher sets the <code>helix_salon</code> cookie. Switching to a salon they are not in is refused.</p>
-<h2>Owner</h2>
-<p>The first-run wizard is Brand, Services, WhatsApp, Languages, Done. It stays in the nav for the owner and for staff until Finish.</p>
-<figure><img src='screenshots/owner-settings.png' alt='Settings'><figcaption>Settings</figcaption></figure>
-<p>Settings holds the name (2–80 characters), logo, two hex colours, WhatsApp, address, map link, city, languages, and the default language. The guest page and the QR use that name, logo, colours, and WhatsApp number.</p>
-<p>Tool switches, audiences, and hair suggestions are here. Visit tries are 1–20. Anonymous and member daily caps are 0–500. The monthly try-on allowance is 0–5000. Removing the Lookuvi mark is Pro only. A Starter salon that tries is told it needs Pro or Chain.</p>
-<p>Chairs are not on this page. They are on the queue desk: 1–30 chairs, stations, or rooms, average minutes 5–240, alert lead 0–120. The public board shows the label the desk saved.</p>
-<figure><img src='screenshots/owner-customers.png' alt='Customers'><figcaption>Customers</figcaption></figure>
-<p>Customers is in the nav only when the queue product is on. The owner sets reminders on or off (on by default), the gap at 28–42 days (default 35), and the monthly WhatsApp cap at 0–5000 (default 50). The cap counts reminders and offers that are sent or still pending. It does not count queue alerts or the desk’s own WhatsApp button.</p>
-<p>The page shows how many of the monthly try-ons are used, and says to change that number in Settings. A number that replied STOP stays off. A number stopped at the desk can be turned back on by the owner. The 90-day return rate is the joins that came back through a reminder link (<code>?r=</code>).</p>
-<p>An offer is at most 180 characters. Under three characters is refused. If WhatsApp is not connected, the owner is told nothing was sent and the cap is not used.</p>
-<figure><img src='screenshots/owner-services.png' alt='Services'><figcaption>Services</figcaption></figure>
-<p>A service key is lowercase letters, numbers, and hyphens. Price is 0–500000 rupees. Duration is 5–480 minutes, and it feeds the queue wait. The add form suggests 499. A bridal package with an empty price is hidden from the guest. The owner cannot delete the salon from Settings. Closing a salon is a support action.</p>
-<figure><img src='screenshots/owner-styles.png' alt='Styles'><figcaption>Styles</figcaption></figure>
-<p>Styles and shades can be renamed, enabled, or disabled. Only Lite has a ceiling, 25 styles. The error names the plan: “Lite includes 25 styles.” A disabled style cannot be booked.</p>
-<figure><img src='screenshots/owner-qr.png' alt='QR'><figcaption>QR</figcaption></figure>
-<p>The salon-mode link is a rotating token. While a guest holds it, the anonymous daily cap does not apply. Rotate it when a tablet should stop working. The printable QR is the welcome code, and it will not render on localhost.</p>
-<figure><img src='screenshots/owner-billing.png' alt='Billing'><figcaption>Billing</figcaption></figure>
-<p>Billing on a production server with the mock provider tells the owner to contact Lookuvi. Do not turn on self-serve for the seven salons.</p>
-<p>Team invites need a new password of at least 12 characters that is not one of the demo passwords. A super-admin email cannot be invited. The last owner cannot be removed. An owner cannot remove themselves when they are the only owner.</p>
-<h2>Super admin</h2>
-<p>Sign-in is the same email and password page. In production, a super admin with no authenticator is sent to Security before any other platform page, and the platform APIs refuse them. This development server does not apply that gate. The production path was not executed here.</p>
-<figure><img src='screenshots/super-overview.png' alt='Overview'><figcaption>Overview</figcaption></figure>
-<p>Overview is the month’s snapshot: trials, active salons, ex-GST MRR of active plans, and recent audit lines. A salon owner who opens <code>/super</code> is redirected to login. The navigation chrome can appear in the first bytes of the response. Salon names, credits, and leads are not in that response. The APIs return 403.</p>
-<figure><img src='screenshots/super-salons.png' alt='Salons'><figcaption>Salons</figcaption></figure>
-<p>Create asks for name, slug, plan, city, WhatsApp, and the owner’s email, name, and password. The slug is lowercase words. Reserved words such as <code>admin</code> and <code>api</code> are refused. A duplicate slug is refused. The new salon is a 14-day trial, the queue is on, the line is open with one chair, and styles and shades are copied on. The plan’s tries are granted once. The mark is set to that same number so a later plan click does not grant them again.</p>
-<p>Editing a plan grants only the gap between the highest plan already given and the new plan. Pro after Starter adds 900, not another 1800. Doing it again adds nothing. A downgrade adds nothing and does not take tries away. The daily preview cap moves to the new plan’s number only when it still equals the previous plan’s number. A custom daily cap stays.</p>
-<p>Goodwill is a separate credit delta. It does not move the mark. The balance cannot go below zero. The screen says so, and the balance stays where it was. Products (try-on, queue, bridal, groom) are switches on the same salon. Turning the queue off hides Customers and the public line for that salon only.</p>
-<figure><img src='screenshots/super-ai.png' alt='AI'><figcaption>AI</figcaption></figure>
-<p>AI settings hold the engine, encrypted keys, the tier, and the spend cap. The page does not echo a raw key. This launch used mock. Do not paste a live key to rehearse.</p>
-<figure><img src='screenshots/super-costs.png' alt='Costs'><figcaption>Costs</figcaption></figure>
-<p>Costs are the platform view of spend. A salon owner cannot open them.</p>
-<h2>What one screen does to another</h2>
-<ul>
-<li>Chairs, the average, and a service duration change the wait on the guest’s ticket. The ticket updates on the guest poll after Next, Start, Done, or no-show.</li>
-<li>Switching live to request does not convert tokens already issued. Walk-in and Next stop working. Existing live rows stay in their old status.</li>
-<li>Done on the live desk, and Mark visited on a request, write a customer visit and arm the reminder. A join with <code>?r=</code> from that reminder is the return the Customers page counts.</li>
-<li>Name, logo, colours, and WhatsApp show on the guest page, the book link, and the QR.</li>
-<li>Suspending a salon shows the paused page to guests and still lets the owner sign in.</li>
-<li>The four limits are different. The plan balance is tries bought or granted. The monthly allowance is succeeded previews this Kolkata month, including staff. The anonymous and member daily caps are per person, per Kolkata day. The salon daily cap is succeeded previews for the whole salon that Kolkata day. Rolling per-hour limits are separate and do not reset at midnight.</li>
-<li>A mock sample does not count as a succeeded preview. A labelled sample at the provider spend cap is the same idea: the guest sees a sample and the credit is not kept.</li>
-<li>STOP from the guest’s reply is stored for the salon the last message belonged to. STOPALL and UNSUBSCRIBE cover every salon on the shared WhatsApp number. A queue “your turn” alert is still sent for a visit they have already joined. The owner cannot undo STOP.</li>
-<li>A customer saved at salon A is invisible to salon B’s search, and salon B cannot change salon A’s lead.</li>
-</ul>
-<h2>Plans, in one place</h2>
-<p>Prices are ex-GST. Invoices add 18 percent. Annual is 10 times monthly.</p>
-<table><tr><th></th><th>Lite</th><th>Starter</th><th>Pro</th></tr>
-<tr><td>Monthly</td><td>2999</td><td>5999</td><td>10999</td></tr>
-<tr><td>Included tries</td><td>300</td><td>900</td><td>1800</td></tr>
-<tr><td>Styles</td><td>25</td><td>No ceiling</td><td>No ceiling</td></tr>
-<tr><td>Lead export</td><td>No</td><td>Yes</td><td>Yes</td></tr>
-<tr><td>Remove Lookuvi mark</td><td>No</td><td>No</td><td>Yes</td></tr>
-<tr><td>Outlets on the price list</td><td>1</td><td>1</td><td>3</td></tr>
-</table>
-<p>Languages on the Lite price list say 2. The product does not enforce that yet.</p>
-<p>New salons start with the queue on. Salons that already existed keep the value they had. A paid renewal, when billing is on, grants one full pack once per payment id and raises the same mark. That path is not part of this launch.</p>
-<h2>Videos</h2>
-<p>Six short recordings, taken after the path worked:</p>
-<ul>
-<li>Customer: guest try-on, the queue join, and the welcome page.</li>
-<li>Staff: the live desk.</li>
-<li>Owner: customers, leads, settings, and services.</li>
-<li>Super admin: overview and salons.</li>
-<li>Platform: sign-in and the reset page.</li>
-<li>Cross-screen: pausing the line on the desk and seeing the guest page follow.</li>
-</ul>
-<p>They are attached to the launch deliverables pull request. They are not a substitute for the pass/fail sheet in <code>docs/test-plan/TEST-PLAN.md</code>.</p>
-</body></html>
+<!doctype html><html><head><meta charset="utf-8"><title>Lookuvi</title>
+<style>
+body { font: 15px/1.45 Georgia, serif; color: #1b1224; margin: 32px; }
+h1 { font-size: 28px; } h2 { font-size: 18px; margin-top: 1.4em; }
+table { border-collapse: collapse; width: 100%; } td, th { border: 1px solid #ddd; padding: 6px 8px; vertical-align: top; }
+.PASS { background: #e5f6e8; } .FAIL { background: #fde8e8; } .UNTESTED { background: #fff6d8; }
+code { font-family: ui-monospace, monospace; font-size: 12px; }
+figure { margin: 16px 0 24px; } figcaption { font-size: 13px; color: #5c5166; }
+</style></head><body><h1>Lookuvi</h1>
+<p>Lookuvi is the try-on and token queue for a family salon. A guest does not make an account. The owner and the staff use a phone. The three founders use the super-admin screens.</p>
+<p>This guide matches the screens on master `4e0b8e514a85b211e84d385d759ff204c3b91428`. Money, a live AI key, and a WhatsApp handset are not connected in this copy. The screens still show what the salon will see.</p>
+<h2>Plans</h2>
+<table><tr><th>Plan</th><th>Monthly</th><th>Try-ons included</th><th>Annual</th></tr><tr><td>Basic</td><td>₹799</td><td>50</td><td>₹7,990</td></tr><tr><td>Standard</td><td>₹1,499</td><td>120</td><td>₹14,990</td></tr><tr><td>Pro</td><td>₹2,499</td><td>220</td><td>₹24,990</td></tr></table>
+<p>Annual is ten times the monthly price. A new salon starts on a 14-day trial with 20 try-ons, on the Basic allowance for the cap. Choosing a plan does not turn it on for free. The owner sees a UPI QR and the words Payment pending. A founder marks the UPI reference paid. That activates the plan, adds the try-ons, and creates a receipt. The receipt is not a tax invoice. GST is off until Lookuvi has a GSTIN.</p>
+<p>Try-on packs, also pending until marked paid: 25 for ₹299, 60 for ₹649, 150 for ₹1,499.</p>
+<p>One try-on is one credit. With no AI key saved, guests see a sample image and the try-on count does not move. The salons table says: No AI key is saved. Customers see sample images.</p>
+<h2>What a guest does</h2>
+<p>Open the salon link. Take or upload a photo, agree to the photo notice, and pick a style. The result appears on the same screen. If bridal or groom is on for that salon, those sections are tabs. If the salon&#x27;s language is Hindi, the buttons are in Hindi.</p>
+<p>Join the queue with a name, a mobile number, and consent. The consent line says the salon may send one WhatsApp reminder and that STOP opts out. The ticket shows the token. The desk shows the same token. Next, Start, and Done on the desk show up on the ticket: Your turn, You are being served, This visit is finished. A no-show says the token was marked as a no-show. If the desk pauses the line, the guest sees that the queue is paused and cannot join.</p>
+<p>A salon in request mode asks for a date and a time. Staff confirm it on the desk.</p>
+<p>A suspended salon says the salon is paused. An expired trial says the trial ended. The owner can still sign in.</p>
+<h2>What the owner sees on a phone</h2>
+<p>The menu has Queue, Customers, Leads, and QR. More has Prices, Settings, Team, Billing, and Security. Styles is not an owner menu. Density and texture are platform data on the super-admin Styles page.</p>
+<p>Prices is one row per service: name, a small rupee field, an on/off switch, and delete behind the ⋯ menu. Bridal packages appear only when bridal is on. They are off for a new salon. When bridal and groom are both off, the visit-code list is hidden. When either is on, Recent visits comes first and the visit code is under it.</p>
+<p>Customers shows four numbers: reminders, offers, WhatsApp used, and came back. Until WhatsApp is connected, one line says reminders are paused. Add a customer with a phone and a name. A CSV file can be uploaded from the same card. A STOP reply shows as Replied STOP. Staff cannot turn that back on.</p>
+<p>QR, on a local address, does not print a code. It says to add the public website address first.</p>
+<p>Billing lists Basic, Standard, and Pro, an annual switch, and the packs. Choose and a pack both stop at Payment pending, with the UPI QR. After a founder marks a payment, the receipt number is on this page and Download saves the PDF.</p>
+<p>Settings holds the salon name, bridal, groom, and Save. GSTIN is hidden while GST is off. Staff who open Settings or Prices are told they cannot change them. Staff who open Billing are told only the owner can change the plan.</p>
+<h2>What the founders see</h2>
+<p>The salons table has the link, plan, status, try-ons left, try-ons this month, trial end, and created date. Filters cover plan, status (including expired), trial ending within 7 days, and low try-ons left (10 or fewer).</p>
+<p>Change plan does not add try-ons. Mark paid does, and it writes the receipt. Adjust try-ons changes the number on the owner phone and on this table together.</p>
+<p>AI settings are two rows, OpenAI and fal, each with a masked saved state, Save, and Test. One row is marked In use. The price list is the source for cost maths. Spend and costs shows month spend, images, and average rupees per image, then a per-salon table. The image log is a separate link.</p>
+<p>A production super-admin sign-in asks for the authenticator code before the platform opens.</p>
+<h2>What still needs a real phone, real money, or a decision</h2>
+<p>• Paying from a UPI app. The placeholder ID is lookuvi@upi until a real ID is set.</p>
+<p>• A WhatsApp message arriving on a handset. The product is ready to record STOP and to show the paused-reminders banner.</p>
+<p>• A paid AI image, which spends one try-on. Samples do not.</p>
+<p>• A printed QR on the public domain, then a camera scan.</p>
+<p>• A tax invoice, after GSTIN and the GST switch.</p>
+<p>Lead export is on Standard and Pro. Basic shows that sentence instead of the download.</p>
+<h2>Screens from this build</h2>
+<figure><img src='file:///opt/cursor/artifacts/screenshots/guest-tryon.png' style='max-width:100%;height:auto' alt='Guest try-on'><figcaption>Guest try-on</figcaption></figure>
+<figure><img src='file:///opt/cursor/artifacts/screenshots/cross-token-guest.png' style='max-width:100%;height:auto' alt='Queue ticket and desk'><figcaption>Queue ticket and desk</figcaption></figure>
+<figure><img src='file:///opt/cursor/artifacts/screenshots/owner-prices-off.png' style='max-width:100%;height:auto' alt='Owner prices'><figcaption>Owner prices</figcaption></figure>
+<figure><img src='file:///opt/cursor/artifacts/screenshots/owner-billing.png' style='max-width:100%;height:auto' alt='Owner billing'><figcaption>Owner billing</figcaption></figure>
+<figure><img src='file:///opt/cursor/artifacts/screenshots/super-salons.png' style='max-width:100%;height:auto' alt='Salons table'><figcaption>Salons table</figcaption></figure>
+<figure><img src='file:///opt/cursor/artifacts/screenshots/super-paid.png' style='max-width:100%;height:auto' alt='Mark paid'><figcaption>Mark paid</figcaption></figure></body></html>

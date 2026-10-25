@@ -1,0 +1,75 @@
+# Video index
+
+Build `4e0b8e514a85b211e84d385d759ff204c3b91428`. Each file is one passing flow on the real app.
+
+- C1-01 (PASS, screen): C1-01.webm — Demo salon home
+- C1-02 (PASS, screen): C1-02.webm — Unknown salon
+- C1-03 (PASS, screen): C1-03.webm — Public queue
+- C1-04 (PASS, screen): C1-04.webm — Welcome page
+- C2-01 (PASS, screen): C2-01.webm — Suspended salon
+- C2-02 (PASS, screen): C2-02.webm — Expired trial
+- C9-01 (PASS, screen): C9-01.webm — Hindi salon screen
+- C6-01 (PASS, screen): C6-01.webm — Bridal tab
+- C4-01 (PASS, screen): C4-01.webm — Photo notice
+- C3-01 (PASS, screen): C3-01.webm — Mock hairstyle preview
+- C12-01 (PASS, screen): C12-01.webm — Appointment request
+- O-LOGIN (PASS, screen): O-LOGIN.webm — Owner sign-in
+- S-LOGIN (PASS, screen): S-LOGIN.webm — Staff sign-in
+- A-LOGIN (PASS, screen): A-LOGIN.webm — Super sign-in with authenticator
+- O1-01 (PASS, screen): O1-01.webm — No Styles link
+- O3-01 (PASS, screen): O3-01.webm — Prices without bridal
+- O3-02 (PASS, screen): O3-02.webm — Bridal prices
+- O3-03 (PASS, screen): O3-03.webm — Add a price
+- O5-01 (PASS, screen): O5-01.webm — Customer counters
+- O5-02 (PASS, screen): O5-02.webm — Add customer
+- O8-01 (PASS, screen): O8-01.webm — Visit list hidden
+- O8-02 (PASS, screen): O8-02.webm — Visit list when bridal is on
+- O9-01 (PASS, screen): O9-01.webm — QR without a public domain
+- O10-01 (PASS, screen): O10-01.webm — Choose a plan stays pending
+- O10-02 (PASS, screen): O10-02.webm — Annual price
+- O10-03 (PASS, screen): O10-03.webm — Try-on pack stays pending
+- O-SET (PASS, screen): O-SET.webm — Settings on a phone
+- O-TEAM (PASS, screen): O-TEAM.webm — Team section
+- O-SEC (PASS, screen): O-SEC.webm — Owner security
+- O-ONB (PASS, screen): O-ONB.webm — Onboarding wizard
+- O-LEAD-LITE (PASS, screen): O-LEAD-LITE.webm — Basic cannot export leads
+- O-LEAD-STD (PASS, screen): O-LEAD-STD.webm — Standard can export leads
+- S-SET (PASS, screen): S-SET.webm — Staff cannot change settings
+- S-PRICE (PASS, screen): S-PRICE.webm — Staff cannot change prices
+- S-BILL (PASS, screen): S-BILL.webm — Staff cannot change the plan
+- S-WALK (PASS, screen): S-WALK.webm — Staff walk-in
+- S-CONFIRM (PASS, screen): S-CONFIRM.webm — Confirm a requested time
+- A-NINE (PASS, screen): A-NINE.webm — Nine salons
+- A-TRIAL (PASS, screen): A-TRIAL.webm — Trial ending filter
+- A-LOW (PASS, screen): A-LOW.webm — Low try-ons filter
+- A-EXP (PASS, screen): A-EXP.webm — Expired status filter
+- A-AI (PASS, screen): A-AI.webm — AI key rows
+- A-SPEND (PASS, screen): A-SPEND.webm — Spend tiles
+- A-LOG (PASS, screen): A-LOG.webm — Image log
+- A-STYLE (PASS, screen): A-STYLE.webm — Platform style tags
+- A-HOME (PASS, screen): A-HOME.webm — Platform snapshot
+- A-SEC (PASS, screen): A-SEC.webm — Authenticator required
+- A-PLAN (PASS, screen): A-PLAN.webm — Change plan does not add try-ons
+- A-PAID (PASS, screen): A-PAID.webm — Mark paid
+- O-RECEIPT (PASS, screen): O-RECEIPT.webm — Receipt download
+- A-NEW (PASS, screen): A-NEW.webm — New salon trial
+- C-STOP (PASS, screen): C-STOP.webm — STOP shows on the customer card
+- O-BAD (PASS, screen): O-BAD.webm — Wrong password
+- P-TERMS (PASS, screen): P-TERMS.webm — Terms without GST
+- O-PAUSE-BANNER (PASS, screen): O-PAUSE-BANNER.webm — Paused salon banner
+- O-EXPIRED-BANNER (PASS, screen): O-EXPIRED-BANNER.webm — Trial ended banner
+- X-TOKEN (PASS, screen-side-by-side): X-TOKEN.mp4 — Token 1 on both screens
+- X-NEXT (PASS, screen-side-by-side): X-NEXT.mp4 — Next calls the guest
+- X-START (PASS, screen-side-by-side): X-START.mp4 — Start service
+- X-DONE (PASS, screen-side-by-side): X-DONE.mp4 — Done
+- X-SKIP (PASS, screen-side-by-side): X-SKIP.mp4 — No-show skip
+- X-PAUSE (PASS, screen-side-by-side): X-PAUSE.mp4 — Pause blocks a join
+- X-ISO (PASS, screen-side-by-side): X-ISO.mp4 — Salon isolation
+- X-SAMPLE (PASS, screen-side-by-side): X-SAMPLE.mp4 — Sample try-on leaves the counter
+- X-CREDIT (PASS, screen-side-by-side): X-CREDIT.mp4 — Adjust try-ons on both screens
+- U-PHONE (UNTESTED, device): no video — Scan a printed QR with a phone camera
+- U-UPI (UNTESTED, money): no video — Pay from a UPI app
+- U-WA (UNTESTED, device): no video — WhatsApp arrives on a handset
+- U-AI (UNTESTED, money): no video — A paid provider image
+- U-GST (UNTESTED, founder): no video — Tax invoice
+- P-K6 (PASS, k6): no video — Guest browse under k6
