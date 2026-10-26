@@ -37,7 +37,7 @@ export default async function SalonPage({
   const tenant = slug === "by-host" ? await loadTenantByHost(host.split(":")[0] || "") : await loadTenantBySlug(slug);
   if (!tenant) notFound();
   if (isBlockedStatus(tenant.status)) return <SalonPaused name={tenant.name} trialEnded={tenant.status === "EXPIRED"} />;
-  if (!tenant.productTryOn && !tenant.productBridal && !tenant.productGroom) {
+  if (!tenant.productTryOn && !tenant.productBridal && !tenant.productGroom && !tenant.productMakeupStudio) {
     if (tenant.productQueue) redirect(`/s/${tenant.slug}/queue`);
     return <TryOnUnavailable name={tenant.name} />;
   }
@@ -69,6 +69,7 @@ export default async function SalonPage({
       showEveryday={tenant.productTryOn}
       showBridal={tenant.productBridal}
       showGroom={tenant.productGroom}
+      showMakeup={tenant.productMakeupStudio}
     />
   );
 }

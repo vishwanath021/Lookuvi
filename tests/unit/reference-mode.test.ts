@@ -347,6 +347,7 @@ const salonConfig = {
   requireLoginToBook: false,
   productBridal: false,
   productGroom: false,
+  productMakeupStudio: false,
   bridalPackages: [],
   services: [],
   styles: [],

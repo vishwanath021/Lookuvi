@@ -16,6 +16,7 @@ const schema = z.object({
   productQueue: z.boolean().optional(),
   productBridal: z.boolean().optional(),
   productGroom: z.boolean().optional(),
+  productMakeupStudio: z.boolean().optional(),
 });
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -38,6 +39,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       ...(parsed.data.productQueue !== undefined ? { productQueue: parsed.data.productQueue } : {}),
       ...(parsed.data.productBridal !== undefined ? { productBridal: parsed.data.productBridal } : {}),
       ...(parsed.data.productGroom !== undefined ? { productGroom: parsed.data.productGroom } : {}),
+      ...(parsed.data.productMakeupStudio !== undefined ? { productMakeupStudio: parsed.data.productMakeupStudio } : {}),
     },
   });
   if (planChange) {
@@ -69,7 +71,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       },
     });
   }
-  const productChange = parsed.data.productTryOn !== undefined || parsed.data.productQueue !== undefined || parsed.data.productBridal !== undefined || parsed.data.productGroom !== undefined;
+  const productChange = parsed.data.productTryOn !== undefined || parsed.data.productQueue !== undefined || parsed.data.productBridal !== undefined || parsed.data.productGroom !== undefined || parsed.data.productMakeupStudio !== undefined;
   if (!planChange && !parsed.data.creditDelta) {
     await prisma.auditLog.create({
       data: {
@@ -85,7 +87,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         actorId: access.session.user.id,
         action: "TENANT_UPDATE",
         target: id,
-        meta: JSON.stringify({ productTryOn: parsed.data.productTryOn, productQueue: parsed.data.productQueue, productBridal: parsed.data.productBridal, productGroom: parsed.data.productGroom }),
+        meta: JSON.stringify({ productTryOn: parsed.data.productTryOn, productQueue: parsed.data.productQueue, productBridal: parsed.data.productBridal, productGroom: parsed.data.productGroom, productMakeupStudio: parsed.data.productMakeupStudio }),
       },
     });
   }

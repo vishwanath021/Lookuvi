@@ -53,6 +53,7 @@ export type SalonConfig = {
   requireLoginToBook: boolean;
   productBridal: boolean;
   productGroom: boolean;
+  productMakeupStudio: boolean;
   bridalPackages: { key: string; name: string; priceInr: number }[];
   services: SalonService[];
   styles: PublicStyle[];
@@ -145,6 +146,7 @@ export async function toSalonConfig(tenant: TenantWithRelations): Promise<SalonC
     requireLoginToBook: tenant.requireLoginToBook,
     productBridal: tenant.productBridal,
     productGroom: tenant.productGroom,
+    productMakeupStudio: tenant.productMakeupStudio,
     bridalPackages: tenant.services
       .filter((service) => BRIDAL_PACKAGE_KEYS.has(service.key) && service.active && service.priceInr > 0)
       .map((service) => ({ key: service.key, name: service.name, priceInr: service.priceInr })),

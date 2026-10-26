@@ -26,7 +26,7 @@ export default async function QueuePage() {
       <h1 className="page-title">Queue</h1>
       <p className="mt-1 text-sm text-muted">{tryOns.toLocaleString("en-IN")} try-ons this month</p>
       <p className="mt-1 text-sm text-muted">Open the line, tap NEXT, then Done when the guest leaves.</p>
-      <QueueDesk initial={desk} lang={tenant.defaultLang} showVisits={tenant.productBridal || tenant.productGroom} />
+      <QueueDesk initial={desk} lang={tenant.defaultLang} showVisits={tenant.productBridal || tenant.productGroom || tenant.productMakeupStudio} />
     </main>
   );
 }

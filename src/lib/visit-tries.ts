@@ -1,5 +1,5 @@
-/** Bridal and groom previews share one visit budget. Everyday try-on does not. */
-export const VISIT_TRY_KINDS = ["BRIDAL", "MEHENDI", "GROOM", "GROOM_OWN", "BRIDAL_OWN"] as const;
+/** Bridal, groom, and photo makeup previews share one visit budget. Everyday try-on does not. */
+export const VISIT_TRY_KINDS = ["BRIDAL", "MEHENDI", "GROOM", "GROOM_OWN", "BRIDAL_OWN", "MAKEUP_STUDIO"] as const;
 
 export const DEFAULT_VISIT_TRY_LIMIT = 3;
 

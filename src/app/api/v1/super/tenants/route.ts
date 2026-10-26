@@ -65,6 +65,7 @@ export async function POST(req: Request) {
       includedCreditMark: 0,
       dailyCap: plan.credits,
       productBridal: false,
+      productMakeupStudio: false,
       productQueue: true,
       city: parsed.data.city || "",
       whatsapp: parsed.data.whatsapp || "",
