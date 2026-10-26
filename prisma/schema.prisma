@@ -36,6 +36,8 @@ model Tenant {
   productBridal       Boolean   @default(false)
   /** Groom looks and the groom's own clothes. Off until the owner turns it on. */
   productGroom        Boolean   @default(false)
+  /** Photo makeup on one picture. Off until the owner turns it on. */
+  productMakeupStudio Boolean   @default(false)
   /** Real bridal and groom previews one customer can spend during a visit. */
   visitTryLimit       Int       @default(3)
   /** One WhatsApp reminder after a completed visit. */

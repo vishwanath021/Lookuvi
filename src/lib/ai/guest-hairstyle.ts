@@ -6,6 +6,7 @@ import { nailById } from "@/data/nails";
 import { shadeById } from "@/data/shades";
 import { browDiagramJpeg } from "@/lib/ai/brow-diagram";
 import { demoBridalSample, demoStyleComposite } from "@/lib/ai/composite";
+import { demoMakeupSample } from "@/lib/makeup-studio/demo-card";
 import { resolveFalKey, resolveOpenAIKey } from "@/lib/ai/credentials";
 import { completeGenerationJob, failGenerationJob } from "@/lib/ai/dedupe";
 import { guestPreviewHeaders } from "@/lib/ai/guest-response";
@@ -356,7 +357,9 @@ export function runGuestLookIfReady(args: Omit<GuestEditArgs, "guest"> & { promp
 export async function demoGuestPreview(args: Omit<GuestEditArgs, "guest" | "original"> & { styleName: string }) {
   const image = args.tool === "bridal" || args.tool === "mehendi"
     ? await demoBridalSample(args.jpeg, args.styleName)
-    : await demoStyleComposite(args.jpeg, args.styleId, args.styleName, thumbnailFolder(args.tool));
+    : args.tool === "makeup"
+      ? await demoMakeupSample(args.jpeg, args.styleName)
+      : await demoStyleComposite(args.jpeg, args.styleId, args.styleName, thumbnailFolder(args.tool));
   const tryOn = await prisma.tryOn.create({
     data: {
       tenantId: args.tenantId,

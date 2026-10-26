@@ -40,6 +40,7 @@ export function SettingsForm({
     requireLoginToBook: boolean;
     productBridal: boolean;
     productGroom: boolean;
+    productMakeupStudio?: boolean;
     visitTryLimit: number;
     logoUrl: string | null;
   };
@@ -52,7 +53,7 @@ export function SettingsForm({
   showGst?: boolean;
   salonModeUrl?: string;
 }) {
-  const [form, setForm] = useState(initial);
+  const [form, setForm] = useState({ ...initial, productMakeupStudio: initial.productMakeupStudio ?? false });
   const [message, setMessage] = useState("");
   const [host, setHost] = useState("");
   const [domainNote, setDomainNote] = useState("");
@@ -165,7 +166,8 @@ export function SettingsForm({
           <legend className="font-medium">Looks on the customer screen</legend>
           <label className="flex items-center gap-2"><input type="checkbox" aria-label="Bridal" checked={form.productBridal} onChange={(event) => set("productBridal", event.target.checked)} /> Bridal</label>
           <label className="flex items-center gap-2"><input type="checkbox" aria-label="Groom" checked={form.productGroom} onChange={(event) => set("productGroom", event.target.checked)} /> Groom</label>
-          {form.productBridal || form.productGroom ? (
+          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Makeup studio" checked={form.productMakeupStudio} onChange={(event) => set("productMakeupStudio", event.target.checked)} /> Makeup studio</label>
+          {form.productBridal || form.productGroom || form.productMakeupStudio ? (
             <label className="text-sm">Tries per visit
               <input className="field narrow mt-1" type="number" min={1} max={20} aria-label="Tries per visit" value={form.visitTryLimit} onChange={(event) => set("visitTryLimit", Number(event.target.value))} />
             </label>
@@ -266,7 +268,7 @@ export function SettingsForm({
       </form>
       </section>
       {message && <p className="text-sm" role="status">{message}</p>}
-      <VisitUnlock show={form.productBridal || form.productGroom} />
+      <VisitUnlock show={form.productBridal || form.productGroom || form.productMakeupStudio} />
     </div>
   );
 }

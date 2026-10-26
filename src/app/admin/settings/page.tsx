@@ -58,6 +58,7 @@ export default async function SettingsPage() {
           requireLoginToBook: tenant.requireLoginToBook,
           productBridal: tenant.productBridal,
           productGroom: tenant.productGroom,
+          productMakeupStudio: tenant.productMakeupStudio,
           visitTryLimit: tenant.visitTryLimit,
           logoUrl: tenant.logoUrl,
         }}

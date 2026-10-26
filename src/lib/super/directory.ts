@@ -23,6 +23,7 @@ export type SalonRecord = {
   productQueue: boolean;
   productBridal: boolean;
   productGroom: boolean;
+  productMakeupStudio: boolean;
   queueToday: number;
 };
 
@@ -87,6 +88,7 @@ export async function loadSalons(): Promise<SalonRecord[]> {
       productQueue: tenant.productQueue,
       productBridal: tenant.productBridal,
       productGroom: tenant.productGroom,
+      productMakeupStudio: tenant.productMakeupStudio,
       queueToday: today.get(tenant.id) || 0,
     };
   });
