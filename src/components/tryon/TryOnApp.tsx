@@ -739,11 +739,21 @@ export function TryOnApp({
         return;
       }
       const out = await res.blob();
-      const aligned = await alignGeneratedPhoto(shot.blob, out, chosen.tool === "beard");
       const reason = res.headers.get("x-demo-reason") || "";
       const sample = reason === "no-key" || reason === "spend-cap" || reason === "failover" || reason === "placement";
+      // Demo samples are the selfie plus a style card. Aligning them to the selfie crops the card
+      // and makes Mid Fade (and every other category) look unchanged.
+      const aligned = sample
+        ? { blob: out, mode: "cover" as const, eyeDelta: null }
+        : await alignGeneratedPhoto(shot.blob, out, chosen.tool === "beard");
       const warning = res.headers.get("x-placement-warning") || "";
-      setNotice(reason === "spend-cap" ? t(lang, "spendCapNote") : warning);
+      setNotice(
+        reason === "spend-cap"
+          ? t(lang, "spendCapNote")
+          : reason === "no-key" || reason === "failover"
+            ? t(lang, "sampleNote")
+            : warning,
+      );
       if (poseDebug) {
         const raw = res.headers.get("x-placement-debug");
         if (raw) {

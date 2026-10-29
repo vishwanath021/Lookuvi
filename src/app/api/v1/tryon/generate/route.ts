@@ -6,7 +6,7 @@ import { bridalFinishById, bridalHairById, bridalLipById, bridalLookById, bridal
 import { readBridalGenerateFields } from "@/lib/bridal-request";
 import { parseBrowColour, parseBrowThickness } from "@/data/brows";
 import { claimGenerationJob, failGenerationJob, jobFingerprint } from "@/lib/ai/dedupe";
-import { demoGuestPreview, engineForGuestTool, guestEngineReady, loadGuestReference, readGuestEngine, runGuestHairstyleIfReady, runGuestLookIfReady } from "@/lib/ai/guest-hairstyle";
+import { demoGuestPreview, engineForGuestTool, guestEngineReady, guestEngineToRun, loadGuestReference, readGuestEngine, runGuestHairstyleIfReady, runGuestLookIfReady } from "@/lib/ai/guest-hairstyle";
 import { guestPreviewHeaders } from "@/lib/ai/guest-response";
 import { auth } from "@/auth";
 import { resolveFalKey } from "@/lib/ai/credentials";
@@ -285,6 +285,10 @@ export async function POST(req: Request) {
 
   const kind = tool === "brows" ? "BROWS" : tool === "beard" ? "BEARD" : tool === "nails" ? "NAILS" : tool === "colour" ? "COLOUR" : tool === "bridal" ? "BRIDAL" : tool === "mehendi" ? "MEHENDI" : "STYLE";
   const effective = engineForGuestTool(tool, engine);
+  const openaiReady = await guestEngineReady("openai");
+  const falReady = await guestEngineReady("fal");
+  // Must match runGuestEdit: when sunburst is selected but its key is missing, fal is still runnable.
+  const runnable = guestEngineToRun(effective, openaiReady, falReady);
   const superUser = placementDebug ? await viewerIsSuper() : false;
   const withPose = async (response: NextResponse) => {
     if (response.status === 200 && placementDebug && superUser) {
@@ -295,7 +299,7 @@ export async function POST(req: Request) {
     }
     return response;
   };
-  if (await guestEngineReady(effective)) {
+  if (runnable) {
     const styled = tool === "style" || !guestLook
       ? await runGuestHairstyleIfReady({
           jpeg,
@@ -328,10 +332,11 @@ export async function POST(req: Request) {
   }
 
   // Say why a guest got the unbilled sample instead of a provider call.
-  const falState = effective === "fal" ? await resolveFalKey() : null;
+  const falState = await resolveFalKey();
   console.warn(
-    `[tryon] sample preview for ${tenant.slug}/${tool}: guest engine "${effective}" is not ready` +
-      (falState && !falState.ok ? ` (fal key ${falState.reason === "off" ? "saved but not enabled on /super/ai" : "missing"})` : ""),
+    `[tryon] sample preview for ${tenant.slug}/${tool}: no runnable guest engine (selected "${effective}", openai=${openaiReady}, fal=${falReady}` +
+      (!falState.ok ? `, fal key ${falState.reason === "off" ? "saved but not enabled on /super/ai" : "missing"}` : "") +
+      ")",
   );
   return withPose(await demoGuestPreview({
     jpeg,

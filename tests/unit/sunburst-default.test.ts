@@ -28,6 +28,16 @@ describe("sunburst default try-on", () => {
     expect((meta.width || 0) / (meta.height || 1)).toBeCloseTo(500 / 700, 2);
   });
 
+
+  it("lets the generate route reach fal when sunburst is selected but OpenAI is not ready", () => {
+    const route = require("node:fs").readFileSync("src/app/api/v1/tryon/generate/route.ts", "utf8");
+    expect(route).toContain("guestEngineToRun(effective, openaiReady, falReady)");
+    expect(route).toContain("if (runnable)");
+    // The old gate only checked the selected engine, so a missing OpenAI key skipped fal entirely.
+    expect(route).not.toMatch(/if \(await guestEngineReady\(effective\)\)/);
+    expect(guestEngineToRun("openai", false, true)).toBe("fal");
+  });
+
   it("defaults every guest tool to sunburst and uses fal only after an unbilled OpenAI failure", async () => {
     expect(DEFAULT_GUEST_ENGINE).toBe("openai");
     await prisma.platformSetting.deleteMany({ where: { key: "guest_hairstyle_engine" } });
