@@ -136,6 +136,8 @@ export function TryBar({
   note,
   another = false,
   onAnother,
+  onSave,
+  saveLabel = "Save this look",
 }: {
   label: string;
   enabled: boolean;
@@ -145,16 +147,23 @@ export function TryBar({
   note?: string;
   another?: boolean;
   onAnother?: () => void;
+  onSave?: () => void;
+  saveLabel?: string;
 }) {
   return (
     <div className="try-bar" data-action-bar="yes">
-      {counter ? <p className="mb-1 text-center text-xs text-muted" data-try-count="yes">{counter}</p> : null}
-      {another ? (
-        <button className="btn secondary" type="button" onClick={onAnother}>Try another look</button>
-      ) : (
-        <button className="btn sheen" type="button" disabled={!enabled || busy} onClick={onClick}>{label}</button>
-      )}
-      {note ? <p className="mt-1 text-center text-sm" role="status">{note}</p> : null}
+      <div className="grid gap-3">
+        {onSave ? (
+          <button className="btn" type="button" onClick={onSave}>{saveLabel}</button>
+        ) : null}
+        {counter ? <p className="text-center text-xs text-muted" data-try-count="yes">{counter}</p> : null}
+        {another ? (
+          <button className="btn secondary" type="button" onClick={onAnother}>Try another look</button>
+        ) : (
+          <button className="btn sheen" type="button" disabled={!enabled || busy} onClick={onClick}>{label}</button>
+        )}
+        {note ? <p className="text-center text-sm" role="status">{note}</p> : null}
+      </div>
     </div>
   );
 }

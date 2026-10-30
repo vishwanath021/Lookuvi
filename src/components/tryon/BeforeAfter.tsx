@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function BeforeAfter({
   before,
@@ -23,6 +23,7 @@ export function BeforeAfter({
 }) {
   const [pos, setPos] = useState(52);
   const box = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
 
   function setFromClientX(clientX: number) {
     const rect = box.current?.getBoundingClientRect();
@@ -30,6 +31,24 @@ export function BeforeAfter({
     const next = ((clientX - rect.left) / rect.width) * 100;
     setPos(Math.min(96, Math.max(4, next)));
   }
+
+  useEffect(() => {
+    function onMove(event: PointerEvent) {
+      if (!dragging.current) return;
+      setFromClientX(event.clientX);
+    }
+    function onUp() {
+      dragging.current = false;
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, []);
 
   return (
     <div
@@ -40,11 +59,13 @@ export function BeforeAfter({
       data-eye-delta={eyeDelta == null ? undefined : eyeDelta.toFixed(2)}
       onPointerDown={(event) => {
         if ((event.target as HTMLElement).tagName === "INPUT") return;
-        box.current?.setPointerCapture(event.pointerId);
-        setFromClientX(event.clientX);
-      }}
-      onPointerMove={(event) => {
-        if (!box.current?.hasPointerCapture(event.pointerId)) return;
+        event.preventDefault();
+        dragging.current = true;
+        try {
+          box.current?.setPointerCapture(event.pointerId);
+        } catch {
+          /* capture is optional; window listeners still move the split */
+        }
         setFromClientX(event.clientX);
       }}
     >

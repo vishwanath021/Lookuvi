@@ -77,13 +77,13 @@ export function LookZoom({ src, onClose }: { src: string; onClose: () => void })
   );
 }
 
-/** Tap the portrait to open the same zoom controls the live studio uses. */
+/** Chip-sized zoom control. Kept off the compare slider so Before/After can drag. */
 export function ResultZoom({ src }: { src: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className="look-zoom-hit" type="button" aria-label="Zoom photo" onClick={() => setOpen(true)}>
-        <span className="look-zoom-chip">Zoom</span>
+      <button className="look-zoom-chip" type="button" aria-label="Zoom photo" data-zoom-chip="yes" onClick={() => setOpen(true)}>
+        Zoom
       </button>
       {open && typeof document !== "undefined" ? createPortal(<LookZoom src={src} onClose={() => setOpen(false)} />, document.body) : null}
     </>
