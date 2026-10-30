@@ -690,10 +690,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
             )}
             {camError && panel === "looks" ? <p className="text-sm" role="alert">{camError}</p> : null}
             {result?.kind === "look" && !busy ? (
-              <>
-                <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} shareUrl={result.share} kind="bridal" />
-                <button className="btn" type="button" onClick={() => void saveCurrent()}>Save this look</button>
-              </>
+              <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} shareUrl={result.share} kind="bridal" />
             ) : null}
             <TryBar
               label={lookButton.label}
@@ -704,6 +701,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               another={lookButton.another}
               onAnother={() => scrollToStep("bridal-steps")}
               onClick={() => { if (face) void generate("look", face); }}
+              onSave={result?.kind === "look" && !busy ? () => void saveCurrent() : undefined}
             />
           </section>
         </div>
@@ -758,10 +756,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               </PhotoActions>
             )}
             {result?.kind === "mehendi" && !busy ? (
-              <>
-                <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} shareUrl={result.share} kind="bridal" />
-                <button className="btn" type="button" onClick={() => void saveCurrent()}>Save this look</button>
-              </>
+              <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} shareUrl={result.share} kind="bridal" />
             ) : null}
             <TryBar
               label={mehendiButton.label}
@@ -772,6 +767,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               another={mehendiButton.another}
               onAnother={() => scrollToStep("bridal-mehendi")}
               onClick={() => { if (hand) void generate("mehendi", hand); }}
+              onSave={result?.kind === "mehendi" && !busy ? () => void saveCurrent() : undefined}
             />
           </section>
         </div>
