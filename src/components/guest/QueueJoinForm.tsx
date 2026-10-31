@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { LegalFooter } from "@/components/legal/LegalFooter";
 import { t } from "@/data/i18n";
 import { QueueWait } from "@/components/guest/QueueWait";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
@@ -157,6 +158,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
         <button className="btn w-full text-lg" type="submit" disabled={busy || (!board.open && !request)}>{busy ? "…" : request ? t(lang, "queueRequest") : t(lang, "queueJoin")}</button>
         {message ? <p className="text-sm" role="status">{message}</p> : null}
       </form>
+      <LegalFooter />
       {board.tryOn ? <p className="mt-4"><a className="btn secondary" href={`/s/${board.slug}`}>{t(lang, "queueTryLook")}</a></p> : null}
     </div>
   );

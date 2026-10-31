@@ -6,6 +6,11 @@ services:
   caddy:
     image: caddy:2
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "60"
     ports:
       - "80:80"
       - "443:443"
@@ -24,6 +29,11 @@ services:
     # Image command is docker-entrypoint.sh: prisma migrate deploy on Postgres, then node server.js.
     image: ${LOOKUVI_IMAGE:?set LOOKUVI_IMAGE}
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "60"
     env_file: .env.production
     environment:
       NODE_ENV: production
@@ -48,6 +58,11 @@ services:
   retention:
     image: curlimages/curl:8.11.1
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "60"
     environment:
       CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET}
     entrypoint: ["/bin/sh", "-c"]
@@ -64,6 +79,11 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "60"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-helix}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
@@ -79,6 +99,11 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "60"
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD}"]
 
 volumes:

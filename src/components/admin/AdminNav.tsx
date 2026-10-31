@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SignOutButton } from "@/components/admin/SignOutButton";
+import { LegalFooter } from "@/components/legal/LegalFooter";
 import { ownerNav, type OwnerFeatures } from "@/lib/features";
 
 export function AdminNav({
@@ -90,6 +91,7 @@ export function AdminNav({
           </details>
         </nav>
         <SignOutButton />
+        <LegalFooter className="mt-4 border-t border-white/10 pt-3 text-[#d8cbe4]" />
       </aside>
     </div>
   );
