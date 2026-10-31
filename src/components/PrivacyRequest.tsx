@@ -18,7 +18,11 @@ export function PrivacyRequest() {
       body: JSON.stringify({ slug, kind, contact, sessionId }),
     });
     const data = await res.json();
-    setMessage(data.message || data.error || "Sent");
+    setMessage(
+        res.status === 429
+          ? "Too many privacy requests from this connection. Please wait up to an hour and try again."
+          : data.message || data.error || "Sent",
+      );
   }
 
   return (

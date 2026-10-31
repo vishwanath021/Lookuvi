@@ -289,6 +289,34 @@ describe("queue joins", () => {
     await expect(guestVisit({ slug, ref: ticket.ref, action: "way", ip: "future-way" })).rejects.toMatchObject({ code: "STATE" });
   });
 
+
+  it("rejects request times outside the daytime window (#15)", async () => {
+    const { slug, tenant } = await salon();
+    await saveQueueSettings(tenant.id, { units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "REQUEST", unitLabel: "chair" });
+    await expect(joinQueue({
+      slug,
+      name: "Night",
+      phone: "9876500412",
+      consent: true,
+      requestedDate: "2099-08-02",
+      requestedSlot: "02:00",
+      ip: "night-slot",
+      send,
+    })).rejects.toMatchObject({ code: "INVALID" });
+    const ok = await joinQueue({
+      slug,
+      name: "Day",
+      phone: "9876500413",
+      consent: true,
+      requestedDate: "2099-08-02",
+      requestedSlot: "10:30",
+      ip: "day-slot",
+      send,
+    });
+    expect(ok.status).toBe("REQUESTED");
+    expect(ok.requestedSlot).toBe("10:30");
+  });
+
   it("confirms a requested visit and deletes old rows", async () => {
     const { slug, tenant } = await salon();
     await saveQueueSettings(tenant.id, { units: 2, avgMinutes: 45, alertLeadMin: 5, mode: "REQUEST", unitLabel: "room" });
