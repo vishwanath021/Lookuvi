@@ -272,6 +272,23 @@ describe("queue joins", () => {
     await expect(guestVisit({ slug, ref: future.ref, action: "way", ip: "way-c" })).rejects.toMatchObject({ code: "STATE" });
   });
 
+  it("refuses on-my-way for a future request ticket (#14)", async () => {
+    const { slug, tenant } = await salon();
+    await saveQueueSettings(tenant.id, { units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "REQUEST", unitLabel: "chair" });
+    const ticket = await joinQueue({
+      slug,
+      name: "Later",
+      phone: "9876500411",
+      consent: true,
+      requestedDate: "2099-08-01",
+      requestedSlot: "11:00",
+      ip: "future-way",
+      send,
+    });
+    expect(ticket.status).toBe("REQUESTED");
+    await expect(guestVisit({ slug, ref: ticket.ref, action: "way", ip: "future-way" })).rejects.toMatchObject({ code: "STATE" });
+  });
+
   it("confirms a requested visit and deletes old rows", async () => {
     const { slug, tenant } = await salon();
     await saveQueueSettings(tenant.id, { units: 2, avgMinutes: 45, alertLeadMin: 5, mode: "REQUEST", unitLabel: "room" });

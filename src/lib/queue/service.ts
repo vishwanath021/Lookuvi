@@ -346,6 +346,7 @@ export async function guestVisit(input: { slug: string; ref: string; action: "wa
   const row = await prisma.queueEntry.findFirst({ where: { cancelToken: input.ref, tenantId: tenant.id } });
   if (!row) throw new QueueError("NOT_FOUND", "That visit was not found.", 404);
   if (input.action === "way") {
+    // Live line only — request-mode / future tickets stay without On my way (#14).
     if (row.status !== "WAITING" && row.status !== "CALLED") {
       throw new QueueError("STATE", "On my way is only for guests still in line.", 409);
     }
