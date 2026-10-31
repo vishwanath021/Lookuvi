@@ -16,7 +16,7 @@ import { requestClientIp } from "@/lib/ratelimit";
 import { kolkataDayStart } from "@/lib/queue/day";
 import { blockedGuestMessage, isBlockedStatus } from "@/lib/salon-status";
 import { consumePreviewRateShared, guestLimitMessage, type PreviewTool } from "@/lib/tools";
-import { refundStaleTryReservations, releaseTryReservation, reserveTryCaps } from "@/lib/try-allowance";
+import { refundStaleTryReservations, reserveTryCaps } from "@/lib/try-allowance";
 import { isPhotoId, loadVisitPhoto, rememberVisitPhoto, refuseVisit, stampVisit } from "@/lib/visit-allowance";
 
 export const runtime = "nodejs";

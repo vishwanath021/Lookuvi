@@ -291,6 +291,7 @@ export async function POST(req: Request) {
 
   const { engine } = await readGuestEngine(tenant.id);
 
+  const kind = tool === "brows" ? "BROWS" : tool === "beard" ? "BEARD" : tool === "nails" ? "NAILS" : tool === "colour" ? "COLOUR" : tool === "bridal" ? "BRIDAL" : tool === "mehendi" ? "MEHENDI" : "STYLE";
   await refundStaleTryReservations(tenant.id);
   const capGate = await reserveTryCaps({
     tenantId: tenant.id,
@@ -317,7 +318,6 @@ export async function POST(req: Request) {
     return limited;
   }
 
-  const kind = tool === "brows" ? "BROWS" : tool === "beard" ? "BEARD" : tool === "nails" ? "NAILS" : tool === "colour" ? "COLOUR" : tool === "bridal" ? "BRIDAL" : tool === "mehendi" ? "MEHENDI" : "STYLE";
   const effective = engineForGuestTool(tool, engine);
   const openaiReady = await guestEngineReady("openai");
   const falReady = await guestEngineReady("fal");
