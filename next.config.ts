@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  images: {
+    // Keep SVG out of the image optimizer (GHSA-2464-fhr4-w9xw).
+    dangerouslyAllowSVG: false,
+  },
   poweredByHeader: false,
   devIndicators: false,
   webpack: (config, { dev }) => {
