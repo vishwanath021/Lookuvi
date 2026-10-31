@@ -5,6 +5,7 @@ import { ensureBridalPackages } from "@/lib/bridal-packages";
 import { isLocale, LOCALES } from "@/data/i18n";
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/session";
+import { isAllowedLogoUrl } from "@/lib/logo-url";
 import { toolEnabled, type ToolId } from "@/lib/tools";
 
 const schema = z.object({
@@ -17,7 +18,12 @@ const schema = z.object({
   city: z.string().max(80).optional(),
   languages: z.array(z.string()).optional(),
   defaultLang: z.string().optional(),
-  logoUrl: z.string().max(200_000).optional().nullable(),
+  logoUrl: z
+    .string()
+    .max(200_000)
+    .nullable()
+    .optional()
+    .refine((value) => value === undefined || isAllowedLogoUrl(value), { message: "LOGO_URL" }),
   removeBranding: z.boolean().optional(),
   onboardingDone: z.boolean().optional(),
   showMen: z.boolean().optional(),
