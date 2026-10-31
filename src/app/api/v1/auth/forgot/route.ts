@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { appBaseUrl } from "@/lib/env";
 import { tooMany } from "@/lib/http/guard";
-import { MAIL_NOT_CONFIGURED, mailConfigured, sendMail } from "@/lib/mail";
+import { MAIL_NOT_CONFIGURED, exposeDevMagicLink, mailConfigured, sendMail } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({ email: z.string().email() });
@@ -26,7 +26,10 @@ export async function POST(req: Request) {
     data: { email, tokenHash, expiresAt: new Date(Date.now() + 30 * 60 * 1000) },
   });
   const link = `${appBaseUrl()}/login/reset?token=${token}`;
-  if (!mailConfigured()) return NextResponse.json({ ...generic, devUrl: link, configured: false });
+  if (!mailConfigured()) {
+    if (exposeDevMagicLink()) return NextResponse.json({ ...generic, devUrl: link, configured: false });
+    return NextResponse.json({ configured: false, message: MAIL_NOT_CONFIGURED }, { status: 503 });
+  }
   const sent = await sendMail(email, "Reset your Lookuvi password", `Choose a new password: ${link}\nThis link expires in 30 minutes.`).catch(() => false);
   if (!sent) {
     await prisma.passwordReset.delete({ where: { id: row.id } }).catch(() => undefined);
