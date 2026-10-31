@@ -566,7 +566,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
 
   return (
     <div data-bridal="flow" data-busy={busy ? "yes" : "no"}>
-      <ConsentSheet open={consent.open} onAgree={() => void consent.agree()} onClose={consent.close} />
+      <ConsentSheet open={consent.open} lang={config.defaultLang || "en"} onAgree={(ageGate) => void consent.agree(ageGate)} onClose={consent.close} />
       <h2 className="page-title">Bridal</h2>
       <p className="mt-1 text-sm text-muted">Hair, makeup, and jewellery in one look. Then mehendi, and a trial with the salon.</p>
       <div className="seg mt-4" role="tablist" aria-label="Bridal">

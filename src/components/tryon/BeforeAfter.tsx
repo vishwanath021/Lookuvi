@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AiGeneratedBadge } from "@/components/legal/AiGeneratedBadge";
 
 export function BeforeAfter({
   before,
@@ -11,6 +12,8 @@ export function BeforeAfter({
   eyeDelta,
   className,
   afterClassName,
+  showAiBadge = true,
+  lang = "en",
 }: {
   before: string;
   after: string;
@@ -20,6 +23,8 @@ export function BeforeAfter({
   eyeDelta?: number | null;
   className?: string;
   afterClassName?: string;
+  showAiBadge?: boolean;
+  lang?: string;
 }) {
   const [pos, setPos] = useState(52);
   const box = useRef<HTMLDivElement>(null);
@@ -69,6 +74,7 @@ export function BeforeAfter({
         setFromClientX(event.clientX);
       }}
     >
+      {showAiBadge ? <AiGeneratedBadge lang={lang} /> : null}
       <img src={after} alt={afterLabel} className={`absolute inset-0 h-full w-full object-cover object-center${afterClassName ? ` ${afterClassName}` : ""}`} draggable={false} />
       <img
         src={before}

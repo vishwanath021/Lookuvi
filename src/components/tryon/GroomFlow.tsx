@@ -322,7 +322,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
 
   return (
     <div data-groom="flow" className="grid gap-4">
-      <ConsentSheet open={consent.open} onAgree={() => void consent.agree()} onClose={consent.close} />
+      <ConsentSheet open={consent.open} lang={config.defaultLang || "en"} onAgree={(ageGate) => void consent.agree(ageGate)} onClose={consent.close} />
       <h2 className="page-title">Groom</h2>
       <p className="text-sm text-muted">Wedding hair, a neat beard, and natural skin. Or dress him in his own clothes.</p>
       <div className="seg" role="tablist" aria-label="Groom">

@@ -11,9 +11,31 @@ export function exposeDevMagicLink() {
 export const MAIL_NOT_CONFIGURED =
   "Email is not configured. Set RESEND_API_KEY or SMTP_URL, and EMAIL_FROM. Until then, reset links and magic links are not sent. An operator can set a password with node scripts/create-super-admin.mjs.";
 
+export function mailFooter(kind: "transactional" | "marketing" = "transactional") {
+  const company = process.env.BRAND_LEGAL_NAME || "Agentic Build Works";
+  const postal = process.env.LEGAL_POSTAL_ADDRESS || "[Registered address]";
+  const lines = [
+    "",
+    "—",
+    `Sent by ${company} (Lookuvi).`,
+    `Postal: ${postal}`,
+  ];
+  if (kind === "marketing") {
+    const unsub = process.env.MARKETING_UNSUBSCRIBE_URL || "https://lookuvi.example/unsubscribe";
+    lines.push(`Unsubscribe: ${unsub}`);
+  }
+  return lines.join("\n");
+}
+
 /** Sends one plain-text message. The body can contain a one-time link, so callers must not log it. */
-export async function sendMail(to: string, subject: string, text: string) {
+export async function sendMail(
+  to: string,
+  subject: string,
+  text: string,
+  opts?: { kind?: "transactional" | "marketing" },
+) {
   const from = process.env.EMAIL_FROM || "Agentic Build Works <login@agenticbuildworks.com>";
+  const body = `${text.trimEnd()}\n${mailFooter(opts?.kind || "transactional")}`;
   if (process.env.RESEND_API_KEY) {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -21,7 +43,7 @@ export async function sendMail(to: string, subject: string, text: string) {
         Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from, to: [to], subject, text }),
+      body: JSON.stringify({ from, to: [to], subject, text: body }),
     });
     return res.ok;
   }
@@ -29,6 +51,6 @@ export async function sendMail(to: string, subject: string, text: string) {
   if (!url) return false;
   const nodemailer = await import("nodemailer");
   const transport = nodemailer.createTransport(url);
-  await transport.sendMail({ from, to, subject, text });
+  await transport.sendMail({ from, to, subject, text: body });
   return true;
 }

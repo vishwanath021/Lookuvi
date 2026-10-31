@@ -412,13 +412,13 @@ describe("login hint", () => {
 });
 
 describe("consent copy", () => {
-  it("names fal and OpenAI in every locale and drops the Gemini demo wording", () => {
+  it("names fal, OpenAI, and Gemini in every locale and drops demo-renderer wording", () => {
     for (const locale of LOCALES) {
       const text = t(locale, "consentProcessor");
       expect(text, locale).toContain("fal");
       expect(text, locale).toContain("Black Forest Labs FLUX");
       expect(text, locale).toContain("OpenAI");
-      expect(text.toLowerCase(), locale).not.toContain("gemini");
+      expect(text.toLowerCase(), locale).toContain("gemini");
       expect(text.toLowerCase(), locale).not.toContain("demo renderer");
     }
   });

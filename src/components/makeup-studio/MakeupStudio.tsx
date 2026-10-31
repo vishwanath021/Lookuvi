@@ -289,7 +289,7 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
     <section data-makeup-studio="on" data-makeup-status={status} className="relative">
       <input ref={uploadRef} data-makeup-upload className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void onFile(event.target.files?.[0])} />
       <input ref={cameraRef} data-makeup-camera className="sr-only" type="file" accept="image/*" capture="user" onChange={(event) => void onFile(event.target.files?.[0])} />
-      <ConsentSheet open={consent.open} onAgree={() => void consent.agree()} onClose={consent.close} />
+      <ConsentSheet open={consent.open} lang={config.defaultLang || "en"} onAgree={(ageGate) => void consent.agree(ageGate)} onClose={consent.close} />
       <div className="md:grid md:grid-cols-[240px_minmax(0,1fr)_240px] md:items-start md:gap-4">
         <div className="max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:max-h-[52dvh] max-md:overflow-y-auto max-md:rounded-t-2xl max-md:border max-md:border-line max-md:bg-white max-md:p-3 max-md:shadow-[0_-8px_24px_rgba(62,48,75,0.12)] md:contents">
           <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-[var(--line)] md:hidden" />

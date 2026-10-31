@@ -105,6 +105,7 @@ export function LookResultActions({
 }) {
   return (
     <div className="grid w-full max-w-[28rem] gap-2" data-result-actions="yes">
+      <p className="text-center text-xs text-muted" data-ai-generated="yes">AI-generated preview</p>
       <button
         className="btn"
         type="button"
