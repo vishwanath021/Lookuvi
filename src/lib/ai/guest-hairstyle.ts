@@ -13,6 +13,7 @@ import { guestPreviewHeaders } from "@/lib/ai/guest-response";
 import { executeReferenceEdit } from "@/lib/ai/reference-run";
 import { readHairstyleReference, thumbnailFolder } from "@/lib/ai/style-reference";
 import { CreditError, reserveCredits, settleCredits } from "@/lib/credits";
+import { releaseTryReservation, settleTryReservation } from "@/lib/try-allowance";
 import { numberEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { appMediaUrl } from "@/lib/storage";
@@ -193,6 +194,8 @@ type GuestEditArgs = {
   tool: string;
   kind: string;
   guest?: { prompt: string; reference: Buffer; referenceFile: string };
+  /** Atomic monthly/daily cap slot from reserveTryCaps. */
+  reservationId?: string;
 };
 
 /**
@@ -211,6 +214,7 @@ async function runGuestEdit(args: GuestEditArgs): Promise<NextResponse | null> {
     await reserveCredits(args.tenantId, 1, creditRef);
   } catch (error) {
     if (error instanceof CreditError) {
+      await releaseTryReservation(args.reservationId || "");
       await failGenerationJob(args.jobId, { outcome: "credits", message: guestLimitMessage("credits") });
       return NextResponse.json({ error: "CREDITS", message: guestLimitMessage("credits") }, { status: 402 });
     }
@@ -260,59 +264,96 @@ async function runGuestEdit(args: GuestEditArgs): Promise<NextResponse | null> {
       });
       await settleCredits(args.tenantId, creditRef, "REFUND");
       await failGenerationJob(args.jobId, { outcome: "unchanged", message: COLOUR_UNCHANGED_MESSAGE, callId: executed.callId });
-      await prisma.tryOn.create({
-        data: {
-          tenantId: args.tenantId,
-          sessionId: args.sessionId,
+      if (args.reservationId) {
+        await settleTryReservation(args.reservationId, {
+          status: "FAILED",
           styleId: args.styleId,
           shadeId: args.styleId,
           kind,
           tier: args.tier,
           actorKey: args.actorKey,
-          quality: "standard",
-          status: "FAILED",
-          credits: 0,
           latencyMs: executed.latencyMs,
-        },
-      });
+          credits: 0,
+        });
+      } else {
+        await prisma.tryOn.create({
+          data: {
+            tenantId: args.tenantId,
+            sessionId: args.sessionId,
+            styleId: args.styleId,
+            shadeId: args.styleId,
+            kind,
+            tier: args.tier,
+            actorKey: args.actorKey,
+            quality: "standard",
+            status: "FAILED",
+            credits: 0,
+            latencyMs: executed.latencyMs,
+          },
+        });
+      }
       return NextResponse.json({ error: "UNCHANGED", message: COLOUR_UNCHANGED_MESSAGE }, { status: 422 });
     }
   }
   if (!executed.ok) {
     await settleCredits(args.tenantId, creditRef, "REFUND");
     await failGenerationJob(args.jobId, { outcome: executed.outcome, message: guestMessage(executed.outcome), callId: executed.callId });
-    await prisma.tryOn.create({
-      data: {
-        tenantId: args.tenantId,
-        sessionId: args.sessionId,
+    if (args.reservationId) {
+      await settleTryReservation(args.reservationId, {
+        status: "FAILED",
         styleId: args.styleId,
         shadeId: kind === "COLOUR" ? args.styleId : null,
         kind,
         tier: args.tier,
         actorKey: args.actorKey,
-        quality: "standard",
-        status: "FAILED",
         credits: 0,
-      },
-    });
+      });
+    } else {
+      await prisma.tryOn.create({
+        data: {
+          tenantId: args.tenantId,
+          sessionId: args.sessionId,
+          styleId: args.styleId,
+          shadeId: kind === "COLOUR" ? args.styleId : null,
+          kind,
+          tier: args.tier,
+          actorKey: args.actorKey,
+          quality: "standard",
+          status: "FAILED",
+          credits: 0,
+        },
+      });
+    }
     return NextResponse.json({ error: "PREVIEW", message: guestMessage(executed.outcome) }, { status: executed.httpStatus });
   }
   const jpegOut = await sharp(framed || executed.framedPng).jpeg({ quality: 90 }).toBuffer();
-  const tryOn = await prisma.tryOn.create({
-    data: {
-      tenantId: args.tenantId,
-      sessionId: args.sessionId,
-      styleId: args.styleId,
-      shadeId: kind === "COLOUR" ? args.styleId : null,
-      kind,
-      tier: args.tier,
-      actorKey: args.actorKey,
-      quality: "standard",
-      status: "SUCCEEDED",
-      latencyMs: executed.latencyMs,
-      credits: 1,
-    },
-  });
+  const tryOn = args.reservationId
+    ? await settleTryReservation(args.reservationId, {
+        status: "SUCCEEDED",
+        styleId: args.styleId,
+        shadeId: kind === "COLOUR" ? args.styleId : null,
+        kind,
+        tier: args.tier,
+        actorKey: args.actorKey,
+        latencyMs: executed.latencyMs,
+        credits: 1,
+      })
+    : await prisma.tryOn.create({
+        data: {
+          tenantId: args.tenantId,
+          sessionId: args.sessionId,
+          styleId: args.styleId,
+          shadeId: kind === "COLOUR" ? args.styleId : null,
+          kind,
+          tier: args.tier,
+          actorKey: args.actorKey,
+          quality: "standard",
+          status: "SUCCEEDED",
+          latencyMs: executed.latencyMs,
+          credits: 1,
+        },
+      });
+  if (!tryOn) throw new Error("TRY_RESERVATION");
   await settleCredits(args.tenantId, creditRef, "COMMIT");
   await logGenerateEvent({
     tenantId: args.tenantId,
@@ -360,6 +401,8 @@ export async function demoGuestPreview(args: Omit<GuestEditArgs, "guest" | "orig
     : args.tool === "makeup"
       ? await demoMakeupSample(args.jpeg, args.styleName)
       : await demoStyleComposite(args.jpeg, args.styleId, args.styleName, thumbnailFolder(args.tool));
+  // Demo samples do not consume the salon monthly/daily allowance.
+  await releaseTryReservation(args.reservationId || "");
   const tryOn = await prisma.tryOn.create({
     data: {
       tenantId: args.tenantId,

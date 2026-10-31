@@ -16,7 +16,7 @@ import { requestClientIp } from "@/lib/ratelimit";
 import { kolkataDayStart } from "@/lib/queue/day";
 import { blockedGuestMessage, isBlockedStatus } from "@/lib/salon-status";
 import { consumePreviewRateShared, guestLimitMessage, type PreviewTool } from "@/lib/tools";
-import { refuseMonthlyTries } from "@/lib/try-allowance";
+import { refundStaleTryReservations, reserveTryCaps } from "@/lib/try-allowance";
 import { isPhotoId, loadVisitPhoto, rememberVisitPhoto, refuseVisit, stampVisit } from "@/lib/visit-allowance";
 
 export const runtime = "nodejs";
@@ -103,15 +103,6 @@ export async function POST(req: Request) {
   const ip = requestClientIp(req);
   const staffId = await staffUser(tenant.id);
   const bucket = staffId ? `staff:${staffId}` : ip;
-  const usedToday = await prisma.tryOn.count({
-    where: { tenantId: tenant.id, kind: { in: [...AI_PREVIEW_KINDS] }, status: "SUCCEEDED", createdAt: { gte: kolkataDayStart() } },
-  });
-  if (usedToday >= tenant.dailyCap) {
-    return NextResponse.json({ error: "DAILY_CAP", message: guestLimitMessage("daily") }, { status: 429 });
-  }
-  const monthly = await refuseMonthlyTries(tenant.id, tenant.monthlyTryAllowance);
-  if (monthly) return NextResponse.json(monthly, { status: 429 });
-
   const salonOk = verifySalonToken(String(form.get("salonToken") || ""), tenant.id, tenant.salonNonce);
   const jar = await cookies();
   const guest = readGuestToken(jar.get("helix_guest")?.value);
@@ -178,6 +169,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "RATE", message: limited.message }, { status: 429 });
   }
 
+  await refundStaleTryReservations(tenant.id);
+  const capGate = await reserveTryCaps({
+    tenantId: tenant.id,
+    monthlyAllowance: tenant.monthlyTryAllowance,
+    dailyCap: tenant.dailyCap,
+    sessionId,
+    kind: MAKEUP_STUDIO_KIND,
+    tier,
+    actorKey,
+    styleId,
+  });
+  if (!capGate.ok) {
+    await failGenerationJob(claim.id, { outcome: "cap", message: capGate.message });
+    return NextResponse.json(
+      { error: capGate.error, message: capGate.message, used: capGate.used, allowance: capGate.allowance },
+      { status: 429 },
+    );
+  }
+  const reservationId = capGate.id;
+
   const shared = {
     jpeg,
     original: jpeg,
@@ -191,6 +202,7 @@ export async function POST(req: Request) {
     requestId,
     tool: MAKEUP_STUDIO_TOOL,
     kind: MAKEUP_STUDIO_KIND,
+    reservationId,
   };
   let response: NextResponse | null = null;
   if (!usingDemoProvider()) {
