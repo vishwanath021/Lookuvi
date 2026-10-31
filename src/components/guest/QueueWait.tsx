@@ -2,16 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { t } from "@/data/i18n";
-import { displayedWait } from "@/lib/queue/wait-display";
+import { displayedWait, waitSample } from "@/lib/queue/wait-display";
 
+/** Counts the server wait down once a minute. Resamples when the server figure changes; never remounts on poll. */
 function useDisplayedWait(serverWait: number) {
-  const [sampledAt] = useState(() => Date.now());
-  const [now, setNow] = useState(sampledAt);
+  const [sample, setSample] = useState(() => ({ wait: serverWait, at: Date.now() }));
+  const [now, setNow] = useState(() => Date.now());
+  const next = waitSample(sample, serverWait, Date.now());
+  if (next !== sample && (next.wait !== sample.wait || next.at !== sample.at)) {
+    setSample(next);
+  }
 
   useEffect(() => {
     let timer = 0;
     const arm = () => {
-      const elapsed = Date.now() - sampledAt;
+      const elapsed = Date.now() - sample.at;
       const into = elapsed % 60_000;
       const delay = into === 0 ? 60_000 : 60_000 - into;
       timer = window.setTimeout(() => {
@@ -21,9 +26,9 @@ function useDisplayedWait(serverWait: number) {
     };
     arm();
     return () => window.clearTimeout(timer);
-  }, [sampledAt]);
+  }, [sample.at]);
 
-  return displayedWait(serverWait, sampledAt, now);
+  return displayedWait(sample.wait, sample.at, now);
 }
 
 export function QueueWait({

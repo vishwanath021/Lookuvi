@@ -22,6 +22,9 @@ export const QUEUE_IP_JOINS_PER_HOUR = 60;
 export const QUEUE_PHONE_JOINS_PER_HOUR = 4;
 export const QUEUE_DEVICE_JOINS_PER_HOUR = 8;
 const HOUR_MS = 60 * 60 * 1000;
+/** Request-mode slots with no salon hours config: refuse obviously closed overnight times. */
+export const REQUEST_SLOT_EARLIEST = "06:00";
+export const REQUEST_SLOT_LATEST = "22:00";
 
 const LIVE_ACTIVE = ["WAITING", "CALLED", "IN_SERVICE"];
 const REQUEST_ACTIVE = ["REQUESTED", "CONFIRMED"];
@@ -231,6 +234,10 @@ function checkSlot(date: string, slot: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new QueueError("INVALID", "Choose a date.", 400);
   if (!/^\d{2}:\d{2}$/.test(slot)) throw new QueueError("INVALID", "Choose a time.", 400);
   if (date < kolkataDayKey()) throw new QueueError("INVALID", "Choose today or a later date.", 400);
+  // No operating-hours fields on the salon yet. Keep request times inside a daytime window.
+  if (slot < REQUEST_SLOT_EARLIEST || slot > REQUEST_SLOT_LATEST) {
+    throw new QueueError("INVALID", `Choose a time between ${REQUEST_SLOT_EARLIEST} and ${REQUEST_SLOT_LATEST}.`, 400);
+  }
 }
 
 export async function joinQueue(input: {
@@ -346,8 +353,9 @@ export async function guestVisit(input: { slug: string; ref: string; action: "wa
   const row = await prisma.queueEntry.findFirst({ where: { cancelToken: input.ref, tenantId: tenant.id } });
   if (!row) throw new QueueError("NOT_FOUND", "That visit was not found.", 404);
   if (input.action === "way") {
-    if (row.status === "CANCELLED" || row.status === "DONE" || row.status === "NO_SHOW") {
-      throw new QueueError("STATE", "This visit is already closed.", 409);
+    // Live line only — request-mode / future tickets stay without On my way (#14).
+    if (row.status !== "WAITING" && row.status !== "CALLED") {
+      throw new QueueError("STATE", "On my way is only for guests still in line.", 409);
     }
     await prisma.queueEntry.update({ where: { id: row.id }, data: { onTheWay: true } });
   } else {
@@ -465,7 +473,7 @@ export async function startEntry(tenantId: string, id: string) {
   if (!slot) throw new QueueError("BUSY", "Every place is busy. Mark one done first.", 409);
   await prisma.queueEntry.update({
     where: { id },
-    data: { status: "IN_SERVICE", startedAt: row.startedAt || new Date(), calledAt: row.calledAt || new Date(), unitSlot: slot },
+    data: { status: "IN_SERVICE", startedAt: row.startedAt || new Date(), calledAt: row.calledAt || new Date(), unitSlot: slot, onTheWay: false },
   });
   return deskSnapshot(tenantId);
 }
@@ -476,7 +484,7 @@ export async function finishEntry(tenantId: string, id: string, status: "DONE" |
   if (!row) throw new QueueError("NOT_FOUND", "That guest was not found.", 404);
   const allowed = status === "DONE" ? ["CALLED", "IN_SERVICE", "WAITING", "CONFIRMED"] : ["WAITING", "CALLED", "IN_SERVICE"];
   if (!allowed.includes(row.status)) throw new QueueError("STATE", "That guest is already closed.", 409);
-  await prisma.queueEntry.update({ where: { id }, data: { status, doneAt: new Date(), unitSlot: null } });
+  await prisma.queueEntry.update({ where: { id }, data: { status, doneAt: new Date(), unitSlot: null, onTheWay: false } });
   if (status === "DONE" && row.phone) await recordVisit(tenantId, row.phone, row.name);
   await sweepAlerts(tenantId, send);
   return deskSnapshot(tenantId);
