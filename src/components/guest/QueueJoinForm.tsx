@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { t } from "@/data/i18n";
 import { QueueWait } from "@/components/guest/QueueWait";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
+import { parseVisitMemory, rememberVisit, serializeVisitMemory, visitMemoryKey, type VisitMemory } from "@/lib/queue/visit-memory";
 
 type Board = {
   name: string;
@@ -17,8 +18,6 @@ type Board = {
   services: { id: string; name: string; minutes: number }[];
 };
 
-type Memory = { name: string; phone: string; ref: string };
-
 export function QueueJoinForm({ initial }: { initial: Board }) {
   const lang = initial.lang || "en";
   const [board, setBoard] = useState(initial);
@@ -31,7 +30,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
-  const [memory, setMemory] = useState<Memory | null>(null);
+  const [visits, setVisits] = useState<VisitMemory[]>([]);
   const [returnToken, setReturnToken] = useState("");
   const request = board.mode === "REQUEST";
 
@@ -40,10 +39,9 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
     const token = new URLSearchParams(window.location.search).get("r") || "";
     if (/^[A-Za-z0-9_-]{16,80}$/.test(token)) setReturnToken(token);
     try {
-      const saved = JSON.parse(localStorage.getItem(`lookuvi-queue:${board.slug}`) || "null") as Memory | null;
-      if (saved?.phone && saved.ref) setMemory(saved);
+      setVisits(parseVisitMemory(localStorage.getItem(visitMemoryKey(board.slug))));
     } catch {
-      setMemory(null);
+      setVisits([]);
     }
   }, [board.slug]);
 
@@ -98,7 +96,8 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
       setMessage(data.message || "That did not work. Try again.");
       return;
     }
-    localStorage.setItem(`lookuvi-queue:${board.slug}`, JSON.stringify({ name: nextName, phone: nextPhone, ref: data.ref }));
+    const next = rememberVisit(visits, { name: nextName, phone: nextPhone, ref: data.ref });
+    localStorage.setItem(visitMemoryKey(board.slug), serializeVisitMemory(next));
     window.location.href = data.statusPath;
   }
 
@@ -110,11 +109,15 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
         ) : <p className="mt-2 text-sm">{t(lang, "queueClosed")}</p>}
       </div>
       <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted">{board.open ? t(lang, "queueOpenNow") : t(lang, "queueClosedNow")}</p>
-      {memory ? (
-        <div className="card mt-4 grid gap-2 p-4">
-          <p>{t(lang, "queueWelcome", { name: memory.name || memory.phone })}</p>
-          <a className="btn secondary" href={`/s/${board.slug}/q/${memory.ref}`}>{t(lang, "queueSeePlace")}</a>
-          <button className="btn" type="button" disabled={busy || (!board.open && !request)} onClick={() => void join(memory.name, memory.phone, true)}>{t(lang, "queueRejoin")}</button>
+      {visits.length ? (
+        <div className="card mt-4 grid gap-3 p-4" data-queue-visits={visits.length}>
+          {visits.map((visit) => (
+            <div key={visit.ref} className="grid gap-2 border-b border-line pb-3 last:border-b-0 last:pb-0">
+              <p>{t(lang, "queueWelcome", { name: visit.name || visit.phone })}</p>
+              <a className="btn secondary" href={`/s/${board.slug}/q/${visit.ref}`}>{t(lang, "queueSeePlace")}</a>
+              <button className="btn" type="button" disabled={busy || (!board.open && !request)} onClick={() => void join(visit.name, visit.phone, true)}>{t(lang, "queueRejoin")}</button>
+            </div>
+          ))}
         </div>
       ) : null}
       <form
