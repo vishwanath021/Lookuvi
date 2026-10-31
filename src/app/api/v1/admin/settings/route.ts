@@ -23,7 +23,7 @@ const schema = z.object({
     .max(200_000)
     .nullable()
     .optional()
-    .refine((value) => value === undefined || isAllowedLogoUrl(value), { message: "LOGO_URL" }),
+    .refine((value) => value === undefined || isAllowedLogoUrl(value), { error: "LOGO_URL" }),
   removeBranding: z.boolean().optional(),
   onboardingDone: z.boolean().optional(),
   showMen: z.boolean().optional(),

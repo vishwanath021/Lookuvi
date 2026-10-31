@@ -12,7 +12,7 @@ const bodySchema = z.object({
     .array(
       z.object({
         name: z.string().min(1).max(60),
-        props: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+        props: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
       }),
     )
     .max(20),

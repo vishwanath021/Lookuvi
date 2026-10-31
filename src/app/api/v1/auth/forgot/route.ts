@@ -6,7 +6,7 @@ import { tooMany } from "@/lib/http/guard";
 import { MAIL_NOT_CONFIGURED, exposeDevMagicLink, mailConfigured, sendMail } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 
-const bodySchema = z.object({ email: z.string().email() });
+const bodySchema = z.object({ email: z.email() });
 const generic = { message: "If that account exists, we sent a reset link." };
 
 export async function POST(req: Request) {

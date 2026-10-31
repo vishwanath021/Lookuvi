@@ -16,7 +16,7 @@ const bodySchema = z.object({
   plan: z.string().optional(),
   city: z.string().max(80).optional(),
   whatsapp: z.string().max(20).optional(),
-  ownerEmail: z.string().email().optional(),
+  ownerEmail: z.email().optional(),
   ownerName: z.string().trim().min(2).max(80).optional(),
   ownerPassword: z.string().min(12).max(200).optional(),
 });

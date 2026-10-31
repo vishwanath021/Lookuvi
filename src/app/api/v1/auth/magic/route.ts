@@ -6,7 +6,7 @@ import { tooMany } from "@/lib/http/guard";
 import { MAIL_NOT_CONFIGURED, exposeDevMagicLink, mailConfigured, sendMail } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 
-const bodySchema = z.object({ email: z.string().email() });
+const bodySchema = z.object({ email: z.email() });
 
 export async function POST(req: Request) {
   const limited = await tooMany(req, "magic", 8, 15 * 60 * 1000);
