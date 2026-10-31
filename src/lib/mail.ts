@@ -3,6 +3,11 @@ export function mailConfigured() {
   return Boolean(process.env.RESEND_API_KEY || process.env.SMTP_URL);
 }
 
+/** True only when local/dev is allowed to return a one-time link in the JSON body. Never on in production (env gate refuses boot). */
+export function exposeDevMagicLink() {
+  return process.env.ALLOW_DEV_MAGIC_LINK === "true" && process.env.NODE_ENV !== "production";
+}
+
 export const MAIL_NOT_CONFIGURED =
   "Email is not configured. Set RESEND_API_KEY or SMTP_URL, and EMAIL_FROM. Until then, reset links and magic links are not sent. An operator can set a password with node scripts/create-super-admin.mjs.";
 
