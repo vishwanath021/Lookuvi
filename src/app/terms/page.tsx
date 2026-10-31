@@ -10,7 +10,7 @@ export default function TermsPage() {
     <main className="mx-auto max-w-2xl px-5 py-10 text-sm leading-7">
       <p className="text-muted"><Link href="/">Lookuvi</Link></p>
       <h1 className="mt-3 page-title">Terms</h1>
-      <p className="mt-4">These terms are a template for a salon subscription to Lookuvi, a product of {company}. They are not a substitute for a contract reviewed for your entity. Version 2026-10-31.</p>
+      <p className="mt-4">These terms cover a salon subscription to Lookuvi, a product of {company}. Have your entity review them before relying on them as a signed contract. Version 2026-10-31.</p>
       <h2 className="mt-6 font-serif text-2xl">The service</h2>
       <p>We host a branded try-on page, QR, and (on eligible plans) an embed. Live colour is included. AI previews spend credits. When credits run out, colour keeps working and new previews stop with a plain message.</p>
       <h2 className="mt-6 font-serif text-2xl">Previews</h2>

@@ -10,7 +10,7 @@ export default function RefundPage() {
     <main className="mx-auto max-w-2xl px-5 py-10 text-sm leading-7">
       <p className="text-muted"><Link href="/">Lookuvi</Link></p>
       <h1 className="mt-3 page-title">Refund &amp; cancellation</h1>
-      <p className="mt-2 text-muted">Version 2026-10-31. For salon (B2B) subscriptions and try-on packs. Guest walk-in try-ons are free to the guest. This page is a template.</p>
+      <p className="mt-2 text-muted">Version 2026-10-31. For salon (B2B) subscriptions and try-on packs. Guest walk-in try-ons are free to the guest. Fill the placeholders before launch.</p>
       <div className="mt-6 space-y-4">
         <p>{company} sells Lookuvi plans and try-on packs to salons in India. Prices in the product are in Indian rupees and are shown before payment. GST is not charged until {company} has a GSTIN. A receipt is not a tax invoice until then.</p>
         <h2 className="font-serif text-2xl">Plans</h2>

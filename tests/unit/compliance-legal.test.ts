@@ -21,11 +21,12 @@ describe("compliance legal pages", () => {
     expect(html).toContain("30 days");
   });
 
-  it("publishes refund, AI disclosure, copyright, privacy, and terms templates", () => {
+  it("publishes refund, AI disclosure, copyright, privacy, and terms pages", () => {
     for (const Page of [RefundPage, AiDisclosurePage, CopyrightPage, PrivacyPage, TermsPage]) {
       const html = renderToStaticMarkup(createElement(Page));
       expect(html.length).toBeGreaterThan(200);
-      expect(html).toMatch(/template|Counsel|counsel/i);
+      expect(html.toLowerCase()).not.toContain("template");
+      expect(html.toLowerCase()).not.toContain("lawyer");
     }
     const privacy = renderToStaticMarkup(createElement(PrivacyPage));
     expect(privacy).toContain("Google Gemini");

@@ -10,7 +10,7 @@ export default function GrievancePage() {
     <main className="mx-auto max-w-2xl px-5 py-10 text-sm leading-7">
       <p className="text-muted"><Link href="/">Lookuvi</Link></p>
       <h1 className="mt-3 page-title">Grievance &amp; contact</h1>
-      <p className="mt-2 text-muted">Version 2026-10-31. How to reach Lookuvi about privacy, service, or content complaints. This page is a template.</p>
+      <p className="mt-2 text-muted">Version 2026-10-31. How to reach Lookuvi about privacy, service, or content complaints. Fill the placeholders before launch.</p>
       <div className="mt-6 space-y-4">
         <p>{company} operates Lookuvi. Salons that use Lookuvi are data fiduciaries for their guests under the Digital Personal Data Protection Act, 2023. Lookuvi is the processor for try-on software.</p>
         <h2 className="font-serif text-2xl">Grievance Officer</h2>

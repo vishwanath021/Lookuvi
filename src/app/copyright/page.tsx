@@ -10,7 +10,7 @@ export default function CopyrightPage() {
     <main className="mx-auto max-w-2xl px-5 py-10 text-sm leading-7">
       <p className="text-muted"><Link href="/">Lookuvi</Link></p>
       <h1 className="mt-3 page-title">Copyright &amp; takedown</h1>
-      <p className="mt-2 text-muted">Version 2026-10-31. Notice-and-takedown contact for alleged copyright or unlawful content on Lookuvi. This page is a template (DMCA-style process adapted for India).</p>
+      <p className="mt-2 text-muted">Version 2026-10-31. Notice-and-takedown contact for alleged copyright or unlawful content on Lookuvi. DMCA-style process adapted for India. Fill placeholders before launch.</p>
       <div className="mt-6 space-y-4">
         <p>{company} hosts salon-branded try-on pages and related content. If you believe material on Lookuvi infringes your copyright or is otherwise unlawful, send a notice to:</p>
         <ul className="list-disc space-y-1 pl-5">

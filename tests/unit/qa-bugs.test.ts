@@ -364,12 +364,12 @@ describe("privacy page", () => {
     const html = renderToStaticMarkup(createElement(PrivacyPage));
     expect(html).toContain("fal (Black Forest Labs FLUX)");
     expect(html).toContain("OpenAI");
+    expect(html).toContain("Google Gemini");
     expect(html).toContain("Hostinger");
     expect(html).toContain("Cloudflare");
     expect(html).toContain("Digital Personal Data Protection Act, 2023");
     expect(html.toLowerCase()).not.toContain("template");
     expect(html.toLowerCase()).not.toContain("lawyer");
-    expect(html.toLowerCase()).not.toContain("gemini");
   });
 });
 

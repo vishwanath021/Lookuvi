@@ -14,7 +14,7 @@ export function LegalFooter({ className = "", company = "Agentic Build Works" }:
         <Link className="underline" href="/ai-disclosure">AI disclosure</Link>
         <Link className="underline" href="/copyright">Copyright</Link>
       </nav>
-      <p className="mt-2">Lookuvi is a product of {company}. Legal text is a template — have counsel review it.</p>
+      <p className="mt-2">Lookuvi is a product of {company}.</p>
     </footer>
   );
 }

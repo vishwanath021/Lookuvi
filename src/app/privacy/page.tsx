@@ -11,7 +11,7 @@ export default function PrivacyPage() {
     <main className="mx-auto max-w-2xl px-5 py-10">
       <p className="text-sm text-muted"><Link href="/">Lookuvi</Link></p>
       <h1 className="mt-3 page-title">Privacy</h1>
-      <p className="mt-2 text-sm text-muted">Version 2026-10-31. How Lookuvi and each salon handle personal data for the try-on and the queue. This notice is a template — have counsel review it before launch.</p>
+      <p className="mt-2 text-sm text-muted">Version 2026-10-31. How Lookuvi and each salon handle personal data for the try-on and the queue.</p>
       <div className="mt-6 space-y-4 text-sm leading-7">
         <p>The salon is the data fiduciary for its guests under the Digital Personal Data Protection Act, 2023. {company} operates Lookuvi and is the processor that runs the try-on software. A face or hand photo used for a preview is personal data (and is treated with care similar to sensitive / biometric-like data under older SPDI practice).</p>
 
