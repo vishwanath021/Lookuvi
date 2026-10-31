@@ -27,12 +27,12 @@ export function usePhotoConsent(slug: string, lang: string) {
     }
   }, [storageKey]);
 
-  async function persist() {
+  async function persist(ageGate = true) {
     if (idRef.current) return idRef.current;
     const res = await fetch("/api/v1/consent", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ slug, sessionId: guestSessionId(), lang: lang || "en", accepted: true, ageGate: true }),
+      body: JSON.stringify({ slug, sessionId: guestSessionId(), lang: lang || "en", accepted: true, ageGate: Boolean(ageGate) }),
     });
     const data = await res.json().catch(() => ({}));
     if (!data.id) return "";
@@ -54,12 +54,13 @@ export function usePhotoConsent(slug: string, lang: string) {
     setOpen(true);
   }
 
-  function agree() {
+  function agree(ageGate = true) {
+    if (!ageGate) return;
     const next = pending.current;
     pending.current = null;
     setOpen(false);
     next?.();
-    void persist();
+    void persist(true);
   }
 
   function close() {

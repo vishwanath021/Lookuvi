@@ -76,6 +76,13 @@ export function BillingPanel({
   return (
     <div>
       <p className="text-sm">Current plan <strong>{name}</strong> · {status} · {credits.toLocaleString("en-IN")} try-ons left</p>
+      <p className="mt-2 text-xs text-muted">
+        Prices are shown before you pay. A plan renews for the same interval until you cancel or payment fails.
+        {" "}
+        <a className="underline" href="/refund">Refund &amp; cancellation</a>
+        {" · "}
+        <a className="underline" href="/grievance">Grievance</a>
+      </p>
       <label className="mt-3 flex items-center gap-2 text-sm">
         <input type="checkbox" checked={interval === "yearly"} onChange={(event) => setInterval(event.target.checked ? "yearly" : "monthly")} />
         Annual (two months free)

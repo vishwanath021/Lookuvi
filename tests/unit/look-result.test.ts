@@ -6,9 +6,9 @@ import { lookDownloadName, lookShareMessage } from "@/lib/look-result";
 
 describe("look result actions", () => {
   it("names the full-resolution file salon, look, and date", () => {
-    expect(lookDownloadName("Demo Salon", "Telugu Muhurtham Classic", new Date(2026, 9, 18))).toBe("demo-salon-telugu-muhurtham-classic-2026-10-18.jpg");
-    expect(lookShareMessage("bridal", "Soft rose", "https://look.example/a")).toBe("Look at this bridal look: Soft rose. https://look.example/a");
-    expect(lookShareMessage("groom", "Your own look")).toBe("Look at this groom look: Your own look.");
+    expect(lookDownloadName("Demo Salon", "Telugu Muhurtham Classic", new Date(2026, 9, 18))).toBe("ai-preview-demo-salon-telugu-muhurtham-classic-2026-10-18.jpg");
+    expect(lookShareMessage("bridal", "Soft rose", "https://look.example/a")).toBe("Look at this bridal look: Soft rose (AI-generated preview). https://look.example/a");
+    expect(lookShareMessage("groom", "Your own look")).toBe("Look at this groom look: Your own look (AI-generated preview).");
   });
 
   it("offers download, WhatsApp, and zoom controls", () => {

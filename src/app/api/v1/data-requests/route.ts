@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
   slug: z.string().min(1),
-  kind: z.enum(["withdraw", "delete", "access"]),
+  kind: z.enum(["withdraw", "delete", "access", "correct", "grievance"]),
   contact: z.string().min(3).max(120),
   sessionId: z.string().max(80).optional().nullable(),
 });

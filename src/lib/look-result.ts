@@ -3,12 +3,13 @@ export function lookDownloadName(slug: string, look: string, when = new Date()) 
   const day = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, "0")}-${String(when.getDate()).padStart(2, "0")}`;
   const salon = slug.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "salon";
   const name = look.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "look";
-  return `${salon}-${name}-${day}.jpg`;
+  return `ai-preview-${salon}-${name}-${day}.jpg`;
 }
 
 export function lookShareMessage(kind: "bridal" | "groom", name: string, link?: string) {
   const lead = kind === "groom" ? "Look at this groom look" : "Look at this bridal look";
-  return link ? `${lead}: ${name}. ${link}` : `${lead}: ${name}.`;
+  const note = "AI-generated preview";
+  return link ? `${lead}: ${name} (${note}). ${link}` : `${lead}: ${name} (${note}).`;
 }
 
 /** Full-resolution file behind the preview URL, saved as a JPEG download. */

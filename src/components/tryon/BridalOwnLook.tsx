@@ -308,7 +308,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
 
   return (
     <div data-own="flow" className="grid gap-4">
-      <ConsentSheet open={consent.open} onAgree={() => void consent.agree()} onClose={consent.close} />
+      <ConsentSheet open={consent.open} lang={config.defaultLang || "en"} onAgree={(ageGate) => void consent.agree(ageGate)} onClose={consent.close} />
       <StepRail
         id="own-steps"
         label="Your own look"

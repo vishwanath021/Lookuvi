@@ -27,7 +27,7 @@ export function PrivacyRequest() {
 
   return (
     <form className="card space-y-3 p-4" onSubmit={submit}>
-      <h2 className="font-serif text-2xl">Request access, deletion, or withdrawal</h2>
+      <h2 className="font-serif text-2xl">Request access, correction, deletion, or withdrawal</h2>
       <label className="block text-sm">Salon slug
         <input className="field mt-1" value={slug} onChange={(event) => setSlug(event.target.value)} required />
       </label>
@@ -39,6 +39,8 @@ export function PrivacyRequest() {
           <option value="withdraw">Withdraw consent</option>
           <option value="delete">Delete my lead</option>
           <option value="access">Access what you store</option>
+          <option value="correct">Correct my details</option>
+          <option value="grievance">Grievance / complaint</option>
         </select>
       </label>
       <button className="btn" type="submit">Send</button>

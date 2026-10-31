@@ -7,6 +7,7 @@ import { BeforeAfter } from "@/components/tryon/BeforeAfter";
 import { guestSessionId } from "@/lib/guest-session";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { LegalFooter } from "@/components/legal/LegalFooter";
+import { AiGeneratedBadge } from "@/components/legal/AiGeneratedBadge";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio, StudioRail } from "@/components/tryon/LiveStudio";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
@@ -26,7 +27,7 @@ import { classifySkinPhoto } from "@/lib/hand-photo";
 import type { SalonConfig } from "@/lib/salon";
 import { guestSectionCopy, guestSections, type GuestSection } from "@/lib/guest-sections";
 import { salonActionItems } from "@/lib/salon-actions";
-import { downloadLookFile } from "@/lib/look-result";
+import { downloadLookFile, lookDownloadName } from "@/lib/look-result";
 import { normalizeWhatsAppPhone } from "@/lib/whatsapp";
 
 function poseLine(label: string, value: number | string | null) {
@@ -848,7 +849,7 @@ export function TryOnApp({
 
   async function downloadLook() {
     if (!active) return;
-    await downloadLookFile(active.after, `${config.slug}-${active.styleName}.jpg`);
+    await downloadLookFile(active.after, lookDownloadName(config.slug, active.styleName));
     track("download", { style: active.styleId });
   }
 
@@ -904,7 +905,7 @@ export function TryOnApp({
           queueLabel={t(lang, "queueJoinLook")}
         />
       ) : null}
-      <ConsentSheet open={consent.open} onAgree={() => { track("consent_accepted", { lang }); void consent.agree(); }} onClose={consent.close} />
+      <ConsentSheet open={consent.open} lang={lang} onAgree={(ageGate) => { track("consent_accepted", { lang }); void consent.agree(ageGate); }} onClose={consent.close} />
       <LegalFooter className="px-4 pb-8" />
       <div data-scroll="salon" className="pb-16 pt-6">
       {sections.length > 1 ? (
@@ -972,9 +973,13 @@ export function TryOnApp({
                   afterLabel={t(lang, "after")}
                   alignMode={active.alignMode}
                   eyeDelta={active.eyeDelta}
+                  lang={lang}
                 />
               ) : (
-                <img src={active.after} alt="" className="w-full" />
+                <div className="relative">
+                  <AiGeneratedBadge lang={lang} />
+                  <img src={active.after} alt="" className="w-full" />
+                </div>
               )}
             </div>
             <StudioRail
