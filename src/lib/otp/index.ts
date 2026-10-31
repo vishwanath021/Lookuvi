@@ -52,6 +52,7 @@ export function otpSender(): OtpSender {
   return new MockOtpSender();
 }
 
+/** True only when local/dev may return the OTP in the JSON body. Never on in production (env gate refuses boot). */
 export function exposeDevOtp() {
-  return process.env.NODE_ENV !== "production";
+  return process.env.ALLOW_DEV_OTP === "true" && process.env.NODE_ENV !== "production";
 }
