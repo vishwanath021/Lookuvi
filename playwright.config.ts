@@ -78,6 +78,7 @@ export default defineConfig({
           OPENROUTER_API_KEY: "",
           MOCK_DELAY_MS: "200",
           ALLOW_DEV_MAGIC_LINK: "true",
+          ALLOW_DEV_OTP: "true",
           OTP_PROVIDER: "mock",
           ENABLED_TOOLS: "all",
           FEATURE_BOOKINGS: "true",
