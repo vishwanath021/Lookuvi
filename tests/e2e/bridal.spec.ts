@@ -60,8 +60,9 @@ test("guest can pick an event and a look, refine it, try mehendi, save, compare,
   await expect(page.getByRole("list", { name: "Makeup" }).locator("img")).toHaveCount(0);
   await expect(page.getByRole("list", { name: "Makeup" }).getByRole("button", { name: "Soft rose" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Sleek low bun" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Textured side bun" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Volume updo with matha patti" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open bridal waves" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "South Indian braid with gajra" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Hair" }).locator("img")).toHaveCount(8);
   await page.locator("[data-step='look']").screenshot({ path: `${SHOTS}/02-looks.png` });
   await page.locator("[data-step='makeup']").screenshot({ path: `${SHOTS}/02-makeup.png` });
   await page.locator("[data-step='hair']").screenshot({ path: `${SHOTS}/02-hair.png` });
