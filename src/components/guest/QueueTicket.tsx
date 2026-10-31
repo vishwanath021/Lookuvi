@@ -29,7 +29,10 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const lang = ticket.lang || "en";
-  const open = ticket.status === "WAITING" || ticket.status === "CALLED" || ticket.status === "REQUESTED" || ticket.status === "CONFIRMED";
+  const live = ticket.status === "WAITING" || ticket.status === "CALLED";
+  const canCancel = live || ticket.status === "REQUESTED" || ticket.status === "CONFIRMED";
+  const showComing = ticket.onTheWay && live;
+  const showTryLook = ticket.tryOn && (live || ticket.status === "REQUESTED" || ticket.status === "CONFIRMED");
 
   useEffect(() => {
     setReady(true);
@@ -63,7 +66,6 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
     setTicket((current) => ({ ...current, ...data }));
   }
 
-  const live = ticket.status === "WAITING" || ticket.status === "CALLED";
   let line = "";
   if (ticket.status === "IN_SERVICE") line = t(lang, "queueServingYou");
   if (ticket.status === "REQUESTED") line = t(lang, "queueWaitingConfirm");
@@ -72,7 +74,7 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
   if (ticket.status === "DONE") line = t(lang, "queueFinished");
   if (ticket.status === "NO_SHOW") line = t(lang, "queueMissed");
 
-  const joined = ticket.status === "WAITING" || ticket.status === "CALLED" || ticket.status === "IN_SERVICE"
+  const joined = live || ticket.status === "IN_SERVICE"
     ? t(lang, "queueJoined", { token: ticket.token, min: ticket.waitMin })
     : "";
 
@@ -88,15 +90,15 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
         </>
       )}
       {ticket.serviceName ? <p className="mt-1 text-sm text-muted">{ticket.serviceName}</p> : null}
-      {ticket.onTheWay ? <p className="mt-3 text-sm">{t(lang, "queueComing")}</p> : null}
-      {open ? (
+      {showComing ? <p className="mt-3 text-sm" data-queue-coming="yes">{t(lang, "queueComing")}</p> : null}
+      {canCancel ? (
         <div className="mt-6 grid gap-2">
-          {!ticket.onTheWay ? <button className="btn w-full text-lg" type="button" disabled={busy} onClick={() => void act("way")}>{t(lang, "queueOnWay")}</button> : null}
+          {live && !ticket.onTheWay ? <button className="btn w-full text-lg" type="button" disabled={busy} onClick={() => void act("way")}>{t(lang, "queueOnWay")}</button> : null}
           <button className="btn secondary w-full" type="button" disabled={busy} onClick={() => void act("cancel")}>{t(lang, "queueCancel")}</button>
         </div>
       ) : null}
       {message ? <p className="mt-3 text-sm" role="status">{message}</p> : null}
-      {ticket.tryOn ? <p className="mt-6"><a className="btn secondary" href={`/s/${slug}`}>{t(lang, "queueTryLook")}</a></p> : null}
+      {showTryLook ? <p className="mt-6"><a className="btn secondary" href={`/s/${slug}`} data-queue-try="yes">{t(lang, "queueTryLook")}</a></p> : null}
     </div>
   );
 }

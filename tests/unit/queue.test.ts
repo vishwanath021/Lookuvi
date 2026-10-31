@@ -10,7 +10,7 @@ import { kolkataDayKey } from "@/lib/queue/day";
 import { peopleAhead, waitMinutes } from "@/lib/queue/estimate";
 import { displayedWait, waitSample } from "@/lib/queue/wait-display";
 import { indianMobile } from "@/lib/queue/phone";
-import { QUEUE_DEVICE_JOINS_PER_HOUR, QUEUE_IP_JOINS_PER_HOUR, QUEUE_PHONE_JOINS_PER_HOUR, QueueError, addWalkIn, callNext, confirmRequest, ensureQueueState, finishEntry, guestVisit, joinQueue, publicBoard, purgeOldQueueEntries, saveQueueSettings, setQueueOpen, sweepAlerts } from "@/lib/queue/service";
+import { QUEUE_DEVICE_JOINS_PER_HOUR, QUEUE_IP_JOINS_PER_HOUR, QUEUE_PHONE_JOINS_PER_HOUR, QueueError, addWalkIn, callNext, confirmRequest, ensureQueueState, finishEntry, guestTicket, guestVisit, joinQueue, publicBoard, purgeOldQueueEntries, saveQueueSettings, setQueueOpen, startEntry, sweepAlerts } from "@/lib/queue/service";
 import { resetRateLimits } from "@/lib/ratelimit";
 import { loadSalons } from "@/lib/super/directory";
 
@@ -232,6 +232,44 @@ describe("queue joins", () => {
       deviceId: "shared-handset-1",
       send,
     })).rejects.toMatchObject({ code: "RATE" });
+  });
+
+  it("clears on-the-way when service starts or ends and hides it for request tickets (#3-#6)", async () => {
+    const { slug, tenant } = await salon();
+    const ticket = await joinQueue({ slug, name: "Asha", phone: "9876500401", consent: true, ip: "way-a", send });
+    await guestVisit({ slug, ref: ticket.ref, action: "way", ip: "way-a" });
+    const before = await prisma.queueEntry.findFirstOrThrow({ where: { cancelToken: ticket.ref } });
+    expect(before.onTheWay).toBe(true);
+    await callNext(tenant.id, send);
+    await startEntry(tenant.id, before.id);
+    const started = await guestTicket(slug, ticket.ref);
+    expect(started.status).toBe("IN_SERVICE");
+    expect(started.onTheWay).toBe(false);
+    await finishEntry(tenant.id, before.id, "DONE", send);
+    const done = await guestTicket(slug, ticket.ref);
+    expect(done.status).toBe("DONE");
+    expect(done.onTheWay).toBe(false);
+
+    const other = await joinQueue({ slug, name: "Bea", phone: "9876500402", consent: true, ip: "way-b", send });
+    await guestVisit({ slug, ref: other.ref, action: "way", ip: "way-b" });
+    const row = await prisma.queueEntry.findFirstOrThrow({ where: { cancelToken: other.ref } });
+    await finishEntry(tenant.id, row.id, "NO_SHOW", send);
+    const missed = await guestTicket(slug, other.ref);
+    expect(missed.status).toBe("NO_SHOW");
+    expect(missed.onTheWay).toBe(false);
+
+    await saveQueueSettings(tenant.id, { units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "REQUEST", unitLabel: "chair" });
+    const future = await joinQueue({
+      slug,
+      name: "Future",
+      phone: "9876500403",
+      consent: true,
+      requestedDate: "2099-07-01",
+      requestedSlot: "10:00",
+      ip: "way-c",
+      send,
+    });
+    await expect(guestVisit({ slug, ref: future.ref, action: "way", ip: "way-c" })).rejects.toMatchObject({ code: "STATE" });
   });
 
   it("confirms a requested visit and deletes old rows", async () => {

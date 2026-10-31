@@ -346,8 +346,8 @@ export async function guestVisit(input: { slug: string; ref: string; action: "wa
   const row = await prisma.queueEntry.findFirst({ where: { cancelToken: input.ref, tenantId: tenant.id } });
   if (!row) throw new QueueError("NOT_FOUND", "That visit was not found.", 404);
   if (input.action === "way") {
-    if (row.status === "CANCELLED" || row.status === "DONE" || row.status === "NO_SHOW") {
-      throw new QueueError("STATE", "This visit is already closed.", 409);
+    if (row.status !== "WAITING" && row.status !== "CALLED") {
+      throw new QueueError("STATE", "On my way is only for guests still in line.", 409);
     }
     await prisma.queueEntry.update({ where: { id: row.id }, data: { onTheWay: true } });
   } else {
@@ -465,7 +465,7 @@ export async function startEntry(tenantId: string, id: string) {
   if (!slot) throw new QueueError("BUSY", "Every place is busy. Mark one done first.", 409);
   await prisma.queueEntry.update({
     where: { id },
-    data: { status: "IN_SERVICE", startedAt: row.startedAt || new Date(), calledAt: row.calledAt || new Date(), unitSlot: slot },
+    data: { status: "IN_SERVICE", startedAt: row.startedAt || new Date(), calledAt: row.calledAt || new Date(), unitSlot: slot, onTheWay: false },
   });
   return deskSnapshot(tenantId);
 }
@@ -476,7 +476,7 @@ export async function finishEntry(tenantId: string, id: string, status: "DONE" |
   if (!row) throw new QueueError("NOT_FOUND", "That guest was not found.", 404);
   const allowed = status === "DONE" ? ["CALLED", "IN_SERVICE", "WAITING", "CONFIRMED"] : ["WAITING", "CALLED", "IN_SERVICE"];
   if (!allowed.includes(row.status)) throw new QueueError("STATE", "That guest is already closed.", 409);
-  await prisma.queueEntry.update({ where: { id }, data: { status, doneAt: new Date(), unitSlot: null } });
+  await prisma.queueEntry.update({ where: { id }, data: { status, doneAt: new Date(), unitSlot: null, onTheWay: false } });
   if (status === "DONE" && row.phone) await recordVisit(tenantId, row.phone, row.name);
   await sweepAlerts(tenantId, send);
   return deskSnapshot(tenantId);
