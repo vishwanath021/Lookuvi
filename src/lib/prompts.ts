@@ -104,7 +104,9 @@ export function buildColourPrompt(shade: ShadeDef) {
 }
 
 /**
- * Full bridal look. Image 2 is clothing and jewellery.
+ * Full bridal look. Image 2 is clothing and jewellery by default.
+ * When a hairstyle card with a catalogue photo is chosen, Image 2 is that hair
+ * reference instead and clothing comes from the written look description.
  * Flux-3 edit has no strength or guidance field, so identity is locked here.
  * Hair changes only when a hairstyle card was chosen.
  */
@@ -112,7 +114,7 @@ export function buildBridalPrompt(
   look: BridalLook,
   finish: BridalFinish,
   lip: BridalLip,
-  live?: { kajal?: boolean; lashes?: boolean; blush?: boolean; brow?: boolean; makeup?: string; hair?: string },
+  live?: { kajal?: boolean; lashes?: boolean; blush?: boolean; brow?: boolean; makeup?: string; hair?: string; hairImage?: boolean },
 ) {
   const marks = [
     live?.kajal ? "kajal on" : "kajal off",
@@ -120,16 +122,27 @@ export function buildBridalPrompt(
     live?.blush ? "blush on" : "blush off",
     live?.brow ? "brow tint on" : "brow tint off",
   ];
-  const roles = look.outfit
-    ? live?.hair
-      ? "Image 1 is the customer selfie. Image 2 is an outfit or saree to copy. Copy the clothing from image 2. Do not copy the reference person's face. The hairstyle comes from the written instruction, not from image 2."
-      : "Image 1 is the customer selfie. Image 2 is an outfit or saree to copy. Copy the clothing from image 2. Do not copy the reference person's face or hair."
-    : "Image 1 is the customer selfie. This is a makeup-only look. Keep the customer's own clothing and jewellery. Do not copy clothing or jewellery from image 2. Do not copy the reference person's face or hair.";
-  const clothingLine = look.outfit
-    ? "Copy the clothing from image 2 because this look is an outfit or saree."
-    : "Keep the customer's own clothing and jewellery exactly as in image 1. Change makeup only.";
+  const hairFromImage = Boolean(live?.hair && live.hairImage);
+  const roles = hairFromImage
+    ? look.outfit
+      ? "Image 1 is the customer selfie. Image 2 is a bridal hairstyle reference only. Change the customer's hair to match the hairstyle in image 2. Do not copy the reference person's face, skin, or clothing. Clothing and jewellery come from the written look description, not from image 2."
+      : "Image 1 is the customer selfie. Image 2 is a bridal hairstyle reference only. Change the customer's hair to match the hairstyle in image 2. Keep the customer's own clothing and jewellery. Do not copy the reference person's face or clothing."
+    : look.outfit
+      ? live?.hair
+        ? "Image 1 is the customer selfie. Image 2 is an outfit or saree to copy. Copy the clothing from image 2. Do not copy the reference person's face. The hairstyle comes from the written instruction, not from image 2."
+        : "Image 1 is the customer selfie. Image 2 is an outfit or saree to copy. Copy the clothing from image 2. Do not copy the reference person's face or hair."
+      : "Image 1 is the customer selfie. This is a makeup-only look. Keep the customer's own clothing and jewellery. Do not copy clothing or jewellery from image 2. Do not copy the reference person's face or hair.";
+  const clothingLine = hairFromImage
+    ? look.outfit
+      ? "Dress the person from the written look description for clothing and jewellery. Do not copy clothing from image 2."
+      : "Keep the customer's own clothing and jewellery exactly as in image 1. Change makeup and hair only."
+    : look.outfit
+      ? "Copy the clothing from image 2 because this look is an outfit or saree."
+      : "Keep the customer's own clothing and jewellery exactly as in image 1. Change makeup only.";
   const hairLine = live?.hair
-    ? `${live.hair} Change the hair only because a hairstyle was chosen. Keep the face the same.`
+    ? hairFromImage
+      ? `${live.hair} Match the hairstyle silhouette, length, parting, and accessories from image 2. Change the hair because a hairstyle card with a photo was chosen. Keep the face the same.`
+      : `${live.hair} Change the hair only because a hairstyle was chosen. Keep the face the same.`
     : "Do not change the hair. Keep the existing haircut, length, texture, and how it is worn. Tied hair stays tied. Waves stay waves. Ignore any hairstyle named in the look description or shown on the reference person.";
   return [
     roles,

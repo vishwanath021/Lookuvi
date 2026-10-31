@@ -1,6 +1,5 @@
 /**
- * Bridal photo generation is paused.
- * Cards use public/bridal/{id}.webp when a file is already there, and a named card otherwise.
- * Do not call an image model from this script.
+ * Bridal hair catalogue photos are committed under public/bridal/hair-*.webp.
+ * See FIXTURES.md for prompts and provenance. Do not call an image model here.
  */
-console.log("Bridal photo generation is paused. No new photos were created.");
+console.log("Bridal hair thumbs are committed in public/bridal/. See FIXTURES.md.");

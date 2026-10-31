@@ -55,3 +55,21 @@ Playwright points the fake camera at this file (`playwright.config.ts`). `docs/s
 | `docs/mask-overlays/` | Debug overlays of the geometric fixtures plus three catalogue crops (`real-soft-bob`, `real-soft-arch`, `real-short-boxed`). |
 
 `tests/fixtures/faces/no-face.jpg` is the makeup studio check for a picture with no face.
+
+## Bridal hairstyle catalogue cards (2026-10-30)
+
+Eight synthetic bridal hairstyle portraits for the salon Bridal Hair step. Generated with the Cursor/Grok Bot platform image tool (not OpenAI/fal API keys). No famous or real identifiable people. Studio style matches the Style-tab catalogue: neutral grey background, head-and-shoulders, cream blouse.
+
+| File | Style | Prompt summary |
+|---|---|---|
+| `public/bridal/hair-south-indian-braid.webp` | Traditional South Indian braid with jasmine/gajra | Photoreal synthetic South Asian woman, three-quarter back/side angle, long dark braid with white jasmine gajra, cream blouse, warm-grey studio background |
+| `public/bridal/hair-low-bun-flowers.webp` | Low bun with flowers | Soft low bridal bun with white and peach flowers, three-quarter front, cream blouse, warm-grey studio background |
+| `public/bridal/hair-messy-side-braid.webp` | Messy side braid | Romantic messy side braid over one shoulder, face-framing strands, cream blouse, warm-grey studio background |
+| `public/bridal/hair-open-waves.webp` | Open bridal waves | Long open soft waves, centre parting, front head-and-shoulders, cream blouse, warm-grey studio background |
+| `public/bridal/hair-half-up-half-down.webp` | Half-up half-down | Crown softly gathered, lower half in waves, front three-quarter, cream blouse, warm-grey studio background |
+| `public/bridal/hair-sleek-bun.webp` | Sleek low bun | Polished sleek low bun, clean centre parting, no flowers, three-quarter front, cream blouse, warm-grey studio background |
+| `public/bridal/hair-juda-accessories.webp` | Juda with hair accessories | Traditional juda bun with gold hair accessories and hair chain, three-quarter back/side, cream blouse, warm-grey studio background |
+| `public/bridal/hair-front-puff-braid.webp` | Front puff with braid | Soft front puff at the crown with a long thick braid, side angle, cream blouse, warm-grey studio background |
+
+Source originals (platform GenerateImage outputs) were resized to 768×1024 WebP at quality 82 for the catalogue. Licence: Lookuvi synthetic fixture, same terms as the Style-tab catalogue portraits.
+
