@@ -28,7 +28,6 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
   const lang = ticket.lang || "en";
   const open = ticket.status === "WAITING" || ticket.status === "CALLED" || ticket.status === "REQUESTED" || ticket.status === "CONFIRMED";
 
@@ -40,7 +39,6 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
         .then((data) => {
           if (data && typeof data.status === "string") {
             setTicket((current) => ({ ...current, ...data }));
-            setRefreshKey((key) => key + 1);
           }
         })
         .catch(() => undefined);
@@ -63,7 +61,6 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
       return;
     }
     setTicket((current) => ({ ...current, ...data }));
-    setRefreshKey((key) => key + 1);
   }
 
   const live = ticket.status === "WAITING" || ticket.status === "CALLED";
@@ -83,7 +80,7 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
     <div data-status={ticket.status} data-ready={ready ? "yes" : "no"}>
       {joined ? <p className="mt-4 text-lg" data-queue-joined="yes">{joined}</p> : null}
       {live ? (
-        <QueueWait key={refreshKey} serverWait={ticket.waitMin} ahead={ticket.ahead} token={ticket.token} lang={lang} phrase={ticket.status === "CALLED" ? "turn" : undefined} />
+        <QueueWait serverWait={ticket.waitMin} ahead={ticket.ahead} token={ticket.token} lang={lang} phrase={ticket.status === "CALLED" ? "turn" : undefined} />
       ) : (
         <>
           <p className="mt-6 text-lg">{line}</p>

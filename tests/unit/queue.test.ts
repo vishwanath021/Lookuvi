@@ -8,7 +8,7 @@ import { notifyGuest, sendWhatsApp, type NotifyMessage } from "@/lib/notify";
 import { prisma } from "@/lib/prisma";
 import { kolkataDayKey } from "@/lib/queue/day";
 import { peopleAhead, waitMinutes } from "@/lib/queue/estimate";
-import { displayedWait } from "@/lib/queue/wait-display";
+import { displayedWait, waitSample } from "@/lib/queue/wait-display";
 import { indianMobile } from "@/lib/queue/phone";
 import { QUEUE_DEVICE_JOINS_PER_HOUR, QUEUE_IP_JOINS_PER_HOUR, QUEUE_PHONE_JOINS_PER_HOUR, QueueError, addWalkIn, callNext, confirmRequest, ensureQueueState, finishEntry, guestVisit, joinQueue, publicBoard, purgeOldQueueEntries, saveQueueSettings, setQueueOpen, sweepAlerts } from "@/lib/queue/service";
 import { resetRateLimits } from "@/lib/ratelimit";
@@ -49,6 +49,15 @@ describe("queue maths and phone", () => {
     expect(displayedWait(16, 1_000, 1_000 + 16 * 60_000)).toBe(0);
     expect(displayedWait(16, 1_000, 1_000 + 40 * 60_000)).toBe(0);
     expect(displayedWait(0, 1_000, 1_000 + 60_000)).toBe(0);
+  });
+
+  it("keeps the wait sample clock when a poll repeats the same server wait (#2)", () => {
+    const first = waitSample({ wait: 20, at: 1_000 }, 20, 1_000 + 30_000);
+    expect(first).toEqual({ wait: 20, at: 1_000 });
+    expect(displayedWait(first.wait, first.at, 1_000 + 60_000)).toBe(19);
+    const changed = waitSample(first, 10, 1_000 + 90_000);
+    expect(changed).toEqual({ wait: 10, at: 1_000 + 90_000 });
+    expect(displayedWait(changed.wait, changed.at, 1_000 + 90_000)).toBe(10);
   });
 
   it("accepts Indian mobiles and rejects everything else", () => {

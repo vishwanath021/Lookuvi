@@ -32,7 +32,6 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [memory, setMemory] = useState<Memory | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [returnToken, setReturnToken] = useState("");
   const request = board.mode === "REQUEST";
 
@@ -55,7 +54,6 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
         .then((data) => {
           if (data && typeof data.open === "boolean") {
             setBoard(data);
-            setRefreshKey((key) => key + 1);
           }
         })
         .catch(() => undefined);
@@ -108,7 +106,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
     <div>
       <div data-queue-open={board.open ? "yes" : "no"} data-queue-mode={board.mode}>
         {request ? <p className="mt-2 text-sm">{t(lang, "queueRequestNote")}</p> : board.open ? (
-          <QueueWait key={refreshKey} serverWait={board.waitMin} ahead={board.ahead} lang={lang} phrase="join" />
+          <QueueWait serverWait={board.waitMin} ahead={board.ahead} lang={lang} phrase="join" />
         ) : <p className="mt-2 text-sm">{t(lang, "queueClosed")}</p>}
       </div>
       <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted">{board.open ? t(lang, "queueOpenNow") : t(lang, "queueClosedNow")}</p>
