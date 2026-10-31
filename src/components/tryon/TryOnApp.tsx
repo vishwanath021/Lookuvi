@@ -6,6 +6,7 @@ import { isPlatformLogo, LookuviMark } from "@/components/brand/LookuviMark";
 import { BeforeAfter } from "@/components/tryon/BeforeAfter";
 import { guestSessionId } from "@/lib/guest-session";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
+import { LegalFooter } from "@/components/legal/LegalFooter";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio, StudioRail } from "@/components/tryon/LiveStudio";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
@@ -904,6 +905,7 @@ export function TryOnApp({
         />
       ) : null}
       <ConsentSheet open={consent.open} onAgree={() => { track("consent_accepted", { lang }); void consent.agree(); }} onClose={consent.close} />
+      <LegalFooter className="px-4 pb-8" />
       <div data-scroll="salon" className="pb-16 pt-6">
       {sections.length > 1 ? (
         <div className={`mb-4 grid items-start gap-3 ${sections.length > 3 ? "grid-cols-2 sm:grid-cols-4" : sections.length > 2 ? "grid-cols-3" : "grid-cols-2"}`} data-guest-tabs="yes">

@@ -215,3 +215,7 @@ Production script policy is a per-request nonce plus `strict-dynamic` and `wasm-
 ## 14. Laptop without a droplet
 
 `npm run dev` uses SQLite and does not force the authenticator. `docker compose up` (the file without `.prod`) is a production-mode container and needs `APP_BASE_URL` to be `https://` even on a laptop, because the process refuses to boot otherwise. For day-to-day work, use `npm run dev`.
+
+## CERT-In logging and time sync
+
+Production Docker services use the `json-file` driver with `max-size` / `max-file` (see `docker-compose.prod.yml`). **Archiving or shipping those rotated files for at least 180 days** (India where feasible) is an operator duty — local disk rotation alone is not enough on a small VPS. Enable NTP (`chrony` or `systemd-timesyncd`) on the host. Incident playbook: `docs/CERT-IN.md`.
