@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/session";
 
 const schema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   name: z.string().min(2).max(80),
   password: z.string().max(200).optional(),
 });
