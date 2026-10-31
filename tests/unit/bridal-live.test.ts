@@ -48,17 +48,19 @@ describe("bridal prompt shades", () => {
   it("adds a chosen hairstyle and makeup note without trusting a raw id", () => {
     const look = bridalLookById("gadwal-telangana");
     const makeup = bridalMakeupById("makeup-soft-rose");
-    const hair = bridalHairById("hair-sleek-low-bun");
+    const hair = bridalHairById("hair-sleek-bun");
     expect(looksForEvent("wedding")[1]?.name).toBe("Telangana Gadwal Bride");
     expect(look && makeup && hair).toBeTruthy();
     if (!look || !makeup || !hair) return;
     const prompt = buildBridalPrompt(look, bridalFinishById(makeup.finishId), bridalLipById(makeup.lipId), {
       makeup: makeup.prompt,
       hair: hair.prompt,
+      hairImage: true,
     });
     expect(prompt).toContain("sleek low bun");
     expect(prompt).toContain("matha patti");
-    expect(prompt).toContain("Change the hair only because a hairstyle was chosen");
+    expect(prompt).toContain("hairstyle reference only");
+    expect(prompt).toContain("Match the hairstyle silhouette");
     expect(prompt).toContain("exact face shape");
     expect(prompt).toContain("sindoor");
     expect(prompt).not.toMatch(/jasmine|marigold|poola|rose braid/i);
@@ -68,11 +70,21 @@ describe("bridal prompt shades", () => {
     expect(makeup.prompt).not.toMatch(/round red bindi|maroon matte|nose ring|temple jewellery/i);
     expect(bridalHairById("not-a-style")).toBeNull();
     expect(bridalMakeupById("not-a-card")).toBeNull();
-    expect(BRIDAL_HAIR.map((item) => item.name)).toEqual(["Sleek low bun", "Textured side bun", "Volume updo with matha patti"]);
-    expect(BRIDAL_HAIR.every((item) => item.image === false)).toBe(true);
+    expect(BRIDAL_HAIR).toHaveLength(8);
+    expect(BRIDAL_HAIR.every((item) => item.image === true)).toBe(true);
+    expect(BRIDAL_HAIR.map((item) => item.id)).toEqual([
+      "hair-south-indian-braid",
+      "hair-low-bun-flowers",
+      "hair-messy-side-braid",
+      "hair-open-waves",
+      "hair-half-up-half-down",
+      "hair-sleek-bun",
+      "hair-juda-accessories",
+      "hair-front-puff-braid",
+    ]);
     expect(BRIDAL_MAKEUP.every((item) => item.image === false && item.style === "trending")).toBe(true);
     expect(BRIDAL_MAKEUP.map((item) => item.name)).toEqual(["Soft rose", "Nude glow", "Soft red", "Rose shimmer"]);
-    expect([...BRIDAL_LOOKS, ...MEHENDI_CARDS].every((item) => item.image)).toBe(true);
+    expect([...BRIDAL_LOOKS, ...BRIDAL_HAIR, ...MEHENDI_CARDS].every((item) => item.image)).toBe(true);
   });
 
   it("keeps outfit photos in Temple and hides a category row that has only one chip", () => {
@@ -87,7 +99,7 @@ describe("bridal prompt shades", () => {
     expect(defaultBridalStyle(BRIDAL_MAKEUP)).toBe("trending");
     expect(cardsForStyle(BRIDAL_MAKEUP, "trending").map((item) => item.id)).toEqual(BRIDAL_MAKEUP.map((item) => item.id));
     expect(cardsForStyle(BRIDAL_LOOKS, "trending").map((look) => look.id)).toEqual(BRIDAL_LOOKS.map((look) => look.id));
-    expect(cardsForStyle(BRIDAL_HAIR, "temple")).toHaveLength(3);
+    expect(cardsForStyle(BRIDAL_HAIR, "temple")).toHaveLength(8);
   });
 
   it("does not send edit strength or guidance, because flux-3 has neither", () => {
@@ -116,5 +128,34 @@ describe("bridal prompt shades", () => {
     expect(fields.hair).toBeUndefined();
     expect(fields.makeup).toBe("makeup-classic-red");
     expect(fields.kajal).toBeUndefined();
+  });
+});
+
+describe("bridal hair catalogue photos", () => {
+  it("ships a public/bridal webp for every hair card and prefers hair as the generate reference", async () => {
+    const { existsSync } = await import("node:fs");
+    const path = await import("node:path");
+    const { bridalThumbPublicPath } = await import("@/lib/bridal-reference");
+    for (const item of BRIDAL_HAIR) {
+      expect(item.image).toBe(true);
+      expect(bridalThumbPublicPath(item.id)).toBe(`/bridal/${item.id}.webp`);
+      expect(existsSync(path.join(process.cwd(), "public", "bridal", `${item.id}.webp`))).toBe(true);
+    }
+    const look = bridalLookById("telugu-muhurtham");
+    const hair = bridalHairById("hair-open-waves");
+    expect(look && hair).toBeTruthy();
+    if (!look || !hair) return;
+    const withPhoto = buildBridalPrompt(look, bridalFinishById("hd"), bridalLipById("red"), {
+      hair: hair.prompt,
+      hairImage: true,
+    });
+    expect(withPhoto).toContain("bridal hairstyle reference only");
+    expect(withPhoto).toContain("written look description");
+    expect(withPhoto).not.toContain("Copy the clothing from image 2 because this look is an outfit");
+    const textOnly = buildBridalPrompt(look, bridalFinishById("hd"), bridalLipById("red"), {
+      hair: hair.prompt,
+      hairImage: false,
+    });
+    expect(textOnly).toContain("The hairstyle comes from the written instruction");
   });
 });

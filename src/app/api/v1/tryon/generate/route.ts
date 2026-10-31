@@ -10,7 +10,7 @@ import { demoGuestPreview, engineForGuestTool, guestEngineReady, guestEngineToRu
 import { guestPreviewHeaders } from "@/lib/ai/guest-response";
 import { auth } from "@/auth";
 import { resolveFalKey } from "@/lib/ai/credentials";
-import { bridalReferenceJpeg } from "@/lib/bridal-reference";
+import { bridalReferenceJpeg, bridalThumbPublicPath } from "@/lib/bridal-reference";
 import { buildBridalPrompt, buildMehendiPrompt } from "@/lib/prompts";
 import { styleEnabledForTenant } from "@/lib/style-menu";
 import { consumePreviewRateShared, guestLimitMessage, toolEnabled, type PreviewTool, type ToolId } from "@/lib/tools";
@@ -259,17 +259,28 @@ export async function POST(req: Request) {
     }
   }
 
+  const bridalHairImage = Boolean(tool === "bridal" && hair?.image && bridalThumbPublicPath(hair.id));
+  const bridalReferenceId = tool === "bridal" && bridalLook
+    ? bridalHairImage && hair
+      ? hair.id
+      : bridalLook.id
+    : "";
   const guestLook = tool === "style"
     ? null
     : tool === "bridal" && bridalLook
-      ? { prompt: buildBridalPrompt(bridalLook, finish, lip, {
-          kajal: bridalFields.kajal === "1",
-          lashes: bridalFields.lashes === "1",
-          blush: bridalFields.blush === "1",
-          brow: bridalFields.browTint === "1",
-          makeup: makeup?.prompt,
-          hair: hair?.prompt,
-        }), reference: await bridalReferenceJpeg(bridalLook.id), referenceFile: `${bridalLook.id}.jpg` }
+      ? {
+          prompt: buildBridalPrompt(bridalLook, finish, lip, {
+            kajal: bridalFields.kajal === "1",
+            lashes: bridalFields.lashes === "1",
+            blush: bridalFields.blush === "1",
+            brow: bridalFields.browTint === "1",
+            makeup: makeup?.prompt,
+            hair: hair?.prompt,
+            hairImage: bridalHairImage,
+          }),
+          reference: await bridalReferenceJpeg(bridalReferenceId),
+          referenceFile: `${bridalReferenceId}.jpg`,
+        }
       : tool === "mehendi" && mehendiStyle && mehendiCoverage && mehendiShade && mehendiDensity
         ? { prompt: buildMehendiPrompt(mehendiStyle, mehendiCoverage, mehendiShade, mehendiDensity), reference: await bridalReferenceJpeg(mehendiCard?.id || `mehendi-${mehendiStyle.id}`), referenceFile: `${mehendiCard?.id || mehendiStyle.id}.jpg` }
         : await loadGuestReference(tool as "brows" | "beard" | "nails" | "colour", styleId, tool === "brows" ? { thickness: browThickness, colour: browColour } : undefined);

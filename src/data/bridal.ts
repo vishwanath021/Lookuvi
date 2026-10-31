@@ -10,7 +10,7 @@ export type BridalLook = {
   name: string;
   region: string;
   style: BridalStyleId;
-  /** False skips the photo request. Hair has no file yet, so it must stay false. */
+  /** False skips the photo request and shows the beige placeholder card. */
   image: boolean;
   blurb: string;
   prompt: string;
@@ -191,25 +191,60 @@ export const BRIDAL_MAKEUP: BridalMakeup[] = [
 
 export const BRIDAL_HAIR: BridalHair[] = [
   {
-    id: "hair-sleek-low-bun",
+    id: "hair-south-indian-braid",
+    name: "South Indian braid with gajra",
+    style: "temple",
+    image: true,
+    prompt: "Hairstyle to add: a traditional South Indian long braid with white jasmine gajra woven along the length, clean centre parting, and soft crown volume.",
+  },
+  {
+    id: "hair-low-bun-flowers",
+    name: "Low bun with flowers",
+    style: "temple",
+    image: true,
+    prompt: "Hairstyle to add: a soft low bridal bun at the nape with small white and peach flowers tucked into the bun, soft side parting, and light face-framing strands.",
+  },
+  {
+    id: "hair-messy-side-braid",
+    name: "Messy side braid",
+    style: "temple",
+    image: true,
+    prompt: "Hairstyle to add: a romantic messy side braid over one shoulder, soft waves, and loose face-framing strands. Keep the hair free of heavy flower strings.",
+  },
+  {
+    id: "hair-open-waves",
+    name: "Open bridal waves",
+    style: "temple",
+    image: true,
+    prompt: "Hairstyle to add: long open soft bridal waves with a clean centre parting falling over both shoulders. Keep the hair free of flowers.",
+  },
+  {
+    id: "hair-half-up-half-down",
+    name: "Half-up half-down",
+    style: "temple",
+    image: true,
+    prompt: "Hairstyle to add: a half-up half-down bridal style with the crown softly gathered and the lower half in open waves. Keep the hair free of flowers.",
+  },
+  {
+    id: "hair-sleek-bun",
     name: "Sleek low bun",
     style: "temple",
-    image: false,
+    image: true,
     prompt: "Hairstyle to add: a sleek low bun with a clean centre parting, a matha patti along the hairline, and soft volume at the crown. Keep the hair free of flowers.",
   },
   {
-    id: "hair-textured-side-bun",
-    name: "Textured side bun",
+    id: "hair-juda-accessories",
+    name: "Juda with hair accessories",
     style: "temple",
-    image: false,
-    prompt: "Hairstyle to add: a textured side bun with a soft side parting, a maang tikka, and a little height at the crown. Keep the hair free of flowers.",
+    image: true,
+    prompt: "Hairstyle to add: a traditional juda bun with gold hair accessories and a delicate hair chain, centre parting, and neat sides.",
   },
   {
-    id: "hair-volume-updo",
-    name: "Volume updo with matha patti",
+    id: "hair-front-puff-braid",
+    name: "Front puff with braid",
     style: "temple",
-    image: false,
-    prompt: "Hairstyle to add: a volume updo with a centre parting, a matha patti, and soft crown volume. Keep the hair free of flowers.",
+    image: true,
+    prompt: "Hairstyle to add: a soft front puff at the crown with a long thick braid down the back and a clean centre parting.",
   },
 ];
 
