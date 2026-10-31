@@ -22,6 +22,9 @@ export const QUEUE_IP_JOINS_PER_HOUR = 60;
 export const QUEUE_PHONE_JOINS_PER_HOUR = 4;
 export const QUEUE_DEVICE_JOINS_PER_HOUR = 8;
 const HOUR_MS = 60 * 60 * 1000;
+/** Request-mode slots with no salon hours config: refuse obviously closed overnight times. */
+export const REQUEST_SLOT_EARLIEST = "06:00";
+export const REQUEST_SLOT_LATEST = "22:00";
 
 const LIVE_ACTIVE = ["WAITING", "CALLED", "IN_SERVICE"];
 const REQUEST_ACTIVE = ["REQUESTED", "CONFIRMED"];
@@ -231,6 +234,10 @@ function checkSlot(date: string, slot: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new QueueError("INVALID", "Choose a date.", 400);
   if (!/^\d{2}:\d{2}$/.test(slot)) throw new QueueError("INVALID", "Choose a time.", 400);
   if (date < kolkataDayKey()) throw new QueueError("INVALID", "Choose today or a later date.", 400);
+  // No operating-hours fields on the salon yet. Keep request times inside a daytime window.
+  if (slot < REQUEST_SLOT_EARLIEST || slot > REQUEST_SLOT_LATEST) {
+    throw new QueueError("INVALID", `Choose a time between ${REQUEST_SLOT_EARLIEST} and ${REQUEST_SLOT_LATEST}.`, 400);
+  }
 }
 
 export async function joinQueue(input: {

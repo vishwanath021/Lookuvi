@@ -146,7 +146,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
               <input className="field mt-1" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
             </label>
             <label className="text-sm">{t(lang, "queueTime")}
-              <input className="field mt-1" type="time" value={slot} onChange={(event) => setSlot(event.target.value)} required />
+              <input className="field mt-1" type="time" min="06:00" max="22:00" value={slot} onChange={(event) => setSlot(event.target.value)} required />
             </label>
           </>
         ) : null}
