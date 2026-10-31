@@ -245,9 +245,11 @@ export function QueueDesk({ initial, lang, showVisits = false }: { initial: Desk
           <label className="text-sm">{t(lang, "queueAvg")}
             <input className="field mt-1" type="number" min={5} max={240} value={avg} onChange={(event) => setAvg(event.target.value)} />
           </label>
-          <label className="text-sm">{t(lang, "queueAlert")}
-            <input className="field mt-1" type="number" min={0} max={120} value={alertMin} onChange={(event) => setAlertMin(event.target.value)} />
-          </label>
+          {mode === "LIVE" ? (
+            <label className="text-sm">{t(lang, "queueAlert")}
+              <input className="field mt-1" type="number" min={0} max={120} value={alertMin} onChange={(event) => setAlertMin(event.target.value)} />
+            </label>
+          ) : null}
           <label className="text-sm">{t(lang, "queuePlace")}
             <select className="field mt-1" aria-label={t(lang, "queuePlace")} value={unitLabel} onChange={(event) => setUnitLabel(event.target.value)}>
               <option value="chair">{t(lang, "queueChair")}</option>
