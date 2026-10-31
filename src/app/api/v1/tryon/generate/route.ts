@@ -24,7 +24,7 @@ import { ensurePhotoConsent } from "@/lib/photo-consent";
 import { prisma } from "@/lib/prisma";
 import { requestClientIp } from "@/lib/ratelimit";
 import { kolkataDayStart } from "@/lib/queue/day";
-import { refuseMonthlyTries } from "@/lib/try-allowance";
+import { refuseMonthlyTries, refundStaleTryReservations, releaseTryReservation, reserveTryCaps, TRY_CAP_STATUSES } from "@/lib/try-allowance";
 import { isPhotoId, loadVisitPhoto, rememberVisitPhoto, refuseVisit, stampVisit } from "@/lib/visit-allowance";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
   const bucket = staffId ? `staff:${staffId}` : ip;
 
   const usedToday = await prisma.tryOn.count({
-    where: { tenantId: tenant.id, kind: { in: [...AI_PREVIEW_KINDS] }, status: "SUCCEEDED", createdAt: { gte: kolkataDayStart() } },
+    where: { tenantId: tenant.id, kind: { in: [...AI_PREVIEW_KINDS] }, status: { in: [...TRY_CAP_STATUSES] }, createdAt: { gte: kolkataDayStart() } },
   });
   if (usedToday >= tenant.dailyCap) {
     return NextResponse.json({ error: "DAILY_CAP", message: guestLimitMessage("daily") }, { status: 429 });
@@ -291,8 +291,31 @@ export async function POST(req: Request) {
 
   const { engine } = await readGuestEngine(tenant.id);
 
+  await refundStaleTryReservations(tenant.id);
+  const capGate = await reserveTryCaps({
+    tenantId: tenant.id,
+    monthlyAllowance: tenant.monthlyTryAllowance,
+    dailyCap: tenant.dailyCap,
+    sessionId,
+    kind,
+    tier,
+    actorKey,
+    styleId,
+  });
+  if (!capGate.ok) {
+    await failGenerationJob(jobId, { outcome: "cap", message: capGate.message });
+    return NextResponse.json(
+      { error: capGate.error, message: capGate.message, used: capGate.used, allowance: capGate.allowance },
+      { status: 429 },
+    );
+  }
+  const reservationId = capGate.id;
+
   const limited = await takePreviewSlot();
-  if (limited) return limited;
+  if (limited) {
+    await releaseTryReservation(reservationId);
+    return limited;
+  }
 
   const kind = tool === "brows" ? "BROWS" : tool === "beard" ? "BEARD" : tool === "nails" ? "NAILS" : tool === "colour" ? "COLOUR" : tool === "bridal" ? "BRIDAL" : tool === "mehendi" ? "MEHENDI" : "STYLE";
   const effective = engineForGuestTool(tool, engine);
@@ -322,6 +345,7 @@ export async function POST(req: Request) {
           actorKey,
           jobId,
           requestId,
+          reservationId,
         })
       : await runGuestLookIfReady({
           jpeg,
@@ -338,6 +362,7 @@ export async function POST(req: Request) {
           prompt: guestLook.prompt,
           reference: guestLook.reference,
           referenceFile: guestLook.referenceFile,
+          reservationId,
         });
     if (styled) return withPose(styled);
   }
@@ -361,5 +386,6 @@ export async function POST(req: Request) {
     requestId,
     tool,
     kind,
+    reservationId,
   }));
 }

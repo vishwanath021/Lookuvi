@@ -21,7 +21,7 @@ import { deleteObject, putObject } from "@/lib/storage";
 import { auth } from "@/auth";
 import { consumePreviewRateShared, guestLimitMessage } from "@/lib/tools";
 import { kolkataDayStart } from "@/lib/queue/day";
-import { refuseMonthlyTries } from "@/lib/try-allowance";
+import { refundStaleTryReservations, releaseTryReservation, reserveTryCaps, settleTryReservation } from "@/lib/try-allowance";
 import { isPhotoId, loadVisitPhoto, rememberVisitPhoto, refuseVisit, stampVisit } from "@/lib/visit-allowance";
 
 export const runtime = "nodejs";
@@ -149,15 +149,6 @@ export async function POST(req: Request) {
 
   const ip = requestClientIp(req);
   const staffId = await signedInOwnerOrSuper(tenant.id);
-  const usedToday = await prisma.tryOn.count({
-    where: { tenantId: tenant.id, kind: { in: [...AI_PREVIEW_KINDS] }, status: "SUCCEEDED", createdAt: { gte: kolkataDayStart() } },
-  });
-  if (usedToday >= tenant.dailyCap) {
-    return NextResponse.json({ error: "DAILY_CAP", message: guestLimitMessage("daily") }, { status: 429 });
-  }
-  const monthly = await refuseMonthlyTries(tenant.id, tenant.monthlyTryAllowance);
-  if (monthly) return NextResponse.json(monthly, { status: 429 });
-
   const salonToken = String(form.get("salonToken") || "");
   const salonOk = verifySalonToken(salonToken, tenant.id, tenant.salonNonce);
   const jar = await cookies();
@@ -178,8 +169,29 @@ export async function POST(req: Request) {
   const limited = await consumePreviewRateShared({ tool: "groom", staff: Boolean(staffId), bucket: staffId ? `staff:${staffId}` : ip, tenantId: tenant.id });
   if (!limited.ok) return NextResponse.json({ error: "RATE", message: limited.message }, { status: 429 });
 
+  await refundStaleTryReservations(tenant.id);
+  const groomKind = "GROOM";
+  const capGate = await reserveTryCaps({
+    tenantId: tenant.id,
+    monthlyAllowance: tenant.monthlyTryAllowance,
+    dailyCap: tenant.dailyCap,
+    sessionId,
+    kind: groomKind,
+    tier,
+    actorKey,
+    styleId: "",
+  });
+  if (!capGate.ok) {
+    return NextResponse.json(
+      { error: capGate.error, message: capGate.message, used: capGate.used, allowance: capGate.allowance },
+      { status: 429 },
+    );
+  }
+  const reservationId = capGate.id;
+
   const apiKey = await resolveOpenAIKey();
   if (!apiKey) {
+    await releaseTryReservation(reservationId);
     return NextResponse.json(
       { error: "KEY", message: "Add an OpenAI key on AI settings. This look does not use another model." },
       { status: 503 },
@@ -265,21 +277,18 @@ export async function POST(req: Request) {
       costUsd: actual ?? result.quote.estimateUsd,
       requestId,
     });
-    const tryOn = await prisma.tryOn.create({
-      data: {
-        tenantId: tenant.id,
-        sessionId,
-        styleId: result.styleId || "groom",
-        kind: result.own ? "GROOM_OWN" : "GROOM",
-        tier,
-        actorKey,
-        quality: GROOM_QUALITY,
-        provider: `openai:${GROOM_MODEL}`,
-        status: "SUCCEEDED",
-        latencyMs,
-        credits: 1,
-      },
+    const tryOn = await settleTryReservation(reservationId, {
+      status: "SUCCEEDED",
+      styleId: result.styleId || "groom",
+      kind: result.own ? "GROOM_OWN" : "GROOM",
+      tier,
+      actorKey,
+      quality: GROOM_QUALITY,
+      provider: `openai:${GROOM_MODEL}`,
+      latencyMs,
+      credits: 1,
     });
+    if (!tryOn) throw new Error("TRY_RESERVATION");
     await settleCredits(tenant.id, creditRef, "COMMIT");
     const balance = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { creditBalance: true } });
     const response = new NextResponse(new Uint8Array(jpeg), {
@@ -289,6 +298,7 @@ export async function POST(req: Request) {
     await stampVisit(response, tenant.id, sessionId, tenant.visitTryLimit, servedPhotoId);
     return response;
   } catch (error) {
+    await releaseTryReservation(reservationId).catch(() => undefined);
     if (reserved) await settleCredits(tenant.id, creditRef, "REFUND").catch(() => undefined);
     if (callId) {
       const uncertain = error instanceof UncertainBillingError || error instanceof BilledProviderError;
