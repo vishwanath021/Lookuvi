@@ -8,7 +8,7 @@ This is an **operations checklist**, not legal advice.
 |---|---|
 | Legal name | Agentic Build Works |
 | Registered / postal address | 4-164/140, Om Nagar Colony, Kismatpur, Hyderabad 500030, Telangana, India |
-| CERT-In report contact | T Sai Vishwanath · admin@agenticbuildworks.com |
+| CERT-In report contact | Geddam Swami Veerendra · admin@agenticbuildworks.com |
 | Hosting | Hostinger VPS, India region (confirm city/DC on the invoice) |
 | TRAI DLT | N/A — Lookuvi does not send commercial SMS today |
 | CIN / GSTIN | Not issued yet — omit from customer UI until set via `COMPANY_CIN` / `COMPANY_GSTIN` |

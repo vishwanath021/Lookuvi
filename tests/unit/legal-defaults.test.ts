@@ -31,11 +31,11 @@ afterEach(() => {
 });
 
 describe("legal defaults", () => {
-  it("uses Hyderabad address and Vishwanath as grievance officer by default", () => {
+  it("uses Hyderabad address and Veerendra as grievance officer by default", () => {
     expect(companyLegalName()).toBe("Agentic Build Works");
     expect(supportEmail()).toBe("admin@agenticbuildworks.com");
     expect(postalAddress()).toContain("Kismatpur");
-    expect(grievanceOfficerName()).toBe("T Sai Vishwanath");
+    expect(grievanceOfficerName()).toBe("Geddam Swami Veerendra");
     expect(grievanceOfficerEmail()).toBe("admin@agenticbuildworks.com");
     expect(grievanceOfficerPhone()).toBe("");
     expect(copyrightEmail()).toBe("admin@agenticbuildworks.com");

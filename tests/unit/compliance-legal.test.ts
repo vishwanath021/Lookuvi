@@ -69,7 +69,7 @@ describe("compliance legal pages", () => {
     expect(cert).toContain("180 days");
     expect(cert).toContain("6 hours");
     expect(cert).toContain("NTP");
-    expect(cert).toContain("T Sai Vishwanath");
+    expect(cert).toContain("Geddam Swami Veerendra");
     expect(cert).toContain("admin@agenticbuildworks.com");
     expect(cert).toContain("N/A");
     expect(cert).not.toMatch(/\[[A-Z][^\]]+\]/);

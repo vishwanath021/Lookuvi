@@ -7,10 +7,10 @@ export const DEFAULT_LEGAL_NAME = "Agentic Build Works";
 export const DEFAULT_SUPPORT_EMAIL = "admin@agenticbuildworks.com";
 export const DEFAULT_POSTAL_ADDRESS =
   "4-164/140, Om Nagar Colony, Kismatpur, Hyderabad 500030, Telangana, India";
-export const DEFAULT_GRIEVANCE_OFFICER_NAME = "T Sai Vishwanath";
+export const DEFAULT_GRIEVANCE_OFFICER_NAME = "Geddam Swami Veerendra";
 export const DEFAULT_GRIEVANCE_OFFICER_EMAIL = "admin@agenticbuildworks.com";
 export const DEFAULT_COPYRIGHT_EMAIL = "admin@agenticbuildworks.com";
-export const DEFAULT_CERT_IN_CONTACT_NAME = "T Sai Vishwanath";
+export const DEFAULT_CERT_IN_CONTACT_NAME = "Geddam Swami Veerendra";
 export const DEFAULT_CERT_IN_CONTACT_EMAIL = "admin@agenticbuildworks.com";
 
 /** Directors / founders listed on grievance / company contact. */
