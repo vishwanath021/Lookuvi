@@ -25,6 +25,8 @@ export type SalonRecord = {
   productGroom: boolean;
   productMakeupStudio: boolean;
   queueToday: number;
+  openTime: string;
+  closeTime: string;
 };
 
 /** Succeeded try-ons only. Demo samples and failed attempts are not previews. */
@@ -90,6 +92,8 @@ export async function loadSalons(): Promise<SalonRecord[]> {
       productGroom: tenant.productGroom,
       productMakeupStudio: tenant.productMakeupStudio,
       queueToday: today.get(tenant.id) || 0,
+      openTime: tenant.openTime,
+      closeTime: tenant.closeTime,
     };
   });
 }

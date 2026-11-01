@@ -6,6 +6,7 @@ import { isLocale, LOCALES } from "@/data/i18n";
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/session";
 import { isAllowedLogoUrl } from "@/lib/logo-url";
+import { parseOperatingHours } from "@/lib/queue/hours";
 import { toolEnabled, type ToolId } from "@/lib/tools";
 
 const schema = z.object({
@@ -46,6 +47,8 @@ const schema = z.object({
   visitTryLimit: z.number().int().min(1).max(20).optional(),
   monthlyTryAllowance: z.number().int().min(0).max(5000).optional(),
   gstin: z.string().max(20).optional().nullable(),
+  openTime: z.string().max(8).optional(),
+  closeTime: z.string().max(8).optional(),
 });
 
 export async function GET() {
@@ -88,6 +91,12 @@ export async function PUT(req: Request) {
   }
   if (data.productBridal === true && !access.tenant.productBridal) {
     await ensureBridalPackages(access.tenant.id);
+  }
+  if (data.openTime !== undefined || data.closeTime !== undefined) {
+    const hours = parseOperatingHours(data.openTime ?? "", data.closeTime ?? "");
+    if (hours.kind === "invalid") return NextResponse.json({ error: "HOURS", message: hours.message }, { status: 400 });
+    rest.openTime = hours.kind === "custom" ? hours.open : "";
+    rest.closeTime = hours.kind === "custom" ? hours.close : "";
   }
   const tenant = await prisma.tenant.update({
     where: { id: access.tenant.id },

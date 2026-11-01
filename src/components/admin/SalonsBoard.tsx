@@ -20,6 +20,8 @@ function applySalonPatch(row: SalonRecord, body: Record<string, unknown>): Salon
     ...(typeof body.productBridal === "boolean" ? { productBridal: body.productBridal } : {}),
     ...(typeof body.productGroom === "boolean" ? { productGroom: body.productGroom } : {}),
     ...(typeof body.productMakeupStudio === "boolean" ? { productMakeupStudio: body.productMakeupStudio } : {}),
+    ...(typeof body.openTime === "string" ? { openTime: body.openTime } : {}),
+    ...(typeof body.closeTime === "string" ? { closeTime: body.closeTime } : {}),
   };
 }
 
@@ -301,6 +303,32 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
                   <input className="field mt-1" name="name" aria-label={`Salon name for ${selected.slug}`} defaultValue={selected.name} required minLength={2} />
                 </label>
                 <button className="btn w-fit" type="submit" disabled={busy}>{busy ? "Saving…" : "Save name"}</button>
+              </form>
+              <form
+                className="mt-4 grid gap-3"
+                key={`${selected.id}-hours`}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const data = new FormData(event.currentTarget);
+                  void update(selected.id, {
+                    openTime: String(data.get("openTime") || ""),
+                    closeTime: String(data.get("closeTime") || ""),
+                  });
+                }}
+              >
+                <fieldset className="grid gap-2 text-sm">
+                  <legend className="font-medium">Request hours (India time)</legend>
+                  <p className="text-xs text-muted">Leave both empty for 06:00–22:00. This does not open or pause the live queue.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label>Opens
+                      <input className="field mt-1" type="time" name="openTime" aria-label={`Opens for ${selected.slug}`} defaultValue={selected.openTime} />
+                    </label>
+                    <label>Closes
+                      <input className="field mt-1" type="time" name="closeTime" aria-label={`Closes for ${selected.slug}`} defaultValue={selected.closeTime} />
+                    </label>
+                  </div>
+                </fieldset>
+                <button className="btn secondary w-fit" type="submit" disabled={busy}>{busy ? "Saving…" : "Save hours"}</button>
               </form>
               <dl className="mt-4 grid gap-2 text-sm">
                 <div><dt className="text-muted">Link</dt><dd><a className="underline" href={`/s/${selected.slug}`}>{selected.slug}</a></dd></div>

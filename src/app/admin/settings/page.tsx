@@ -61,6 +61,8 @@ export default async function SettingsPage() {
           productMakeupStudio: tenant.productMakeupStudio,
           visitTryLimit: tenant.visitTryLimit,
           logoUrl: tenant.logoUrl,
+          openTime: tenant.openTime,
+          closeTime: tenant.closeTime,
         }}
       />
     </main>
