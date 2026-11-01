@@ -1,9 +1,9 @@
 import NextAuth, { CredentialsSignin, type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import { checkUserTotp } from "@/lib/account-totp";
+import { redeemMagicLink } from "@/lib/auth/magic-link";
 import { numberEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { requestClientIp, sharedRateLimit } from "@/lib/ratelimit";
@@ -108,15 +108,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       authorize: async (credentials) => {
         const token = typeof credentials?.token === "string" ? credentials.token : "";
         const totp = typeof credentials?.totp === "string" ? credentials.totp : "";
-        if (token.length < 20) return null;
-        const tokenHash = createHash("sha256").update(token).digest("hex");
-        const link = await prisma.magicLink.findUnique({ where: { tokenHash } });
-        if (!link || link.used || link.expiresAt.getTime() < Date.now()) return null;
-        const user = await prisma.user.findUnique({ where: { email: link.email.toLowerCase() } });
-        if (!user) return null;
-        await assertTotp(user, totp);
-        await prisma.magicLink.update({ where: { id: link.id }, data: { used: true } });
-        return userToSession(link.email.toLowerCase());
+        const redeemed = await redeemMagicLink(token, totp);
+        if (!redeemed.ok) {
+          if (redeemed.reason === "totp_required") throw new TotpRequired();
+          if (redeemed.reason === "totp_invalid") throw new TotpInvalid();
+          return null;
+        }
+        return redeemed.user;
       },
     }),
   ],
