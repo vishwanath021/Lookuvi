@@ -8,7 +8,11 @@ import { requireSuper } from "@/lib/session";
 export async function GET() {
   const access = await requireSuper();
   if ("error" in access && access.error) return access.error;
-  const tenants = await prisma.tenant.findMany({ orderBy: { createdAt: "desc" }, include: { subscription: true, _count: { select: { leads: true, tryOns: true } } } });
+  const tenants = await prisma.tenant.findMany({
+    where: { deletedAt: null },
+    orderBy: { createdAt: "desc" },
+    include: { subscription: true, _count: { select: { leads: true, tryOns: true } } },
+  });
   const standardInr = numberEnv("AI_COST_INR_STANDARD", 3.5);
   const hdInr = numberEnv("AI_COST_INR_HD", 7);
   const rows = [];

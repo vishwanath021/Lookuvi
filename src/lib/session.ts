@@ -3,6 +3,12 @@ import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isSoftDeleted } from "@/lib/salon-status";
+
+function liveMembership<T extends { tenant: { deletedAt: Date | null } | null }>(hit: T | null) {
+  if (!hit?.tenant || isSoftDeleted(hit.tenant)) return null;
+  return hit;
+}
 
 export const SALON_COOKIE = "helix_salon";
 
@@ -10,24 +16,25 @@ async function membershipFor(userId: string, sessionTenantId?: string) {
   const jar = await cookies();
   const picked = jar.get(SALON_COOKIE)?.value || "";
   if (picked) {
-    const hit = await prisma.membership.findFirst({
+    const hit = liveMembership(await prisma.membership.findFirst({
       where: { userId, tenantId: picked },
       include: { tenant: true },
-    });
+    }));
     if (hit) return hit;
   }
   if (sessionTenantId) {
-    const hit = await prisma.membership.findFirst({
+    const hit = liveMembership(await prisma.membership.findFirst({
       where: { userId, tenantId: sessionTenantId },
       include: { tenant: true },
-    });
+    }));
     if (hit) return hit;
   }
-  return prisma.membership.findFirst({
+  const rows = await prisma.membership.findMany({
     where: { userId },
     include: { tenant: true },
     orderBy: { role: "asc" },
   });
+  return rows.find((row) => liveMembership(row)) ?? null;
 }
 
 export async function requireMembership() {

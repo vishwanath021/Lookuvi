@@ -131,7 +131,7 @@ export async function sweepDueReminders(send: Sender = defaultSend, env: NotifyE
   const ready = outreachReady(env, "reminder");
   if (ready !== "READY") return { sent: 0, reason: ready, salons: 0 };
   const salons = await prisma.tenant.findMany({
-    where: { remindersOn: true, productQueue: true, status: { notIn: ["SUSPENDED", "EXPIRED"] } },
+    where: { deletedAt: null, remindersOn: true, productQueue: true, status: { notIn: ["SUSPENDED", "EXPIRED"] } },
     select: { id: true, name: true, slug: true, reminderDays: true, whatsappMonthlyCap: true },
   });
   let sent = 0;

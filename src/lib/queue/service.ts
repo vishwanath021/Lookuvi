@@ -190,7 +190,7 @@ export async function sweepAllQueues(send: Sender = notifyGuest) {
 
 async function requireQueueTenant(slug: string) {
   const tenant = await prisma.tenant.findUnique({ where: { slug } });
-  if (!tenant || !tenant.productQueue) throw new QueueError("PRODUCT", "The queue is not available for this salon.", 404);
+  if (!tenant || tenant.deletedAt || !tenant.productQueue) throw new QueueError("PRODUCT", "The queue is not available for this salon.", 404);
   if (tenant.status === "SUSPENDED" || tenant.status === "EXPIRED") {
     throw new QueueError("SUSPENDED", tenant.status === "EXPIRED" ? "This salon's trial has ended." : "This salon is paused.", 403);
   }

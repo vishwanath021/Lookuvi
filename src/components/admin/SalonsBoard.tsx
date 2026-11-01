@@ -54,6 +54,8 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
   const [planOpen, setPlanOpen] = useState(false);
   const [creditOpen, setCreditOpen] = useState(false);
   const [suspendOpen, setSuspendOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
@@ -123,6 +125,12 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
     setSuspendOpen(true);
   }
 
+  function openDelete(row: SalonRecord) {
+    setSelected(row);
+    setDeleteConfirm("");
+    setDeleteOpen(true);
+  }
+
   function openPay(row: SalonRecord) {
     setSelected(row);
     setUpiRef("");
@@ -185,6 +193,14 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
     if (!res.ok) {
       say(data.message || "Could not update that salon.", false);
       return false;
+    }
+    if (body.remove === true) {
+      setRows((current) => current.filter((row) => row.id !== id));
+      setSelected(null);
+      setDeleteOpen(false);
+      setDeleteConfirm("");
+      say("Salon deleted. Guest links now return not found. Nothing was removed from the database.");
+      return true;
     }
     const text = data.plan
       ? `Plan set to ${data.plan}. Try-ons are added when the payment is marked paid.`
@@ -272,6 +288,7 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
                         <DropdownMenuItem onSelect={() => openPay(row)}>Mark paid</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => openCredits(row)}>Adjust try-ons</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => openSuspend(row)}>{row.status === "SUSPENDED" ? "Resume" : "Suspend"}</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => openDelete(row)}>Delete</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -282,7 +299,7 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
         </div>
       )}
 
-      <Sheet open={Boolean(selected) && !planOpen && !creditOpen && !suspendOpen && !payOpen} onOpenChange={(open) => { if (!open) setSelected(null); }} title={selected?.name || "Salon"} description={selected ? selected.slug : undefined}>
+      <Sheet open={Boolean(selected) && !planOpen && !creditOpen && !suspendOpen && !payOpen && !deleteOpen} onOpenChange={(open) => { if (!open) setSelected(null); }} title={selected?.name || "Salon"} description={selected ? selected.slug : undefined}>
         {selected ? (
           <Tabs defaultValue="profile">
             <TabsList>
@@ -397,6 +414,7 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
                 <button className="btn secondary" type="button" onClick={() => openPay(selected)}>Mark paid</button>
                 <button className="btn secondary" type="button" onClick={() => openCredits(selected)}>Adjust try-ons</button>
                 <button className="btn secondary" type="button" onClick={() => openSuspend(selected)}>{selected.status === "SUSPENDED" ? "Resume" : "Suspend"}</button>
+                <button className="btn secondary" type="button" onClick={() => openDelete(selected)}>Delete salon</button>
               </div>
             </TabsContent>
             <TabsContent value="usage">
@@ -523,6 +541,27 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
               <input className="field mt-1" aria-label="UPI reference" value={upiRef} onChange={(event) => setUpiRef(event.target.value)} required minLength={6} maxLength={32} />
             </label>
             <button className="btn" type="submit" disabled={busy || !selected}>{busy ? "Saving…" : "Mark paid"}</button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent title="Delete salon" description="This is not suspend. Guest links return not found, and this screen cannot resume the salon. The salon's rows stay in the database.">
+          <form
+            className="grid gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!selected || deleteConfirm !== selected.slug) return;
+              void update(selected.id, { remove: true });
+            }}
+          >
+            <label className="text-sm">Type {selected?.slug} to confirm
+              <input className="field mt-1" aria-label="Type the salon link to confirm" value={deleteConfirm} onChange={(event) => setDeleteConfirm(event.target.value)} autoComplete="off" />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn" type="submit" disabled={busy || !selected || deleteConfirm !== selected.slug}>{busy ? "Deleting…" : "Delete salon"}</button>
+              <button className="btn secondary" type="button" onClick={() => setDeleteOpen(false)}>Cancel</button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

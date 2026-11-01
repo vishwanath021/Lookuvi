@@ -9,6 +9,7 @@ import { platformSuitabilityMap } from "@/lib/catalog-tags";
 import { applySuitability } from "@/lib/hair-suitability";
 import { parseJson } from "@/lib/json";
 import { prisma } from "@/lib/prisma";
+import { isSoftDeleted } from "@/lib/salon-status";
 import { maskToolFlags } from "@/lib/tools";
 
 export type SalonService = {
@@ -80,13 +81,17 @@ function tenantQuery(where: { slug: string } | { id: string }) {
 }
 
 export async function loadTenantBySlug(slug: string) {
-  return tenantQuery({ slug });
+  const tenant = await tenantQuery({ slug });
+  if (!tenant || isSoftDeleted(tenant)) return null;
+  return tenant;
 }
 
 export async function loadTenantByHost(host: string) {
   const domain = await prisma.domain.findUnique({ where: { host: host.toLowerCase() } });
   if (!domain?.verified) return null;
-  return tenantQuery({ id: domain.tenantId });
+  const tenant = await tenantQuery({ id: domain.tenantId });
+  if (!tenant || isSoftDeleted(tenant)) return null;
+  return tenant;
 }
 
 export async function toSalonConfig(tenant: TenantWithRelations): Promise<SalonConfig> {
