@@ -37,6 +37,7 @@ export async function loadSalons(): Promise<SalonRecord[]> {
   const since = kolkataMonthStart();
   const [tenants, grouped, allPreviews, queued] = await Promise.all([
     prisma.tenant.findMany({
+      where: { deletedAt: null },
       orderBy: { createdAt: "desc" },
       include: {
         _count: { select: { leads: true } },

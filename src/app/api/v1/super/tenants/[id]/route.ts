@@ -20,6 +20,7 @@ const schema = z.object({
   productMakeupStudio: z.boolean().optional(),
   openTime: z.string().max(8).nullable().optional(),
   closeTime: z.string().max(8).nullable().optional(),
+  remove: z.literal(true).optional(),
 });
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -31,6 +32,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!parsed.success) return NextResponse.json({ error: "INVALID" }, { status: 400 });
   const tenant = await prisma.tenant.findUnique({ where: { id } });
   if (!tenant) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  if (parsed.data.remove) {
+    const deletedAt = new Date();
+    await prisma.tenant.update({ where: { id }, data: { deletedAt } });
+    await prisma.auditLog.create({
+      data: {
+        actorId: access.session.user.id,
+        action: "SALON_DELETE",
+        target: id,
+        meta: JSON.stringify({ slug: tenant.slug, deletedAt: deletedAt.toISOString() }),
+      },
+    });
+    return NextResponse.json({ ok: true, deleted: true });
+  }
   if (parsed.data.plan && !isPlanId(parsed.data.plan)) return NextResponse.json({ error: "PLAN" }, { status: 400 });
   let hours: { open: string; close: string } | undefined;
   if (parsed.data.openTime !== undefined || parsed.data.closeTime !== undefined) {

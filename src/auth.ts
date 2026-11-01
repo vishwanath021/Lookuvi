@@ -6,6 +6,7 @@ import { checkUserTotp } from "@/lib/account-totp";
 import { redeemMagicLink } from "@/lib/auth/magic-link";
 import { numberEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import { isSoftDeleted } from "@/lib/salon-status";
 import { requestClientIp, sharedRateLimit } from "@/lib/ratelimit";
 import { revokeUserSessions, sessionIsCurrent } from "@/lib/session-revocation";
 
@@ -147,9 +148,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return token;
           }
           const preferred = typeof token.tenantId === "string" ? token.tenantId : "";
-          const membership = preferred
-            ? await prisma.membership.findUnique({ where: { userId_tenantId: { userId: fresh.id, tenantId: preferred } } })
-            : await prisma.membership.findFirst({ where: { userId: fresh.id }, orderBy: { role: "asc" } });
+          const rows = await prisma.membership.findMany({
+            where: { userId: fresh.id },
+            include: { tenant: { select: { deletedAt: true } } },
+            orderBy: { role: "asc" },
+          });
+          const live = rows.filter((row) => row.tenant && !isSoftDeleted(row.tenant));
+          const membership = live.find((row) => row.tenantId === preferred) ?? live[0];
           token.sessionVersion = fresh.sessionVersion;
           token.isSuperAdmin = fresh.isSuperAdmin;
           token.role = membership?.role;
