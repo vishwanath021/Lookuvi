@@ -16,6 +16,8 @@ type Board = {
   ahead: number;
   tryOn: boolean;
   lang: string;
+  hoursOpen?: string;
+  hoursClose?: string;
   services: { id: string; name: string; minutes: number }[];
 };
 
@@ -147,7 +149,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
               <input className="field mt-1" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
             </label>
             <label className="text-sm">{t(lang, "queueTime")}
-              <input className="field mt-1" type="time" min="06:00" max="22:00" value={slot} onChange={(event) => setSlot(event.target.value)} required />
+              <input className="field mt-1" type="time" min={board.hoursOpen || "06:00"} max={board.hoursClose || "22:00"} value={slot} onChange={(event) => setSlot(event.target.value)} required />
             </label>
           </>
         ) : null}

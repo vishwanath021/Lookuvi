@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { sharedRateLimit } from "@/lib/ratelimit";
 import { notifyGuest, type NotifyMessage, type NotifyResult } from "@/lib/notify";
 import { kolkataDayKey } from "@/lib/queue/day";
+import { requestWindow } from "@/lib/queue/hours";
 import { peopleAhead, serviceMinutes, waitMinutes, type WaitRow } from "@/lib/queue/estimate";
 import { attributeReturn, recordVisit, rememberCustomer } from "@/lib/customers/service";
 import { almostMessage, confirmedMessage, deskWhatsAppText, joinedMessage, queueHomeUrl, statusPath, statusUrl, tryOnUrl } from "@/lib/queue/messages";
@@ -22,9 +23,7 @@ export const QUEUE_IP_JOINS_PER_HOUR = 60;
 export const QUEUE_PHONE_JOINS_PER_HOUR = 4;
 export const QUEUE_DEVICE_JOINS_PER_HOUR = 8;
 const HOUR_MS = 60 * 60 * 1000;
-/** Request-mode slots with no salon hours config: refuse obviously closed overnight times. */
-export const REQUEST_SLOT_EARLIEST = "06:00";
-export const REQUEST_SLOT_LATEST = "22:00";
+export { REQUEST_SLOT_EARLIEST, REQUEST_SLOT_LATEST } from "@/lib/queue/hours";
 
 const LIVE_ACTIVE = ["WAITING", "CALLED", "IN_SERVICE"];
 const REQUEST_ACTIVE = ["REQUESTED", "CONFIRMED"];
@@ -209,6 +208,7 @@ export async function publicBoard(slug: string) {
   });
   const live = state.mode === "LIVE";
   const wait = live ? timing(entries, null, state.avgMinutes, state.units) : { ahead: 0, waitMin: 0 };
+  const hours = requestWindow(tenant.openTime, tenant.closeTime);
   return {
     name: tenant.name,
     slug: tenant.slug,
@@ -219,6 +219,8 @@ export async function publicBoard(slug: string) {
     ahead: wait.ahead,
     tryOn: tenant.productTryOn,
     lang: tenant.defaultLang,
+    hoursOpen: hours.open,
+    hoursClose: hours.close,
     services: services.map((service) => ({ id: service.id, name: service.name, minutes: serviceMinutes(service.durationMin, state.avgMinutes) })),
   };
 }
@@ -230,13 +232,12 @@ async function findService(tenantId: string, serviceId: string | undefined) {
   return service;
 }
 
-function checkSlot(date: string, slot: string) {
+function checkSlot(date: string, slot: string, window: { open: string; close: string }) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new QueueError("INVALID", "Choose a date.", 400);
   if (!/^\d{2}:\d{2}$/.test(slot)) throw new QueueError("INVALID", "Choose a time.", 400);
   if (date < kolkataDayKey()) throw new QueueError("INVALID", "Choose today or a later date.", 400);
-  // No operating-hours fields on the salon yet. Keep request times inside a daytime window.
-  if (slot < REQUEST_SLOT_EARLIEST || slot > REQUEST_SLOT_LATEST) {
-    throw new QueueError("INVALID", `Choose a time between ${REQUEST_SLOT_EARLIEST} and ${REQUEST_SLOT_LATEST}.`, 400);
+  if (slot < window.open || slot > window.close) {
+    throw new QueueError("INVALID", `Choose a time between ${window.open} and ${window.close}.`, 400);
   }
 }
 
@@ -263,7 +264,7 @@ export async function joinQueue(input: {
   const state = await ensureQueueState(tenant.id);
   const requestedDate = (input.requestedDate || "").trim();
   const requestedSlot = (input.requestedSlot || "").trim();
-  if (state.mode === "REQUEST") checkSlot(requestedDate, requestedSlot);
+  if (state.mode === "REQUEST") checkSlot(requestedDate, requestedSlot, requestWindow(tenant.openTime, tenant.closeTime));
   else if (!state.isOpen) throw new QueueError("CLOSED", "The queue is paused. Please ask at the desk.", 403);
 
   const dayKey = state.mode === "REQUEST" ? requestedDate : kolkataDayKey();
@@ -563,7 +564,7 @@ export async function confirmRequest(tenantId: string, id: string, input: { date
   if (!row || row.status !== "REQUESTED") throw new QueueError("STATE", "That request is not waiting.", 409);
   const date = (input.date || row.requestedDate).trim();
   const slot = (input.slot || row.requestedSlot).trim();
-  checkSlot(date, slot);
+  checkSlot(date, slot, requestWindow(tenant.openTime, tenant.closeTime));
   await prisma.queueEntry.update({
     where: { id },
     data: { status: "CONFIRMED", requestedDate: date, requestedSlot: slot },

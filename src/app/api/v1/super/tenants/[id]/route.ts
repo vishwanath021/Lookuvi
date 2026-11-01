@@ -4,6 +4,7 @@ import { isPlanId } from "@/data/plans";
 import { applyPlanChange } from "@/lib/billing/plan-assign";
 import { CreditError, grantCredits } from "@/lib/credits";
 import { prisma } from "@/lib/prisma";
+import { parseOperatingHours } from "@/lib/queue/hours";
 import { requireSuper } from "@/lib/session";
 
 const schema = z.object({
@@ -17,6 +18,8 @@ const schema = z.object({
   productBridal: z.boolean().optional(),
   productGroom: z.boolean().optional(),
   productMakeupStudio: z.boolean().optional(),
+  openTime: z.string().max(8).nullable().optional(),
+  closeTime: z.string().max(8).nullable().optional(),
 });
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -29,6 +32,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const tenant = await prisma.tenant.findUnique({ where: { id } });
   if (!tenant) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   if (parsed.data.plan && !isPlanId(parsed.data.plan)) return NextResponse.json({ error: "PLAN" }, { status: 400 });
+  let hours: { open: string; close: string } | undefined;
+  if (parsed.data.openTime !== undefined || parsed.data.closeTime !== undefined) {
+    const parsedHours = parseOperatingHours(parsed.data.openTime ?? "", parsed.data.closeTime ?? "");
+    if (parsedHours.kind === "invalid") return NextResponse.json({ error: "HOURS", message: parsedHours.message }, { status: 400 });
+    hours = parsedHours.kind === "custom" ? { open: parsedHours.open, close: parsedHours.close } : { open: "", close: "" };
+  }
   const planChange = parsed.data.plan && isPlanId(parsed.data.plan) ? await applyPlanChange(id, parsed.data.plan) : null;
   await prisma.tenant.update({
     where: { id },
@@ -40,6 +49,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       ...(parsed.data.productBridal !== undefined ? { productBridal: parsed.data.productBridal } : {}),
       ...(parsed.data.productGroom !== undefined ? { productGroom: parsed.data.productGroom } : {}),
       ...(parsed.data.productMakeupStudio !== undefined ? { productMakeupStudio: parsed.data.productMakeupStudio } : {}),
+      ...(hours ? { openTime: hours.open, closeTime: hours.close } : {}),
     },
   });
   if (planChange) {
