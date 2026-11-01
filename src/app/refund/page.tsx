@@ -1,16 +1,16 @@
 // Counsel still needs to review this page before it is treated as legal advice.
 import Link from "next/link";
 import { LegalFooter } from "@/components/legal/LegalFooter";
-import { legalName } from "@/lib/env";
+import { companyLegalName, supportEmail } from "@/lib/legal";
 
 export default function RefundPage() {
-  const company = legalName();
-  const support = process.env.SUPPORT_EMAIL || "privacy@agenticbuildworks.com";
+  const company = companyLegalName();
+  const support = supportEmail();
   return (
     <main className="mx-auto max-w-2xl px-5 py-10 text-sm leading-7">
       <p className="text-muted"><Link href="/">Lookuvi</Link></p>
       <h1 className="mt-3 page-title">Refund &amp; cancellation</h1>
-      <p className="mt-2 text-muted">Version 2026-10-31. For salon (B2B) subscriptions and try-on packs. Guest walk-in try-ons are free to the guest. Fill the placeholders before launch.</p>
+      <p className="mt-2 text-muted">Version 2026-10-31. For salon (B2B) subscriptions and try-on packs. Guest walk-in try-ons are free to the guest.</p>
       <div className="mt-6 space-y-4">
         <p>{company} sells Lookuvi plans and try-on packs to salons in India. Prices in the product are in Indian rupees and are shown before payment. GST is not charged until {company} has a GSTIN. A receipt is not a tax invoice until then.</p>
         <h2 className="font-serif text-2xl">Plans</h2>
@@ -25,7 +25,7 @@ export default function RefundPage() {
         <p>You may cancel a subscription before the next renewal. After cancellation, guests may lose try-on access when the paid period ends. Export any leads you need before closing the salon.</p>
         <p>Grievance contact: see <Link className="underline" href="/grievance">Grievance</Link>.</p>
       </div>
-      <LegalFooter />
+      <LegalFooter company={company} />
     </main>
   );
 }
