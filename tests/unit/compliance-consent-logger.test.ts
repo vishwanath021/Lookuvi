@@ -38,12 +38,15 @@ describe("compliance consent + logger + mail", () => {
     expect(String(nested.mobile)).toMatch(/\*\*\*6789|redacted/);
   });
 
-  it("appends sender identity and postal placeholder on email footers", () => {
+  it("appends sender identity and postal address on email footers", () => {
     const tx = mailFooter("transactional");
     expect(tx).toContain("Agentic Build Works");
-    expect(tx).toContain("[Registered address]");
+    expect(tx).toContain("Hyderabad 500030");
     expect(tx).not.toContain("Unsubscribe");
+    expect(tx).not.toMatch(/\[[A-Z]/);
     const mk = mailFooter("marketing");
-    expect(mk).toContain("Unsubscribe");
+    expect(mk).toContain("Hyderabad 500030");
+    expect(mk).not.toContain("Unsubscribe");
+    expect(mk).not.toContain("lookuvi.example");
   });
 });

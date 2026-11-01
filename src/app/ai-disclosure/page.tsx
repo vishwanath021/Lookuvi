@@ -1,15 +1,15 @@
 // Counsel still needs to review this page before it is treated as legal advice.
 import Link from "next/link";
 import { LegalFooter } from "@/components/legal/LegalFooter";
-import { legalName } from "@/lib/env";
+import { companyLegalName } from "@/lib/legal";
 
 export default function AiDisclosurePage() {
-  const company = legalName();
+  const company = companyLegalName();
   return (
     <main className="mx-auto max-w-2xl px-5 py-10 text-sm leading-7">
       <p className="text-muted"><Link href="/">Lookuvi</Link></p>
       <h1 className="mt-3 page-title">AI disclosure</h1>
-      <p className="mt-2 text-muted">Version 2026-10-31. How Lookuvi labels synthetically generated try-on images. Aligned with MeitY advisories on synthetically generated content. Fill placeholders before launch.</p>
+      <p className="mt-2 text-muted">Version 2026-10-31. How Lookuvi labels synthetically generated try-on images. Aligned with MeitY advisories on synthetically generated content.</p>
       <div className="mt-6 space-y-4">
         <p>{company}&apos;s Lookuvi product shows hair, brow, beard, nail, bridal, and makeup <strong>previews</strong>. Style previews are produced by an AI image model. They are a guide for a conversation with a stylist — not a photograph of a finished service and not a promise of the cut, colour, or makeup you will receive.</p>
         <h2 className="font-serif text-2xl">Labelling</h2>
@@ -19,7 +19,7 @@ export default function AiDisclosurePage() {
         <h2 className="font-serif text-2xl">Your rights</h2>
         <p>Photo consent, withdrawal, and deletion are described on the <Link className="underline" href="/privacy">Privacy</Link> page.</p>
       </div>
-      <LegalFooter />
+      <LegalFooter company={company} />
     </main>
   );
 }

@@ -1,3 +1,5 @@
+import { companyLegalName, marketingUnsubscribeUrl, postalAddress } from "@/lib/legal";
+
 /** True when a production sender is configured. Dev may still show a link on screen. */
 export function mailConfigured() {
   return Boolean(process.env.RESEND_API_KEY || process.env.SMTP_URL);
@@ -12,17 +14,12 @@ export const MAIL_NOT_CONFIGURED =
   "Email is not configured. Set RESEND_API_KEY or SMTP_URL, and EMAIL_FROM. Until then, reset links and magic links are not sent. An operator can set a password with node scripts/create-super-admin.mjs.";
 
 export function mailFooter(kind: "transactional" | "marketing" = "transactional") {
-  const company = process.env.BRAND_LEGAL_NAME || "Agentic Build Works";
-  const postal = process.env.LEGAL_POSTAL_ADDRESS || "[Registered address]";
-  const lines = [
-    "",
-    "—",
-    `Sent by ${company} (Lookuvi).`,
-    `Postal: ${postal}`,
-  ];
+  const company = companyLegalName();
+  const postal = postalAddress();
+  const lines = ["", "—", `Sent by ${company} (Lookuvi).`, `Postal: ${postal}`];
   if (kind === "marketing") {
-    const unsub = process.env.MARKETING_UNSUBSCRIBE_URL || "https://lookuvi.example/unsubscribe";
-    lines.push(`Unsubscribe: ${unsub}`);
+    const unsub = marketingUnsubscribeUrl();
+    if (unsub) lines.push(`Unsubscribe: ${unsub}`);
   }
   return lines.join("\n");
 }

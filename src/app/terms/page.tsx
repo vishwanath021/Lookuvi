@@ -1,11 +1,12 @@
 // Counsel still needs to review this page before it is treated as legal advice.
 import Link from "next/link";
 import { LegalFooter } from "@/components/legal/LegalFooter";
-import { legalName } from "@/lib/env";
+import { companyLegalName, postalAddress, supportEmail } from "@/lib/legal";
 
 export default function TermsPage() {
-  const company = legalName();
-  const support = process.env.SUPPORT_EMAIL || "privacy@agenticbuildworks.com";
+  const company = companyLegalName();
+  const support = supportEmail();
+  const postal = postalAddress();
   return (
     <main className="mx-auto max-w-2xl px-5 py-10 text-sm leading-7">
       <p className="text-muted"><Link href="/">Lookuvi</Link></p>
@@ -22,8 +23,8 @@ export default function TermsPage() {
       <h2 className="mt-6 font-serif text-2xl">Privacy roles</h2>
       <p>The salon is the data fiduciary. We process try-on traffic as described in the <Link className="underline" href="/privacy">privacy notice</Link>. A data processing addendum should be signed before a paying salon goes live.</p>
       <h2 className="mt-6 font-serif text-2xl">Contact</h2>
-      <p>{support}. Postal: <strong>[Registered address]</strong>.</p>
-      <LegalFooter />
+      <p>{support}. Postal: <strong>{postal}</strong>.</p>
+      <LegalFooter company={company} />
     </main>
   );
 }

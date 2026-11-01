@@ -1,6 +1,17 @@
 # CERT-In Directions (April 2022) — Lookuvi ops note
 
-This is an **operations checklist**, not legal advice. Entity details for reports must be filled by Agentic Build Works.
+This is an **operations checklist**, not legal advice.
+
+## Entity contacts
+
+| Field | Value |
+|---|---|
+| Legal name | Agentic Build Works |
+| Registered / postal address | 4-164/140, Om Nagar Colony, Kismatpur, Hyderabad 500030, Telangana, India |
+| CERT-In report contact | T Sai Vishwanath · admin@agenticbuildworks.com |
+| Hosting | Hostinger VPS, India region (confirm city/DC on the invoice) |
+| TRAI DLT | N/A — Lookuvi does not send commercial SMS today |
+| CIN / GSTIN | Not issued yet — omit from customer UI until set via `COMPANY_CIN` / `COMPANY_GSTIN` |
 
 ## Log retention (180 days)
 
@@ -23,18 +34,12 @@ On becoming aware of a reportable cyber incident (as defined in CERT-In directio
 
 1. Records the incident with `logSecurityIncident` / Admin audit (action `SECURITY_INCIDENT`) — time (IST), systems, IOCs known, containment status.
 2. Contains and preserves evidence (do not wipe disks hastily).
-3. Reports to CERT-In within **6 hours** via the prescribed channel, using entity details below.
+3. Reports to CERT-In within **6 hours** via the prescribed channel, using the entity contacts above.
 4. Follows up with a detailed report as required.
-
-Placeholders:
-
-- Reporting entity legal name: Agentic Build Works (confirm registered name)
-- [Registered address]
-- [CERT-In report contact name / email / phone]
-- Hosting: Hostinger VPS, India region (confirm city/DC on the invoice)
 
 ## Related code
 
 - App logger: `src/lib/logger.ts` (redacts photos, keys, phones)
 - Incident helper: `src/lib/security-incident.ts`
+- Legal defaults: `src/lib/legal.ts`
 - Retention of guest preview objects (24h) is separate from CERT-In log retention — see `src/lib/retention.ts`

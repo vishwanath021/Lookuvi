@@ -2,11 +2,12 @@
 import Link from "next/link";
 import { PrivacyRequest } from "@/components/PrivacyRequest";
 import { LegalFooter } from "@/components/legal/LegalFooter";
-import { legalName } from "@/lib/env";
+import { companyLegalName, postalAddress, supportEmail } from "@/lib/legal";
 
 export default function PrivacyPage() {
-  const contact = process.env.SUPPORT_EMAIL || "privacy@agenticbuildworks.com";
-  const company = legalName();
+  const contact = supportEmail();
+  const company = companyLegalName();
+  const postal = postalAddress();
   return (
     <main className="mx-auto max-w-2xl px-5 py-10">
       <p className="text-sm text-muted"><Link href="/">Lookuvi</Link></p>
@@ -37,10 +38,10 @@ export default function PrivacyPage() {
         <p>We store a consent log (session id, purpose, text version, language, time, a short hash of the browser string, age confirmation), usage events without photos, queue and customer phone records for that salon, and booking leads if the guest taps Book. You can ask for access, correction, erasure, and nomination through the form below or the <Link className="underline" href="/grievance">Grievance</Link> page.</p>
 
         <h2 className="font-serif text-2xl">Queue, WhatsApp, and SMS</h2>
-        <p>A phone number entered for the queue is saved on that salon&apos;s own list, with a visit count and the date of the last completed visit. The salon can send one WhatsApp reminder after a visit, or an offer. Reply STOP to opt out of reminders and offers. That opt-out applies to every salon on this WhatsApp number. Queue updates for a visit you just joined still use the consent tick on the join form. The list is not shared with another salon. Commercial SMS, when used, requires TRAI DLT registration by the sender.</p>
+        <p>A phone number entered for the queue is saved on that salon&apos;s own list, with a visit count and the date of the last completed visit. The salon can send one WhatsApp reminder after a visit, or an offer. Reply STOP to opt out of reminders and offers. That opt-out applies to every salon on this WhatsApp number. Queue updates for a visit you just joined still use the consent tick on the join form. The list is not shared with another salon. Lookuvi does not send commercial SMS today (TRAI DLT is not applicable until SMS is enabled).</p>
 
         <h2 className="font-serif text-2xl">Consent, withdrawal, and children</h2>
-        <p>You agree to the photo notice before the camera opens. Withdrawal is as available as consent: use the form below or the withdraw link on the consent sheet. Withdrawal deletes leads tied to the browser session. Stored previews expire on the retention schedule. Open requests are tracked with a 30-day handling target (acknowledgement target 48 hours). Grievance Officer details: <Link className="underline" href="/grievance">Grievance</Link> (placeholders until appointed). Contact: {contact}.</p>
+        <p>You agree to the photo notice before the camera opens. Withdrawal is as available as consent: use the form below or the withdraw link on the consent sheet. Withdrawal deletes leads tied to the browser session. Stored previews expire on the retention schedule. Open requests are tracked with a 30-day handling target (acknowledgement target 48 hours). Grievance Officer details: <Link className="underline" href="/grievance">Grievance</Link>. Contact: {contact}.</p>
         <p>You must confirm you are 18 or older, or that a parent or guardian is present, before a photo preview. Children&apos;s styles require a parent or guardian. Lookuvi does not run tracking or targeted advertising aimed at children.</p>
 
         <h2 className="font-serif text-2xl">Cookies &amp; local storage</h2>
@@ -52,10 +53,10 @@ export default function PrivacyPage() {
         <h2 className="font-serif text-2xl">Cross-border transfers</h2>
         <p>When AI processors or CDN/DNS providers handle data abroad, that is a cross-border transfer for the purposes of producing your preview or delivering the site. By agreeing to the photo notice you acknowledge those processors may receive the photo for that purpose only.</p>
 
-        <p>Platform contact: {contact}. Registered postal address: <strong>[Registered address]</strong>.</p>
+        <p>Platform contact: {contact}. Registered postal address: <strong>{postal}</strong>.</p>
         <PrivacyRequest />
       </div>
-      <LegalFooter />
+      <LegalFooter company={company} />
     </main>
   );
 }
