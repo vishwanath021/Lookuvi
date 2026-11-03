@@ -66,6 +66,7 @@ export default async function SalonPage({
       demoHint={demoHint}
       poseDebug={Boolean(session?.user?.isSuperAdmin)}
       showQueue={tenant.productQueue}
+      queueMode={tenant.productQueue ? (await prisma.queueState.findUnique({ where: { tenantId: tenant.id }, select: { mode: true } }))?.mode : "LIVE"}
       showEveryday={tenant.productTryOn}
       showBridal={tenant.productBridal}
       showGroom={tenant.productGroom}

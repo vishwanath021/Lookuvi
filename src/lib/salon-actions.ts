@@ -1,5 +1,10 @@
 export type SalonAction = "book" | "queue" | "chat";
 
+/** Everyday entry label. Request mode must not say the guest is joining the live line. */
+export function queueEntryKey(mode: string | null | undefined) {
+  return mode === "REQUEST" ? "queueRequest" : "queueJoinLook";
+}
+
 /** Bridal and groom hide Join queue. Book and WhatsApp stay when the salon has a number. */
 export function salonActionItems(args: { phone: boolean; showQueue: boolean; bridalOn: boolean; groomOn?: boolean }): SalonAction[] {
   const items: SalonAction[] = [];
