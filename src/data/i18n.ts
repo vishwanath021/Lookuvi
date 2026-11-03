@@ -109,7 +109,7 @@ const en: Record<string, string> = {
   useSample: "Use sample portrait",
   sampleNote: "The sample is an illustration, so the preview will not look like a real guest.",
   flipCamera: "Flip",
-  intensity: "Intensity",
+  intensity: "Colour strength",
   liveColour: "Live colour",
   shades: "Shades",
   styles: "Styles",
