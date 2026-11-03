@@ -3,7 +3,7 @@ import { PUT as saveSettings } from "@/app/api/v1/admin/settings/route";
 import { POST as updateTenant } from "@/app/api/v1/super/tenants/[id]/route";
 import { prisma } from "@/lib/prisma";
 import { HOURS_INVALID, parseOperatingHours, requestWindow } from "@/lib/queue/hours";
-import { joinQueue, saveQueueSettings, setQueueOpen } from "@/lib/queue/service";
+import { addWalkIn, joinQueue, saveQueueSettings, setQueueOpen } from "@/lib/queue/service";
 import { resetRateLimits } from "@/lib/ratelimit";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
@@ -114,18 +114,32 @@ describe("operating hours", () => {
     expect(late.requestedSlot).toBe("22:00");
   });
 
-  it("keeps live open and pause independent of request hours", async () => {
+  it("blocks a live join outside custom India hours and still pauses inside them", async () => {
     const tenant = await salon();
-    await prisma.tenant.update({ where: { id: tenant.id }, data: { openTime: "10:00", closeTime: "11:00" } });
+    await prisma.tenant.update({ where: { id: tenant.id }, data: { openTime: "10:00", closeTime: "18:00" } });
     await saveQueueSettings(tenant.id, { units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "LIVE", unitLabel: "chair" });
+    const outside = new Date("2026-06-01T03:30:00.000Z");
+    const inside = new Date("2026-06-01T05:00:00.000Z");
+    await expect(joinQueue({
+      slug: tenant.slug, name: "Late", phone: phone(), consent: true, ip: `live-${tag()}`, send, now: outside,
+    })).rejects.toThrow(/from 10:00 to 18:00 India time/);
     const joined = await joinQueue({
-      slug: tenant.slug, name: "Walk up", phone: phone(), consent: true, ip: `live-${tag()}`, send,
+      slug: tenant.slug, name: "Walk up", phone: phone(), consent: true, ip: `live-${tag()}`, send, now: inside,
     });
     expect(joined.status).toBe("WAITING");
     await setQueueOpen(tenant.id, false);
     await expect(joinQueue({
-      slug: tenant.slug, name: "Paused", phone: phone(), consent: true, ip: `live-${tag()}`, send,
-    })).rejects.toMatchObject({ code: "CLOSED" });
+      slug: tenant.slug, name: "Paused", phone: phone(), consent: true, ip: `live-${tag()}`, send, now: inside,
+    })).rejects.toThrow(/paused/);
+    await setQueueOpen(tenant.id, true);
+    await prisma.tenant.update({ where: { id: tenant.id }, data: { openTime: "", closeTime: "" } });
+    const night = await joinQueue({
+      slug: tenant.slug, name: "Night", phone: phone(), consent: true, ip: `live-${tag()}`, send, now: outside,
+    });
+    expect(night.status).toBe("WAITING");
+    await prisma.tenant.update({ where: { id: tenant.id }, data: { openTime: "10:00", closeTime: "18:00" } });
+    const desk = await addWalkIn(tenant.id, { name: "Desk" }, send);
+    expect(desk.waiting.some((card) => card.name === "Desk")).toBe(true);
   });
 
   it("lets the owner and a super-admin save or clear hours, and rejects open >= close", async () => {

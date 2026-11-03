@@ -18,6 +18,8 @@ type Board = {
   lang: string;
   hoursOpen?: string;
   hoursClose?: string;
+  hoursClosed?: boolean;
+  hoursMessage?: string;
   services: { id: string; name: string; minutes: number }[];
 };
 
@@ -37,6 +39,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
   const [visits, setVisits] = useState<VisitMemory[]>([]);
   const [returnToken, setReturnToken] = useState("");
   const request = board.mode === "REQUEST";
+  const hoursClosed = !request && Boolean(board.hoursClosed);
 
   useEffect(() => {
     setReady(true);
@@ -114,7 +117,9 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
   return (
     <div>
       <div data-queue-open={board.open ? "yes" : "no"} data-queue-mode={board.mode}>
-        {request ? <p className="mt-2 text-sm">{t(lang, "queueRequestNote")}</p> : board.open ? (
+        {request ? <p className="mt-2 text-sm">{t(lang, "queueRequestNote")}</p> : hoursClosed ? (
+          <p className="mt-2 text-sm" role="status">{board.hoursMessage}</p>
+        ) : board.open ? (
           <QueueWait serverWait={board.waitMin} ahead={board.ahead} lang={lang} phrase="join" />
         ) : <p className="mt-2 text-sm">{t(lang, "queueClosed")}</p>}
       </div>
@@ -125,7 +130,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
             <div key={visit.ref} className="grid gap-2 border-b border-line pb-3 last:border-b-0 last:pb-0">
               <p>{t(lang, "queueWelcome", { name: visit.name || visit.phone })}</p>
               <a className="btn secondary" href={`/s/${board.slug}/q/${visit.ref}`}>{t(lang, "queueSeePlace")}</a>
-              <button className="btn" type="button" disabled={busy || (!board.open && !request)} onClick={() => void join(visit.name, visit.phone, true)}>{t(lang, "queueRejoin")}</button>
+              <button className="btn" type="button" disabled={busy || hoursClosed || (!board.open && !request)} onClick={() => void join(visit.name, visit.phone, true)}>{t(lang, "queueRejoin")}</button>
             </div>
           ))}
         </div>
@@ -164,7 +169,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
           <input id="queue-updates" className="mt-1" type="checkbox" checked={consent} aria-label={t(lang, "queueConsent")} onChange={(event) => setConsent(event.target.checked)} required />
           <span>{t(lang, "queueConsent")}<span className="mt-1 block text-muted">This salon may send one WhatsApp reminder after your visit. Reply STOP to opt out.</span></span>
         </label>
-        <button className="btn w-full text-lg" type="submit" disabled={busy || (!board.open && !request)}>{busy ? "…" : request ? t(lang, "queueRequest") : t(lang, "queueJoin")}</button>
+        <button className="btn w-full text-lg" type="submit" disabled={busy || hoursClosed || (!board.open && !request)}>{busy ? "…" : request ? t(lang, "queueRequest") : t(lang, "queueJoin")}</button>
         {message ? <p className="text-sm" role="status">{message}</p> : null}
         {heldPath ? <a className="btn secondary" href={heldPath}>Open that token</a> : null}
       </form>

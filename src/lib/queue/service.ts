@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { sharedRateLimit } from "@/lib/ratelimit";
 import { notifyGuest, type NotifyMessage, type NotifyResult } from "@/lib/notify";
 import { kolkataDayKey } from "@/lib/queue/day";
-import { requestWindow } from "@/lib/queue/hours";
+import { liveJoinWindow, requestWindow } from "@/lib/queue/hours";
 import { peopleAhead, serviceMinutes, waitMinutes, type WaitRow } from "@/lib/queue/estimate";
 import { attributeReturn, recordVisit, rememberCustomer } from "@/lib/customers/service";
 import { almostMessage, confirmedMessage, deskWhatsAppText, joinedMessage, queueHomeUrl, statusPath, statusUrl, tryOnUrl } from "@/lib/queue/messages";
@@ -219,11 +219,14 @@ export async function publicBoard(slug: string) {
   const live = state.mode === "LIVE";
   const wait = live ? timing(entries, null, state.avgMinutes, state.units) : { ahead: 0, waitMin: 0 };
   const hours = requestWindow(tenant.openTime, tenant.closeTime);
+  const liveHours = state.mode === "LIVE" ? liveJoinWindow(tenant.openTime, tenant.closeTime) : { closed: false, message: "" };
   return {
     name: tenant.name,
     slug: tenant.slug,
     open: state.isOpen,
     mode: state.mode,
+    hoursClosed: liveHours.closed,
+    hoursMessage: liveHours.message,
     unitLabel: state.unitLabel,
     waitMin: wait.waitMin,
     ahead: wait.ahead,
@@ -259,6 +262,8 @@ export async function joinQueue(input: {
   consent: boolean;
   requestedDate?: string;
   requestedSlot?: string;
+  /** Test clock. Guests cannot set this; the HTTP route does not read it. */
+  now?: Date;
   ip: string;
   deviceId?: string;
   returnToken?: string;
@@ -275,7 +280,11 @@ export async function joinQueue(input: {
   const requestedDate = (input.requestedDate || "").trim();
   const requestedSlot = (input.requestedSlot || "").trim();
   if (state.mode === "REQUEST") checkSlot(requestedDate, requestedSlot, requestWindow(tenant.openTime, tenant.closeTime));
-  else if (!state.isOpen) throw new QueueError("CLOSED", "The queue is paused. Please ask at the desk.", 403);
+  else {
+    const hours = liveJoinWindow(tenant.openTime, tenant.closeTime, input.now);
+    if (hours.closed) throw new QueueError("CLOSED", hours.message, 403);
+    if (!state.isOpen) throw new QueueError("CLOSED", "The queue is paused. Please ask at the desk.", 403);
+  }
 
   const dayKey = state.mode === "REQUEST" ? requestedDate : kolkataDayKey();
   const active = state.mode === "REQUEST" ? REQUEST_ACTIVE : LIVE_ACTIVE;

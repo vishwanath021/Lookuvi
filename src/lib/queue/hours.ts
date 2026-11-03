@@ -1,6 +1,6 @@
 /**
- * A REQUEST slot is a wall-clock time in Asia/Kolkata, the same clock as `kolkataDayKey`.
- * It is not converted from UTC. Live queue open/pause does not use this window.
+ * Salon hours are wall-clock times in Asia/Kolkata, the same clock as `kolkataDayKey`.
+ * They are not converted from UTC. Desk pause is a separate switch.
  */
 const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -37,4 +37,29 @@ export function requestWindow(open?: string | null, close?: string | null) {
   const parsed = parseOperatingHours(open, close);
   if (parsed.kind === "custom") return { open: parsed.open, close: parsed.close };
   return { open: REQUEST_SLOT_EARLIEST, close: REQUEST_SLOT_LATEST };
+}
+
+/** HH:MM in Asia/Kolkata. */
+export function kolkataClock(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const hour = (parts.find((part) => part.type === "hour")?.value ?? "00").slice(-2);
+  const minute = (parts.find((part) => part.type === "minute")?.value ?? "00").slice(-2);
+  return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+}
+
+/** Live joins use custom hours only. An unset salon stays on the desk open/pause switch. */
+export function liveJoinWindow(open?: string | null, close?: string | null, now = new Date()) {
+  const parsed = parseOperatingHours(open, close);
+  if (parsed.kind !== "custom") return { closed: false as const, message: "" };
+  const clock = kolkataClock(now);
+  if (clock >= parsed.open && clock <= parsed.close) return { closed: false as const, message: "" };
+  return {
+    closed: true as const,
+    message: `This salon takes queue joins from ${parsed.open} to ${parsed.close} India time.`,
+  };
 }
