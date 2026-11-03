@@ -24,7 +24,7 @@ import {
 } from "@/lib/bridal-own";
 import { editFormFields } from "@/lib/ai/edit-request";
 import { generationFrame } from "@/lib/generation-stage";
-import { salonActionItems } from "@/lib/salon-actions";
+import { queueEntryKey, salonActionItems } from "@/lib/salon-actions";
 import type { SalonConfig } from "@/lib/salon";
 
 async function jpeg(width: number, height: number, color: { r: number; g: number; b: number }) {
@@ -422,6 +422,9 @@ describe("your own look screen", () => {
     expect(html).not.toMatch(/gold/i);
     expect(salonActionItems({ phone: true, showQueue: true, bridalOn: true })).toEqual(["book", "chat"]);
     expect(salonActionItems({ phone: true, showQueue: true, bridalOn: false })).toEqual(["book", "queue", "chat"]);
+    expect(queueEntryKey("REQUEST")).toBe("queueRequest");
+    expect(queueEntryKey("LIVE")).toBe("queueJoinLook");
+    expect(queueEntryKey(undefined)).toBe("queueJoinLook");
     expect(compareControl(false)).toEqual({ label: "Compare", className: "btn secondary", pressed: false });
     expect(compareControl(true)).toEqual({ label: "Hide compare", className: "btn sheen", pressed: true });
     expect(html).not.toContain("Comparing");

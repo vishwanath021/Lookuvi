@@ -4,7 +4,10 @@ import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SalonPaused } from "@/components/guest/SalonPaused";
+import { t } from "@/data/i18n";
 import { brandStyle } from "@/lib/contrast";
+import { prisma } from "@/lib/prisma";
+import { queueEntryKey } from "@/lib/salon-actions";
 import { loadTenantBySlug } from "@/lib/salon";
 
 export const dynamic = "force-dynamic";
@@ -23,13 +26,16 @@ export default async function SalonWelcome({ params }: { params: Promise<{ slug:
   if (!tenant) notFound();
   if (isBlockedStatus(tenant.status)) return <SalonPaused name={tenant.name} trialEnded={tenant.status === "EXPIRED"} />;
   if (!tenant.productQueue && !tenant.productTryOn && !tenant.productBridal && !tenant.productGroom && !tenant.productMakeupStudio) notFound();
+  const queueMode = tenant.productQueue
+    ? (await prisma.queueState.findUnique({ where: { tenantId: tenant.id }, select: { mode: true } }))?.mode
+    : "";
   return (
     <main className="mx-auto max-w-lg px-4 py-10" style={brandStyle(tenant.primaryColor, tenant.accentColor) as CSSProperties}>
       <p className="text-xs uppercase tracking-[0.2em] text-muted">Welcome</p>
       <h1 className="page-title mt-2">{tenant.name}</h1>
       {tenant.address ? <p className="mt-2 text-sm text-muted">{tenant.address}</p> : null}
       <div className="mt-6 grid gap-3">
-        {tenant.productQueue ? <Link className="btn w-full text-lg" href={`/s/${tenant.slug}/queue`}>Join queue</Link> : null}
+        {tenant.productQueue ? <Link className="btn w-full text-lg" href={`/s/${tenant.slug}/queue`}>{t(tenant.defaultLang, queueEntryKey(queueMode))}</Link> : null}
         {tenant.productTryOn || tenant.productBridal || tenant.productGroom || tenant.productMakeupStudio ? <Link className="btn secondary w-full text-lg" href={`/s/${tenant.slug}`}>Try a look</Link> : null}
       </div>
     </main>

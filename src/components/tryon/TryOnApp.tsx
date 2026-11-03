@@ -26,7 +26,7 @@ import type { PlacementDebug } from "@/lib/face/pose";
 import { classifySkinPhoto } from "@/lib/hand-photo";
 import type { SalonConfig } from "@/lib/salon";
 import { guestSectionCopy, guestSections, type GuestSection } from "@/lib/guest-sections";
-import { salonActionItems } from "@/lib/salon-actions";
+import { queueEntryKey, salonActionItems } from "@/lib/salon-actions";
 import { downloadLookFile, lookDownloadName } from "@/lib/look-result";
 import { normalizeWhatsAppPhone } from "@/lib/whatsapp";
 
@@ -159,6 +159,7 @@ export function TryOnApp({
   demoHint = false,
   poseDebug = false,
   showQueue = false,
+  queueMode = "LIVE",
   showBridal = false,
   showEveryday = true,
   showGroom = false,
@@ -175,6 +176,7 @@ export function TryOnApp({
   /** Signed-in super-admin only. Guests never receive the numbers. */
   poseDebug?: boolean;
   showQueue?: boolean;
+  queueMode?: string;
   showBridal?: boolean;
   showEveryday?: boolean;
   showGroom?: boolean;
@@ -902,7 +904,7 @@ export function TryOnApp({
           queueHref={`/s/${config.slug}/queue`}
           bookLabel={t(lang, "bookNow")}
           chatLabel={t(lang, "whatsappBtn")}
-          queueLabel={t(lang, "queueJoinLook")}
+          queueLabel={t(lang, queueEntryKey(queueMode))}
         />
       ) : null}
       <ConsentSheet open={consent.open} lang={lang} onAgree={(ageGate) => { track("consent_accepted", { lang }); void consent.agree(ageGate); }} onClose={consent.close} />
