@@ -22,6 +22,7 @@ type Sender = (message: NotifyMessage) => Promise<NotifyResult>;
 export const QUEUE_IP_JOINS_PER_HOUR = 60;
 export const QUEUE_PHONE_JOINS_PER_HOUR = 4;
 export const QUEUE_DEVICE_JOINS_PER_HOUR = 8;
+export const QUEUE_JOIN_RATE_MESSAGE = "Too many joins from this phone or device this hour. Wait and try again. This is not about free chairs.";
 const HOUR_MS = 60 * 60 * 1000;
 export { REQUEST_SLOT_EARLIEST, REQUEST_SLOT_LATEST } from "@/lib/queue/hours";
 
@@ -310,7 +311,7 @@ export async function joinQueue(input: {
   const deviceLimit = device
     ? await sharedRateLimit(`queue:device:${tenant.id}:${device}`, QUEUE_DEVICE_JOINS_PER_HOUR, HOUR_MS)
     : { ok: true as const };
-  if (!ipLimit.ok || !phoneLimit.ok || !deviceLimit.ok) throw new QueueError("RATE", "Too many joins. Wait a few minutes and try again.", 429);
+  if (!ipLimit.ok || !phoneLimit.ok || !deviceLimit.ok) throw new QueueError("RATE", QUEUE_JOIN_RATE_MESSAGE, 429);
 
   await findService(tenant.id, input.serviceId);
   const created = await createQueuedEntry({
