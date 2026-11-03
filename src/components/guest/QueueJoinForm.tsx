@@ -31,6 +31,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
   const [slot, setSlot] = useState("");
   const [consent, setConsent] = useState(false);
   const [message, setMessage] = useState("");
+  const [heldPath, setHeldPath] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [visits, setVisits] = useState<VisitMemory[]>([]);
@@ -78,6 +79,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
   async function join(nextName: string, nextPhone: string, agreed: boolean) {
     setBusy(true);
     setMessage("");
+    setHeldPath("");
     const res = await fetch("/api/v1/queue", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -97,6 +99,11 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
     setBusy(false);
     if (!res.ok) {
       setMessage(data.message || "That did not work. Try again.");
+      return;
+    }
+    if (data.existing) {
+      setMessage(data.message || "This number already has a token. Open it or cancel before joining as someone else.");
+      setHeldPath(typeof data.statusPath === "string" ? data.statusPath : "");
       return;
     }
     const next = rememberVisit(visits, { name: nextName, phone: nextPhone, ref: data.ref });
@@ -159,6 +166,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
         </label>
         <button className="btn w-full text-lg" type="submit" disabled={busy || (!board.open && !request)}>{busy ? "…" : request ? t(lang, "queueRequest") : t(lang, "queueJoin")}</button>
         {message ? <p className="text-sm" role="status">{message}</p> : null}
+        {heldPath ? <a className="btn secondary" href={heldPath}>Open that token</a> : null}
       </form>
       <LegalFooter />
       {board.tryOn ? <p className="mt-4"><a className="btn secondary" href={`/s/${board.slug}`}>{t(lang, "queueTryLook")}</a></p> : null}

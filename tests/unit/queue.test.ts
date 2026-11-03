@@ -10,7 +10,7 @@ import { kolkataDayKey } from "@/lib/queue/day";
 import { peopleAhead, waitMinutes } from "@/lib/queue/estimate";
 import { displayedWait, waitSample } from "@/lib/queue/wait-display";
 import { indianMobile } from "@/lib/queue/phone";
-import { QUEUE_DEVICE_JOINS_PER_HOUR, QUEUE_IP_JOINS_PER_HOUR, QUEUE_PHONE_JOINS_PER_HOUR, QueueError, addWalkIn, callNext, confirmRequest, ensureQueueState, finishEntry, guestTicket, guestVisit, joinQueue, publicBoard, purgeOldQueueEntries, saveQueueSettings, setQueueOpen, startEntry, sweepAlerts } from "@/lib/queue/service";
+import { QUEUE_DEVICE_JOINS_PER_HOUR, QUEUE_IP_JOINS_PER_HOUR, QUEUE_PHONE_JOINS_PER_HOUR, QueueError, addWalkIn, callNext, confirmRequest, ensureQueueState, existingTokenMessage, finishEntry, guestTicket, guestVisit, joinQueue, publicBoard, purgeOldQueueEntries, saveQueueSettings, setQueueOpen, startEntry, sweepAlerts } from "@/lib/queue/service";
 import { resetRateLimits } from "@/lib/ratelimit";
 import { loadSalons } from "@/lib/super/directory";
 
@@ -95,6 +95,7 @@ describe("queue joins", () => {
     expect(send.mock.calls[0][0].body).toContain("you have joined, token 1, about 0 min");
     const again = await joinQueue({ slug, name: "Asha", phone: "9876500101", consent: true, ip: "join-c", send });
     expect(again.ref).toBe(first.ref);
+    expect(again.existing).toBe(false);
     const before = send.mock.calls.length;
     await sweepAlerts(tenant.id, send);
     expect(send.mock.calls.length).toBe(before);
@@ -289,6 +290,25 @@ describe("queue joins", () => {
     await expect(guestVisit({ slug, ref: ticket.ref, action: "way", ip: "future-way" })).rejects.toMatchObject({ code: "STATE" });
   });
 
+
+  it("keeps the first name when the same phone tries to join as someone else", async () => {
+    const { slug, tenant } = await salon();
+    const first = await joinQueue({ slug, name: "Mom", phone: "9876500188", consent: true, ip: "family-a", send });
+    const second = await joinQueue({ slug, name: "Dad", phone: "9876500188", consent: true, ip: "family-b", send });
+    expect(second.existing).toBe(true);
+    expect(second.ref).toBe(first.ref);
+    expect(second.token).toBe(first.token);
+    expect(second.name).toBe("Mom");
+    expect(second.message).toBe(existingTokenMessage(first.token, "Mom"));
+    const row = await prisma.queueEntry.findFirstOrThrow({ where: { cancelToken: first.ref } });
+    expect(row.name).toBe("Mom");
+    expect(await prisma.queueEntry.count({ where: { tenantId: tenant.id, phone: "919876500188" } })).toBe(1);
+    const customer = await prisma.customer.findUnique({ where: { tenantId_phone: { tenantId: tenant.id, phone: "919876500188" } } });
+    expect(customer?.name).toBe("Mom");
+    const same = await joinQueue({ slug, name: "mom", phone: "9876500188", consent: true, ip: "family-c", send });
+    expect(same.existing).toBe(false);
+    expect(same.ref).toBe(first.ref);
+  });
 
   it("rejects request times outside the daytime window (#15)", async () => {
     const { slug, tenant } = await salon();

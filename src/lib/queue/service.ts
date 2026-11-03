@@ -120,7 +120,15 @@ function visitLinks(slug: string, ref: string) {
   return { link: statusUrl(slug, ref), home: queueHomeUrl(slug), tryOn: tryOnUrl(slug) };
 }
 
-function ticket(slug: string, row: EntryRow, mode: string, waitMin: number, ahead: number) {
+export function existingTokenMessage(token: number, name: string) {
+  return `This number already has token #${token} for ${name}. Open it or cancel before joining as someone else.`;
+}
+
+function sameGuestName(left: string, right: string) {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
+function ticket(slug: string, row: EntryRow, mode: string, waitMin: number, ahead: number, existing = false) {
   return {
     ref: row.cancelToken,
     token: row.token,
@@ -133,6 +141,8 @@ function ticket(slug: string, row: EntryRow, mode: string, waitMin: number, ahea
     requestedDate: row.requestedDate,
     requestedSlot: row.requestedSlot,
     statusPath: statusPath(slug, row.cancelToken),
+    existing,
+    message: existing ? existingTokenMessage(row.token, row.name) : "",
   };
 }
 
@@ -275,11 +285,14 @@ export async function joinQueue(input: {
     orderBy: { joinedAt: "desc" },
   });
   if (existing) {
-    await rememberCustomer({ tenantId: tenant.id, phone, name });
-    if (input.returnToken) await attributeReturn({ tenantId: tenant.id, phone, linkToken: input.returnToken });
     const loaded = await loadDay(tenant.id, existing.dayKey);
     const wait = timing(loaded.entries, existing.id, loaded.state.avgMinutes, loaded.state.units);
-    return ticket(tenant.slug, existing as EntryRow, state.mode, wait.waitMin, wait.ahead);
+    if (!sameGuestName(existing.name, name)) {
+      return ticket(tenant.slug, existing as EntryRow, state.mode, wait.waitMin, wait.ahead, true);
+    }
+    await rememberCustomer({ tenantId: tenant.id, phone, name });
+    if (input.returnToken) await attributeReturn({ tenantId: tenant.id, phone, linkToken: input.returnToken });
+    return ticket(tenant.slug, existing as EntryRow, state.mode, wait.waitMin, wait.ahead, false);
   }
 
   const device = deviceKey(input.deviceId);
