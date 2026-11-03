@@ -9,6 +9,11 @@ export function isPlatformLogo(url: string | null | undefined) {
   return PLATFORM_LOGOS.has(url);
 }
 
+/** Salon artwork for the printable standee. The Lookuvi mark is not reprinted as the salon's logo. */
+export function standeeLogo(url: string | null | undefined) {
+  return isPlatformLogo(url) ? "" : url || "";
+}
+
 /** Filled rounded square and two thick hair waves. Paths match public/brand/lookuvi-mark.svg. */
 export function LookuviMark({
   className = "h-10 w-10",
