@@ -55,3 +55,8 @@ export function serializeVisitMemory(visits: VisitMemory[]) {
 export function visitMemoryKey(slug: string) {
   return `lookuvi-queue:${slug}`;
 }
+
+/** Bookings on this device other than the ticket the customer is looking at. */
+export function otherBookings(visits: VisitMemory[], currentRef: string) {
+  return visits.filter((visit) => visit.ref && visit.ref !== currentRef);
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseVisitMemory, rememberVisit, serializeVisitMemory, VISIT_MEMORY_MAX } from "@/lib/queue/visit-memory";
+import { otherBookings, parseVisitMemory, rememberVisit, serializeVisitMemory, VISIT_MEMORY_MAX } from "@/lib/queue/visit-memory";
 
 describe("visit memory (#8/#9)", () => {
   it("migrates the old single booking object and keeps several refs", () => {
@@ -12,6 +12,8 @@ describe("visit memory (#8/#9)", () => {
     const replaced = rememberVisit(both, { name: "Asha2", phone: "9876500101", ref: "ref-c" });
     expect(replaced.map((row) => row.ref)).toEqual(["ref-c", "ref-b"]);
     expect(parseVisitMemory(serializeVisitMemory(both))).toEqual(both);
+    expect(otherBookings(both, "ref-b").map((row) => row.name)).toEqual(["Asha"]);
+    expect(otherBookings(both, "missing")).toEqual(both);
   });
 
   it("caps stored visits", () => {

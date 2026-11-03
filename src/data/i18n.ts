@@ -285,6 +285,7 @@ const en: Record<string, string> = {
   queueRejoin: "Join again",
   queueWelcome: "Welcome back, {name}",
   queueSeePlace: "See your place in line",
+  queueOtherBookings: "Other bookings",
   queueToken: "Token {token}",
   queueYourTurn: "It's your turn. Please come in.",
   queueServingYou: "You are being served.",

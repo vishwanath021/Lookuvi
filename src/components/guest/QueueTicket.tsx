@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { t } from "@/data/i18n";
 import { QueueWait } from "@/components/guest/QueueWait";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
+import { otherBookings, parseVisitMemory, visitMemoryKey, type VisitMemory } from "@/lib/queue/visit-memory";
 
 type Ticket = {
   ref: string;
@@ -28,6 +29,7 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
+  const [others, setOthers] = useState<VisitMemory[]>([]);
   const lang = ticket.lang || "en";
   const live = ticket.status === "WAITING" || ticket.status === "CALLED";
   const canCancel = live || ticket.status === "REQUESTED" || ticket.status === "CONFIRMED";
@@ -36,6 +38,11 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
 
   useEffect(() => {
     setReady(true);
+    try {
+      setOthers(otherBookings(parseVisitMemory(localStorage.getItem(visitMemoryKey(slug))), ticket.ref));
+    } catch {
+      setOthers([]);
+    }
     const timer = setInterval(() => {
       void fetch(`/api/v1/queue/status?slug=${encodeURIComponent(slug)}&ref=${encodeURIComponent(ticket.ref)}`)
         .then((res) => res.json())
@@ -98,6 +105,18 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
         </div>
       ) : null}
       {message ? <p className="mt-3 text-sm" role="status">{message}</p> : null}
+      {others.length ? (
+        <section className="mt-6" data-other-bookings={others.length}>
+          <h2 className="text-sm font-medium">{t(lang, "queueOtherBookings")}</h2>
+          <ul className="mt-2 grid gap-2 text-sm">
+            {others.map((visit) => (
+              <li key={visit.ref}>
+                <a className="underline" href={`/s/${slug}/q/${visit.ref}`}>{visit.name || visit.phone}</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {showTryLook ? <p className="mt-6"><a className="btn secondary" href={`/s/${slug}`} data-queue-try="yes">{t(lang, "queueTryLook")}</a></p> : null}
     </div>
   );
