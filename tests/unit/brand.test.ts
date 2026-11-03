@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPlatformLogo } from "@/components/brand/LookuviMark";
+import { isPlatformLogo, standeeLogo } from "@/components/brand/LookuviMark";
 
 describe("platform logo", () => {
   it("uses the Lookuvi mark when a salon has no logo of its own", () => {
@@ -9,6 +9,9 @@ describe("platform logo", () => {
     expect(isPlatformLogo("/brand/demo-mark.svg")).toBe(true);
     expect(isPlatformLogo("/brand/mark.svg")).toBe(true);
     expect(isPlatformLogo("data:image/jpeg;base64,abc")).toBe(false);
+    expect(standeeLogo("/brand/lookuvi-mark.svg")).toBe("");
+    expect(standeeLogo(null)).toBe("");
+    expect(standeeLogo("data:image/jpeg;base64,abc")).toBe("data:image/jpeg;base64,abc");
     expect(isPlatformLogo("/uploads/salon.png")).toBe(false);
   });
 });

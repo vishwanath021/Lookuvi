@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SalonPaused } from "@/components/guest/SalonPaused";
+import { standeeLogo } from "@/components/brand/LookuviMark";
 import { PrintButton } from "@/components/PrintButton";
 import { brandStyle } from "@/lib/contrast";
 import { salonWelcomeTarget } from "@/lib/public-url";
@@ -30,6 +31,7 @@ export default async function QrStandee({ params }: { params: Promise<{ slug: st
       <article className="card p-8 text-center print:border-0 print:shadow-none">
         <p className="text-xs uppercase tracking-[0.2em] text-muted">Join the queue or try a look</p>
         <h1 className="mt-2 page-title">{tenant.name}</h1>
+        {standeeLogo(tenant.logoUrl) ? <img src={standeeLogo(tenant.logoUrl)} alt="" className="mx-auto mt-4 h-16 w-16 object-contain" data-salon-logo="yes" /> : null}
         <p className="mt-2 text-sm text-muted">Scan to open this salon. You can join the queue or try a look. The preview is a guide.</p>
         {target.local ? (
           <p className="mt-6 text-sm" role="alert" data-qr-warning="yes">This QR is not ready to print. The salon address is on this computer, not a real domain. Set the public domain, or verify the salon’s own domain, then print again.</p>
