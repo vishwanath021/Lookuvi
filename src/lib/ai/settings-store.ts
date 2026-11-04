@@ -3,7 +3,7 @@ import { decryptSecret, encryptSecret, keyHint } from "@/lib/crypto/secret";
 import { allowByoKey } from "@/lib/ai/credentials";
 import { spendSummary } from "@/lib/ai/spend";
 import { parseTier, tierCatalog, type ImageProviderName, type ModelTier, type TierRequest } from "@/lib/ai/tiers";
-import { DEFAULT_GUEST_ENGINE, parseGuestEngine, type GuestEngine } from "@/lib/ai/guest-hairstyle";
+import { DEFAULT_GUEST_ENGINE, DEFAULT_GUEST_MODEL, parseGuestEngine, parseGuestModel, type GuestEngine, type GuestModelId } from "@/lib/ai/guest-hairstyle";
 import { prisma } from "@/lib/prisma";
 
 const providerSchema = z.enum(["openai", "gemini"]);
@@ -30,6 +30,7 @@ export type PlatformAiSettings = SalonAiSettings & {
   falBillingKey: StoredKeyStatus;
   openRouterKey: StoredKeyStatus & { enabled: boolean };
   guestEngine: GuestEngine;
+  guestModel: GuestModelId;
 };
 
 /** @deprecated Salon pages use SalonAiSettings. Super pages use PlatformAiSettings. */
@@ -117,6 +118,8 @@ export async function platformAiView(): Promise<PlatformAiSettings> {
       enabled: Boolean(await setting("platform_openrouter_key_cipher")) && (await setting("platform_openrouter_enabled")) === "true",
     },
     guestEngine: parseGuestEngine(await setting("guest_hairstyle_engine")) || DEFAULT_GUEST_ENGINE,
+    guestModel: parseGuestModel(await setting("guest_hairstyle_model"))
+      || ((await setting("guest_hairstyle_engine")) === "fal" ? "blackforestlabs/flux-3/edit-image" : DEFAULT_GUEST_MODEL),
   };
 }
 

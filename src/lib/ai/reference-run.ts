@@ -299,7 +299,11 @@ export async function executeReferenceEdit(args: {
       if (fal.outputSize) {
         recordedSize = fal.outputSize;
         const [outputWidth, outputHeight] = fal.outputSize.split("x").map((part) => Number(part));
-        falComputedUsd = falPriceListUsd({ model: quote.model, outputWidth, outputHeight })?.usd ?? null;
+        const inputs = [
+          { width: inputMeta.width || 0, height: inputMeta.height || 0 },
+          { width: prepared.referenceWidth || 0, height: prepared.referenceHeight || 0 },
+        ].filter((image) => image.width > 0 && image.height > 0);
+        falComputedUsd = falPriceListUsd({ model: quote.model, outputWidth, outputHeight, inputs })?.usd ?? null;
       }
     } else if (provider === "openrouter") {
       const prompt = "prompt" in prepared ? prepared.prompt : planned?.prompt || "";

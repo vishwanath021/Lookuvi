@@ -90,6 +90,7 @@ const PER_IMAGE: Record<string, number> = {
   "fal-ai/nano-banana-pro/edit": 0.15,
   "fal-ai/nano-banana-2/edit": 0.08,
   "bytedance/seedream/v5/lite/edit": 0.035,
+  "meta/muse-image/edit": 0.01,
   "fal-ai/nano-banana/edit": 0.039,
 };
 
@@ -111,6 +112,8 @@ export function falPriceListUsd(args: {
   model: string;
   outputWidth: number;
   outputHeight: number;
+  /** Selfie and style reference. FLUX.2 edit bills these megapixels as well as the output. */
+  inputs?: { width: number; height: number }[];
   at?: Date;
 }): { usd: number; unit: "image" | "output megapixels" } | null {
   const width = args.outputWidth;
@@ -119,6 +122,13 @@ export function falPriceListUsd(args: {
   const perImage = PER_IMAGE[args.model];
   if (perImage != null) return { usd: perImage, unit: "image" };
   const outMp = megapixels(width, height);
+  if (args.model === "fal-ai/flux-2/edit") {
+    const inMp = (args.inputs ?? []).reduce((sum, image) => {
+      if (!Number.isFinite(image.width) || !Number.isFinite(image.height) || image.width < 1 || image.height < 1) return sum;
+      return sum + megapixels(image.width, image.height);
+    }, 0);
+    return { usd: roundUsd((inMp + outMp) * 0.012), unit: "output megapixels" };
+  }
   if (args.model === "blackforestlabs/flux-3/edit-image") {
     return { usd: flux3UsdForMegapixels(outMp), unit: "output megapixels" };
   }

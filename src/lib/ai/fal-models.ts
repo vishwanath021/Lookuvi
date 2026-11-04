@@ -37,6 +37,7 @@ export const FAL_NUMBERED_PROMPT_IDS = [
   "fal-ai/nano-banana-2/edit",
   "bytedance/seedream/v5/lite/edit",
   "openai/gpt-image-2/edit",
+  "meta/muse-image/edit",
 ] as const;
 
 export const FAL_NUMBERED_IMAGE_PROMPT =
@@ -126,6 +127,14 @@ export const FAL_COMPARISON_MODELS: readonly FalModelRow[] = [
     safetyChecker: true,
     sizeMode: "image_size",
     maxInputs: 4,
+  },
+  {
+    id: "meta/muse-image/edit",
+    label: "meta/muse-image/edit (aspect_ratio from the selfie; $0.01 per image)",
+    experimental: false,
+    safetyChecker: false,
+    sizeMode: "defaults",
+    maxInputs: 10,
   },
   {
     id: "fal-ai/nano-banana/edit",
@@ -265,6 +274,13 @@ export function falUsdRange(
       detail: "Token billed. The estimate is $0.054 for a 1024x1536 image at quality medium. quality is hard-set to medium and is never high. image_size is the selfie aspect as width and height.",
     };
   }
+  if (id === "meta/muse-image/edit") {
+    return {
+      lowUsd: 0.01,
+      highUsd: 0.01,
+      detail: "$0.01 per image. image_urls is the selfie then the style reference. aspect_ratio is the closest Muse ratio to the selfie. output_format is png.",
+    };
+  }
   if (id === "fal-ai/nano-banana/edit") {
     return {
       lowUsd: 0.039,
@@ -351,6 +367,34 @@ const FLUX3_ASPECTS: { name: string; ratio: number }[] = [
   { name: "1:2", ratio: 1 / 2 },
 ];
 
+/** Muse aspect_ratio values. Ratios outside this list are not sent. */
+const MUSE_ASPECTS: { name: string; ratio: number }[] = [
+  { name: "21:9", ratio: 21 / 9 },
+  { name: "16:9", ratio: 16 / 9 },
+  { name: "4:3", ratio: 4 / 3 },
+  { name: "3:2", ratio: 3 / 2 },
+  { name: "1:1", ratio: 1 },
+  { name: "2:3", ratio: 2 / 3 },
+  { name: "3:4", ratio: 3 / 4 },
+  { name: "9:16", ratio: 9 / 16 },
+  { name: "9:21", ratio: 9 / 21 },
+];
+
+export function closestMuseAspect(width: number, height: number) {
+  const ratio = Math.max(1, width) / Math.max(1, height);
+  const log = Math.log(ratio);
+  let best = MUSE_ASPECTS[0];
+  let bestDelta = Infinity;
+  for (const aspect of MUSE_ASPECTS) {
+    const delta = Math.abs(log - Math.log(aspect.ratio));
+    if (delta < bestDelta) {
+      best = aspect;
+      bestDelta = delta;
+    }
+  }
+  return best.name;
+}
+
 /** Closest flux-3 aspect_ratio to the selfie. A 3:4 crop is "3:4", not the 2:3 size bucket. */
 export function closestFluxAspect(width: number, height: number) {
   const ratio = Math.max(1, width) / Math.max(1, height);
@@ -407,6 +451,11 @@ export function buildFalEditBody(id: string, args: {
     }
     if (IMAGE_SIZE_ON_MINIMAL.has(row.id)) minimal.image_size = { width, height };
     if (row.id === "openai/gpt-image-2/edit") minimal.quality = "medium";
+    if (row.id === "meta/muse-image/edit") {
+      minimal.aspect_ratio = args.width && args.height ? closestMuseAspect(args.width, args.height) : falAspectRatio(args.size);
+      minimal.num_images = 1;
+      minimal.output_format = "png";
+    }
     if (row.id === "blackforestlabs/flux-3/edit-image") {
       minimal.resolution = args.resolution ?? flux3ResolutionFor(args.fluxUse ?? "saved");
     }

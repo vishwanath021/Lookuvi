@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MODEL_PRICES } from "@/data/model-prices";
+import { GUEST_FAL_MODEL, GUEST_MODEL_OPTIONS, GUEST_OPENAI_MODEL, type GuestModelId } from "@/lib/ai/guest-models";
 import type { GuestEngine } from "@/lib/ai/guest-hairstyle";
 import type { PlatformAiSettings } from "@/lib/ai/settings-store";
 import { formatAiInr } from "@/lib/display";
@@ -18,6 +19,7 @@ export function SuperAiForm({
   const [openaiDraft, setOpenaiDraft] = useState("");
   const [falDraft, setFalDraft] = useState("");
   const [guestEngine, setGuestEngine] = useState<GuestEngine>(initial.guestEngine || "openai");
+  const [guestModel, setGuestModel] = useState<GuestModelId>(initial.guestModel || GUEST_OPENAI_MODEL);
   const [allowByo, setAllowByo] = useState(initial.allowByo);
   const [tier, setTier] = useState(initial.tier);
   const [highEnabled, setHighEnabled] = useState(initial.highEnabled);
@@ -33,13 +35,14 @@ export function SuperAiForm({
     setHighEnabled(data.highEnabled);
     if (data.tier) setTier(data.tier);
     if (data.guestEngine === "fal" || data.guestEngine === "openai") setGuestEngine(data.guestEngine);
+    if (data.guestModel) setGuestModel(data.guestModel);
   }
 
-  async function saveGuest(engine: GuestEngine) {
+  async function saveModel(model: GuestModelId) {
     const res = await fetch("/api/v1/super/ai", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ guestEngineOnly: true, guestEngine: engine }),
+      body: JSON.stringify({ guestModelOnly: true, guestModel: model }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -47,7 +50,7 @@ export function SuperAiForm({
       return false;
     }
     applyView(data);
-    setMessage(engine === "fal" ? "fal is in use." : "OpenAI is in use.");
+    setMessage(model === GUEST_OPENAI_MODEL ? "OpenAI gpt-image-2.5-sunburst is in use." : `${model} is in use.`);
     return true;
   }
 
@@ -97,7 +100,7 @@ export function SuperAiForm({
       const saved = await saveFal(true);
       if (!saved) return;
     }
-    await saveGuest(engine);
+    await saveModel(engine === "fal" ? GUEST_FAL_MODEL : GUEST_OPENAI_MODEL);
     setBusy(false);
   }
 
@@ -144,6 +147,24 @@ export function SuperAiForm({
           onTest={() => void testKey("fal", falDraft)}
           onUse={() => void chooseEngine("fal")}
         />
+        <label className="block text-sm">Guest hairstyle model
+          <select
+            className="field mt-1"
+            aria-label="Guest hairstyle model"
+            value={guestModel}
+            disabled={busy}
+            onChange={(event) => {
+              const model = event.target.value as GuestModelId;
+              setGuestModel(model);
+              setBusy(true);
+              setMessage("");
+              void saveModel(model).finally(() => setBusy(false));
+            }}
+          >
+            {GUEST_MODEL_OPTIONS.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
+          </select>
+        </label>
+        <p className="text-xs text-muted">Sunburst is the default. A fal model uses the fal key above. Nothing else changes until you pick a different model.</p>
         {message ? <p className="text-sm" role="status">{message}</p> : null}
       </section>
 
