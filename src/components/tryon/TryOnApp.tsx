@@ -1123,7 +1123,7 @@ export function TryOnApp({
       {poseDebug && poseNote && (error || showResult) && <PoseReadout debug={poseNote} />}
       {notice && <p className="mt-3 text-center text-sm" role="status">{notice}</p>}
 
-      {!showResult && tool === "brows" && (
+      {!showResult && !busy && tool === "brows" && (
         <div className="mt-4 grid gap-3">
           <div className="flex flex-wrap gap-2" role="group" aria-label="Brow thickness">
             {BROW_THICKNESS.map((item) => (

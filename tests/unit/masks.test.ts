@@ -458,7 +458,7 @@ describe("region masks", () => {
       ["beards", BEARDS],
       ["nails", NAILS],
     ] as const) {
-      const names = new Set(readdirSync(path.join(process.cwd(), "public", folder)));
+      const names = new Set(readdirSync(path.join(process.cwd(), "public", folder)).filter((name) => name.endsWith(".jpg")));
       expect(names.size).toBe(rows.length);
       for (const row of rows) expect(names.has(`${row.id}.jpg`)).toBe(true);
     }

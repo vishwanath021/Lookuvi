@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 export function StyleCard({ id, name, folder = "styles" }: { id: string; name: string; folder?: "styles" | "brows" | "beards" | "nails" }) {
+  const [src, setSrc] = useState(`/${folder}/thumbs/${id}.webp`);
   const [missing, setMissing] = useState(false);
   if (missing) {
     return (
@@ -13,13 +14,17 @@ export function StyleCard({ id, name, folder = "styles" }: { id: string; name: s
   }
   return (
     <img
-      src={`/${folder}/${id}.jpg`}
-      width={512}
-      height={512}
+      src={src}
+      width={384}
+      height={384}
       alt={`${name} style reference`}
       loading="lazy"
+      decoding="async"
       className="aspect-square w-full object-cover"
-      onError={() => setMissing(true)}
+      onError={() => {
+        if (src.endsWith(".webp")) setSrc(`/${folder}/${id}.jpg`);
+        else setMissing(true);
+      }}
     />
   );
 }
