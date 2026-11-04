@@ -37,12 +37,21 @@ export function BrowCard({ id, name }: { id: string; name: string }) {
   return (
     <span className="relative block aspect-video w-full overflow-hidden" data-brow-card="photo">
       <img
-        src={photo}
+        src={photo.replace("/brows/cards/", "/brows/cards/thumbs/")}
         alt=""
-        width={800}
-        height={450}
+        width={640}
+        height={360}
+        loading="lazy"
+        decoding="async"
         className="aspect-video h-full w-full object-cover object-center"
-        onError={() => setMissing(true)}
+        onError={(event) => {
+          const img = event.currentTarget;
+          if (img.src.endsWith(".webp") && img.src.includes("/thumbs/")) {
+            img.src = photo;
+            return;
+          }
+          setMissing(true);
+        }}
       />
     </span>
   );

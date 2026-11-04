@@ -684,7 +684,10 @@ describe("new fal edit schemas", () => {
     const flux = buildFalEditBody("fal-ai/flux-2/edit", shared);
     const klein = buildFalEditBody("fal-ai/flux-2/klein/4b/edit", shared);
     const seed = buildFalEditBody("bytedance/seedream/v5/lite/edit", shared);
-    for (const body of [qwen, flux, klein]) {
+    expect(qwen?.image_urls).toEqual(["https://cdn.example/a.jpg", "https://cdn.example/b.jpg"]);
+    expect(qwen?.image_size).toBeUndefined();
+    expect(qwen?.output_format).toBe("jpeg");
+    for (const body of [flux, klein]) {
       expect(body?.prompt).toBe("edit");
       expect(body?.image_urls).toEqual(["https://cdn.example/a.jpg", "https://cdn.example/b.jpg"]);
       expect(body?.image_size).toEqual({ width: 1024, height: 1536 });

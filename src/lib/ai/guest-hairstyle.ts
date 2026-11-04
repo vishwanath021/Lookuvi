@@ -359,7 +359,11 @@ async function runGuestEdit(args: GuestEditArgs): Promise<NextResponse | null> {
     }
     return NextResponse.json({ error: "PREVIEW", message: guestMessage(executed.outcome) }, { status: executed.httpStatus });
   }
-  const jpegOut = await sharp(framed || executed.framedPng).jpeg({ quality: 90 }).toBuffer();
+  const jpegOut = await sharp(framed || executed.framedPng, { failOn: "none" })
+    .rotate()
+    .resize({ width: 1280, height: 1280, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 82, mozjpeg: true })
+    .toBuffer();
   const tryOn = args.reservationId
     ? await settleTryReservation(args.reservationId, {
         status: "SUCCEEDED",

@@ -8,6 +8,7 @@ import { parseAskedTexture, selectReferenceVariant, type AskedTexture } from "@/
 import { existingHairstyleFiles, hairstyleReferenceFile, readHairstyleReference } from "@/lib/ai/style-reference";
 import { buildReferencePrompt } from "@/lib/prompts";
 import { FAL_COMPARISON_MODELS, FAL_NUMBERED_IMAGE_PROMPT, falUsesNumberedPrompt, flux3ResolutionFor, quoteFalModel, type Flux3Use } from "@/lib/ai/fal-models";
+import { isQwenEdit, qwenHairPrompt } from "@/lib/ai/qwen-prompt";
 import { productionModelNotice } from "@/lib/ai/model-notices";
 import { OPENROUTER_COMPARISON_MODELS, quoteOpenRouterModel } from "@/lib/ai/openrouter-models";
 import { bufferedInr, usdFromTokenCounts } from "@/lib/ai/tiers";
@@ -217,9 +218,12 @@ export async function prepareComparison(args: { jpeg: Buffer; styleId: string; c
   if (!width || !height) return { ok: false as const, message: "The selfie could not be read." };
   const quote = quoteComparisonModel(row.id, width, height, { width: referenceMeta.width || 512, height: referenceMeta.height || 512 }, args.quality, args.fluxUse ?? "saved");
   if (!quote.ok) return quote;
-  const prompt = row.provider === "fal" && falUsesNumberedPrompt(row.id)
-    ? FAL_NUMBERED_IMAGE_PROMPT
-    : buildReferencePrompt(style, args.colourName, asked === "natural" ? undefined : asked);
+  const textureLine = asked && asked !== "natural" ? ` The hair texture should be ${asked}, adapted to the head in image 1.` : "";
+  const prompt = isQwenEdit(row.id)
+    ? `${qwenHairPrompt(style)}${textureLine}`
+    : row.provider === "fal" && falUsesNumberedPrompt(row.id)
+      ? FAL_NUMBERED_IMAGE_PROMPT
+      : buildReferencePrompt(style, args.colourName, asked === "natural" ? undefined : asked);
   const shared = {
     style,
     quote,

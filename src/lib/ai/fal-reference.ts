@@ -426,11 +426,11 @@ export async function postFalReferenceEdit(args: {
       "The safety checker blocked this image. fal returned a black frame or marked it unsafe. The call was not retried.",
     );
   }
-  const png = await sharp(bytes, { failOn: "none" }).rotate().png().toBuffer();
-  const meta = await sharp(png, { failOn: "none" }).metadata();
+  const image = await sharp(bytes, { failOn: "none" }).rotate().jpeg({ quality: 86, mozjpeg: true }).toBuffer();
+  const meta = await sharp(image, { failOn: "none" }).metadata();
   const width = meta.width || result.images?.[0]?.width || 0;
   const height = meta.height || result.images?.[0]?.height || 0;
-  return { image: png, requestId, outputSize: width && height ? `${width}x${height}` : "" };
+  return { image, requestId, outputSize: width && height ? `${width}x${height}` : "" };
   } catch (error) {
     if (requestId && (error instanceof UncertainBillingError || error instanceof BilledProviderError)) error.requestId = requestId;
     throw error;

@@ -471,5 +471,10 @@ export function buildFalEditBody(id: string, args: {
   else body.image_size = { width, height };
   if (row.safetyChecker) body.enable_safety_checker = true;
   body.output_format = "png";
+  if (row.id === "fal-ai/qwen-image-edit-2511") {
+    // The page uses the input size when image_size is omitted, so the edit stays on the selfie.
+    delete body.image_size;
+    body.output_format = "jpeg";
+  }
   return body;
 }
