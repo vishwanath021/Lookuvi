@@ -5,6 +5,7 @@ import { SuperAiForm } from "@/components/admin/SuperAiForm";
 import { falPriceListUsd } from "@/lib/ai/cost-source";
 import { buildFalEditBody, closestMuseAspect, falUsdRange } from "@/lib/ai/fal-models";
 import { DEFAULT_GUEST_MODEL, GUEST_MODEL_OPTIONS, parseGuestModel, readGuestModel, saveGuestModel } from "@/lib/ai/guest-hairstyle";
+import { guestModelPriceRows } from "@/lib/ai/guest-prices";
 import { resolveFalKey } from "@/lib/ai/credentials";
 import { saveFalKey } from "@/lib/ai/settings-store";
 import { prisma } from "@/lib/prisma";
@@ -96,6 +97,7 @@ describe("guest hairstyle models", () => {
         guestEngine: "openai",
         guestModel: "gpt-image-2.5-sunburst",
       },
+      prices: guestModelPriceRows(),
     }));
     expect(html).toContain("aria-label=\"fal key\"");
     expect(html).toContain("Guest hairstyle model");

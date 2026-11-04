@@ -643,6 +643,8 @@ textarea { min-height: 48px; }
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 .nav-side {
+  position: relative;
+  z-index: 30;
   background-color: #3e304b;
   background-image: var(--metal-purple);
   color: #f3f0f8;

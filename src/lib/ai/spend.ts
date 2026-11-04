@@ -2,7 +2,7 @@ import { listedInr } from "@/data/model-prices";
 import { numberEnv } from "@/lib/env";
 import { logInfo } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
-import { actualIsKnown, capPaise } from "@/lib/ai/cost-source";
+import { KNOWN_ACTUAL_SOURCES, actualIsKnown, capPaise } from "@/lib/ai/cost-source";
 import { costUsdFromUsage, exactInr, isModelTier, tierRequest, type UsageNumbers } from "@/lib/ai/tiers";
 
 const DEFAULTS: Record<string, number> = {
@@ -68,6 +68,7 @@ export function countsTowardSpendCap(status: string) {
 }
 
 export async function releasePaidCall(id: string, status: "REFUNDED" | "BILLED_FAILED" | "UNCERTAIN" = "REFUNDED") {
+  clearSpendSummaryCache();
   if (!id) return;
   const counts = status !== "REFUNDED";
   await prisma.aiCall.updateMany({ where: { id, status: "CHARGED" }, data: { status, charged: counts } });
@@ -102,6 +103,7 @@ export async function finalizePaidCall(
     providerRequestId?: string;
   },
 ) {
+  clearSpendSummaryCache();
   if (!id) return;
   const fromUsage = args.billed ? costUsdFromUsage(args.model, args.usage) : null;
   const source = args.costSource ?? (fromUsage != null ? "usage" : "estimate");
@@ -131,21 +133,48 @@ export function spendCapWhere() {
   return { status: { in: [...SPEND_CAP_STATUSES] } };
 }
 
-export async function spendSummary() {
-  const rows = await prisma.aiCall.findMany({
-    where: { ...spendCapWhere(), createdAt: { gte: kolkataMonthStart() } },
-    select: { estimatePaise: true, costInrPaise: true, costSource: true, charged: true },
-  });
-  const known = rows.filter((row) => row.charged && actualIsKnown(row.costSource));
+export type SpendSummary = {
+  /** Cap basis. Actual once that cost is known. An unknown bill stays on the reserved estimate. */
+  spentInr: number;
+  /** Known actuals at FX, with no 1.08 buffer. */
+  actualInr: number;
+  actualCalls: number;
+  capInr: number;
+  calls: number;
+};
+
+export async function spendSummary(): Promise<SpendSummary> {
+  const where = { ...spendCapWhere(), createdAt: { gte: kolkataMonthStart() } };
+  const knownWhere = { ...where, charged: true, costSource: { in: [...KNOWN_ACTUAL_SOURCES] } };
+  const reservedWhere = { ...where, charged: true, costSource: { notIn: [...KNOWN_ACTUAL_SOURCES] } };
+  const [calls, known, reserved] = await Promise.all([
+    prisma.aiCall.count({ where }),
+    prisma.aiCall.aggregate({ where: knownWhere, _sum: { costInrPaise: true }, _count: { _all: true } }),
+    prisma.aiCall.aggregate({ where: reservedWhere, _sum: { estimatePaise: true } }),
+  ]);
+  const knownPaise = known._sum.costInrPaise ?? 0;
+  const reservedPaise = reserved._sum.estimatePaise ?? 0;
   return {
-    /** Cap basis. Actual once that cost is known. An unknown bill stays on the reserved estimate. */
-    spentInr: rows.reduce((sum, row) => sum + capPaise(row), 0) / 100,
-    /** Known actuals at FX, with no 1.08 buffer. */
-    actualInr: known.reduce((sum, row) => sum + row.costInrPaise, 0) / 100,
-    actualCalls: known.length,
+    spentInr: (knownPaise + reservedPaise) / 100,
+    actualInr: knownPaise / 100,
+    actualCalls: known._count._all,
     capInr: spendCapInr(),
-    calls: rows.length,
+    calls,
   };
+}
+
+let spendCache: { at: number; value: SpendSummary } | null = null;
+
+export function clearSpendSummaryCache() {
+  spendCache = null;
+}
+
+/** Page loads share one snapshot so the AI screen does not recount the month on every request. */
+export async function cachedSpendSummary(maxAgeMs = 15_000) {
+  if (spendCache && Date.now() - spendCache.at < maxAgeMs) return spendCache.value;
+  const value = await spendSummary();
+  spendCache = { at: Date.now(), value };
+  return value;
 }
 
 export async function beginPaidCall(args: {
@@ -159,6 +188,7 @@ export async function beginPaidCall(args: {
   estimateInr?: number;
   estimateUsd?: number;
 }) {
+  clearSpendSummaryCache();
   const estimateInr = args.estimateInr ?? costPerCallInr(args.provider, args.quality);
   const estimatePaise = Math.round(estimateInr * 100);
   const capPaise = Math.round(spendCapInr() * 100);

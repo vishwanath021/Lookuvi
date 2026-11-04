@@ -23,7 +23,7 @@ import { syncFalCostAfterGeneration } from "@/lib/ai/fal-billing";
 import { beginPaidCall, finalizePaidCall, releasePaidCall } from "@/lib/ai/spend";
 import { costUsdFromUsage, exactInr, providerUsageLog, type UsageNumbers } from "@/lib/ai/tiers";
 import { numberEnv } from "@/lib/env";
-import { logProviderCall } from "@/lib/logger";
+import { logProviderCall, logProviderFailure } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
 function usageFrom(payload: {
@@ -537,6 +537,13 @@ export async function executeReferenceEdit(args: {
       requestId: failedRequestId,
     });
     const message = error instanceof Error ? error.message : "The reference edit did not finish.";
+    logProviderFailure({
+      provider,
+      model: quote.model,
+      salonId: args.tenantId,
+      body: message,
+      requestId: failedRequestId,
+    });
     await prisma.benchmarkRun.update({ where: { id }, data: { status: uncertain ? "UNCERTAIN" : "FAILED", message } });
     const httpStatus = uncertain ? 504 : unknown || error instanceof UnbilledProviderError ? 422 : 502;
     return {

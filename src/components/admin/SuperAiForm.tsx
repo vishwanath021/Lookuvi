@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { MODEL_PRICES } from "@/data/model-prices";
+import { useEffect, useState } from "react";
 import { GUEST_FAL_MODEL, GUEST_MODEL_OPTIONS, GUEST_OPENAI_MODEL, type GuestModelId } from "@/lib/ai/guest-models";
+import type { GuestPriceRow } from "@/lib/ai/guest-prices";
 import type { GuestEngine } from "@/lib/ai/guest-hairstyle";
 import type { PlatformAiSettings } from "@/lib/ai/settings-store";
 import { formatAiInr } from "@/lib/display";
@@ -10,9 +10,11 @@ import { formatAiInr } from "@/lib/display";
 export function SuperAiForm({
   initial,
   salonCapInr,
+  prices,
 }: {
   initial: PlatformAiSettings;
   salonCapInr: number;
+  prices: GuestPriceRow[];
 }) {
   const [openaiKey, setOpenaiKey] = useState(initial.openaiKey);
   const [falKey, setFalKey] = useState(initial.falKey);
@@ -25,7 +27,9 @@ export function SuperAiForm({
   const [highEnabled, setHighEnabled] = useState(initial.highEnabled);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const capPct = initial.spend.capInr > 0 ? Math.min(100, (initial.spend.spentInr / initial.spend.capInr) * 100) : 0;
+  const [spend, setSpend] = useState(initial.spend);
+  const [spendPending, setSpendPending] = useState(Boolean(initial.spend.pending));
+  const capPct = spend.capInr > 0 ? Math.min(100, (spend.spentInr / spend.capInr) * 100) : 0;
   const salonCapLabel = Number.isFinite(salonCapInr) ? formatAiInr(salonCapInr) : "Not set";
 
   function applyView(data: PlatformAiSettings) {
@@ -36,7 +40,29 @@ export function SuperAiForm({
     if (data.tier) setTier(data.tier);
     if (data.guestEngine === "fal" || data.guestEngine === "openai") setGuestEngine(data.guestEngine);
     if (data.guestModel) setGuestModel(data.guestModel);
+    if (data.spend && !data.spend.pending) {
+      setSpend(data.spend);
+      setSpendPending(false);
+    }
   }
+
+  useEffect(() => {
+    if (!initial.spend.pending) return;
+    let cancel = false;
+    void fetch("/api/v1/super/ai/spend")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: PlatformAiSettings["spend"] | null) => {
+        if (cancel || !data || typeof data.spentInr !== "number") return;
+        setSpend(data);
+        setSpendPending(false);
+      })
+      .catch(() => {
+        if (!cancel) setSpendPending(false);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [initial.spend.pending]);
 
   async function saveModel(model: GuestModelId) {
     const res = await fetch("/api/v1/super/ai", {
@@ -168,21 +194,22 @@ export function SuperAiForm({
         {message ? <p className="text-sm" role="status">{message}</p> : null}
       </section>
 
-      <section className="card grid gap-2 p-4">
+      <section className="card grid gap-2 p-4" data-prices="guest">
         <h2 className="text-base font-semibold">Models & price per image</h2>
         <ul className="text-sm">
-          {MODEL_PRICES.map((row) => (
+          {prices.map((row) => (
             <li key={row.id} className="flex justify-between gap-3 border-t border-line py-2">
-              <span>{row.label} · {row.model} · {row.role === "primary" ? "In use by default" : "Fallback"}</span>
-              <span>₹{row.inrPerImage}</span>
+              <span>{row.label}<span className="block text-xs text-muted">{row.detail}</span></span>
+              <span>{formatAiInr(row.inr)}</span>
             </li>
           ))}
         </ul>
+        <p className="text-xs text-muted">Estimates use the FX_INR_PER_USD setting, with no 8% buffer. Not an invoice. A live medium 1024×1360 sunburst bill was about $0.032.</p>
       </section>
 
       <section className="card grid gap-2 p-4">
         <h2 className="text-base font-semibold">Spend cap</h2>
-        <p className="text-sm">{formatAiInr(initial.spend.spentInr)} of {formatAiInr(initial.spend.capInr)}</p>
+        <p className="text-sm">{spendPending ? "Loading spend…" : `${formatAiInr(spend.spentInr)} of ${formatAiInr(spend.capInr)}`}</p>
         <div className="h-2 overflow-hidden rounded-full bg-sand" aria-hidden>
           <div className="h-full bg-aubergine" style={{ width: `${capPct}%` }} />
         </div>

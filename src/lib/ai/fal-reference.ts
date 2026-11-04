@@ -3,7 +3,7 @@ import { BilledProviderError, UnbilledProviderError, UncertainBillingError, Unkn
 import { buildFalEditBody, falModel, type Flux3Resolution } from "@/lib/ai/fal-models";
 import type { EditSize } from "@/lib/ai/edit-request";
 import { numberEnv } from "@/lib/env";
-import { logInfo } from "@/lib/logger";
+import { logInfo, logProviderFailure, scrubProviderBody } from "@/lib/logger";
 
 const QUEUE_ORIGIN = "https://queue.fal.run";
 const REST_ORIGIN = "https://rest.fal.ai";
@@ -34,6 +34,41 @@ export function falQueueAppId(endpointId: string) {
   const [owner, app] = endpointId.split("/").filter(Boolean);
   if (!owner || !app) return endpointId;
   return `${owner}/${app}`;
+}
+
+function uniqueUrls(urls: string[]) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const url of urls) {
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+
+/**
+ * Status URLs to try, in order.
+ * The queue guide says to use the submit response, and otherwise only owner/app
+ * (`meta/muse-image`), because a path that still contains the endpoint (`/edit`) returns 405.
+ * The model OpenAPI lists the full id, so that path is the next try when owner/app is refused.
+ */
+export function falQueueStatusCandidates(endpointId: string, requestId: string, returned?: string) {
+  const app = `${QUEUE_ORIGIN}/${falQueueAppId(endpointId)}/requests/${requestId}/status`;
+  const full = `${QUEUE_ORIGIN}/${endpointId}/requests/${requestId}/status`;
+  return uniqueUrls([acceptedQueueUrl(returned, requestId), app, full]);
+}
+
+/**
+ * Result URLs to try, in order.
+ * The queue guide fetches `/{owner}/{app}/requests/{request_id}` with no `/response` suffix.
+ * `/response` is only a last try for gateways that still publish that alias.
+ */
+export function falQueueResultCandidates(endpointId: string, requestId: string, returned?: string) {
+  const app = `${QUEUE_ORIGIN}/${falQueueAppId(endpointId)}/requests/${requestId}`;
+  const full = `${QUEUE_ORIGIN}/${endpointId}/requests/${requestId}`;
+  const legacy = `${QUEUE_ORIGIN}/${falQueueAppId(endpointId)}/requests/${requestId}/response`;
+  return uniqueUrls([acceptedQueueUrl(returned, requestId), app, full, legacy]);
 }
 
 /**
@@ -219,8 +254,15 @@ export async function postFalReferenceEdit(args: {
   const deadline = started + deadlineMs;
   let submitted = false;
   let requestId = "";
-  let statusUrl = "";
-  let resultUrl = "";
+  let statusCandidates: string[] = [];
+  let resultCandidates: string[] = [];
+  const loggedHttp = new Set<string>();
+  const noteHttp = (phase: string, status: number, body: string) => {
+    const key = `${phase}:${status}`;
+    if (loggedHttp.has(key) || loggedHttp.size >= 4) return;
+    loggedHttp.add(key);
+    logProviderFailure({ provider: "fal", model: row.id, httpStatus: status, body, requestId });
+  };
   try {
     const response = await fetchImpl(`${QUEUE_ORIGIN}/${row.id}`, {
       method: "POST",
@@ -231,6 +273,7 @@ export async function postFalReferenceEdit(args: {
     submitted = true;
     const text = await response.text();
     if (response.status === 401 || response.status === 403) {
+      noteHttp("submit", response.status, text);
       throw new UnbilledProviderError("fal rejected the key. The edit was not accepted.");
     }
     let payload: { request_id?: string; status_url?: string; response_url?: string; error?: string } = {};
@@ -240,16 +283,16 @@ export async function postFalReferenceEdit(args: {
       payload = {};
     }
     if (!response.ok || !payload.request_id) {
+      noteHttp("submit", response.status, text);
       if (response.status >= 400 && response.status < 500) {
-        throw new UnbilledProviderError(scrub(payload.error || text || "fal refused the edit before it was queued."));
+        throw new UnbilledProviderError(scrubProviderBody(payload.error || text) || "fal refused the edit before it was queued.");
       }
       throw new UncertainBillingError("fal did not confirm the queue request. It was not submitted again.");
     }
     requestId = payload.request_id;
     logInfo("fal queue submit", { endpointId: row.id, requestId });
-    const appId = falQueueAppId(row.id);
-    statusUrl = acceptedQueueUrl(payload.status_url, requestId) || `${QUEUE_ORIGIN}/${appId}/requests/${requestId}/status`;
-    resultUrl = acceptedQueueUrl(payload.response_url, requestId) || `${QUEUE_ORIGIN}/${appId}/requests/${requestId}/response`;
+    statusCandidates = falQueueStatusCandidates(row.id, requestId, payload.status_url);
+    resultCandidates = falQueueResultCandidates(row.id, requestId, payload.response_url);
   } catch (error) {
     if (error instanceof UnbilledProviderError || error instanceof UncertainBillingError || error instanceof UnknownModelError) throw error;
     if (submitted) throw new UncertainBillingError("The fal queue request left this server and the reply was lost. It was not submitted again.");
@@ -258,8 +301,10 @@ export async function postFalReferenceEdit(args: {
 
   let completed = false;
   let lastStatusError = "";
+  let statusIndex = 0;
   try {
   while (now() < deadline) {
+    const statusUrl = statusCandidates[Math.min(statusIndex, statusCandidates.length - 1)] || "";
     let statusResponse: Response;
     try {
       statusResponse = await fetchImpl(withLogs(statusUrl), {
@@ -271,13 +316,30 @@ export async function postFalReferenceEdit(args: {
       continue;
     }
     if (!statusResponse.ok) {
-      lastStatusError = scrub(await statusResponse.text().catch(() => ""));
+      const body = await statusResponse.text().catch(() => "");
+      noteHttp("status", statusResponse.status, body);
+      lastStatusError = scrub(body);
+      if ((statusResponse.status === 404 || statusResponse.status === 405) && statusIndex < statusCandidates.length - 1) {
+        statusIndex += 1;
+        continue;
+      }
       await sleep(falPollDelayMs());
       continue;
     }
-    const status = (await statusResponse.json()) as StatusBody;
+    let status: StatusBody;
+    try {
+      status = (await statusResponse.json()) as StatusBody;
+    } catch {
+      noteHttp("status", statusResponse.status, "status body was not JSON");
+      if (statusIndex < statusCandidates.length - 1) {
+        statusIndex += 1;
+        continue;
+      }
+      await sleep(falPollDelayMs());
+      continue;
+    }
     const returned = acceptedQueueUrl(status.response_url, requestId);
-    if (returned) resultUrl = returned;
+    if (returned) resultCandidates = falQueueResultCandidates(row.id, requestId, returned);
     if (status.status === "IN_QUEUE" || status.status === "IN_PROGRESS") {
       await sleep(falPollDelayMs(status.status));
       continue;
@@ -286,6 +348,7 @@ export async function postFalReferenceEdit(args: {
       completed = true;
       const detail = statusDetail(status);
       if (status.error || status.error_type) {
+        noteHttp("status", 200, JSON.stringify({ error: status.error, error_type: status.error_type }));
         throw new BilledProviderError(args.estimateUsd, undefined, `fal finished with an error. The call was not retried. ${detail}`);
       }
       break;
@@ -296,31 +359,59 @@ export async function postFalReferenceEdit(args: {
   if (!completed) {
     throw new UncertainBillingError(`The fal edit did not finish before the deadline. The queue request was not submitted again.${lastStatusError ? ` ${lastStatusError}` : ""}`);
   }
-  if (!resultUrl) resultUrl = `${QUEUE_ORIGIN}/${falQueueAppId(row.id)}/requests/${requestId}/response`;
 
-  const resultResponse = await fetchImpl(resultUrl, {
-    headers: { Authorization: `Key ${args.apiKey}` },
-    signal: AbortSignal.timeout(Math.max(1, deadline - now())),
-  }).catch(() => {
-    throw new UncertainBillingError("fal marked the edit complete and the result could not be read. It was not submitted again.");
-  });
-  if (!resultResponse.ok) {
-    const body = scrub(await resultResponse.text().catch(() => ""));
-    throw new UncertainBillingError(`fal marked the edit complete and the result was refused. It was not submitted again.${body ? ` ${body}` : ""}`);
-  }
-  const result = (await resultResponse.json()) as {
+  type FalResult = {
     images?: { url?: string; width?: number; height?: number }[];
     has_nsfw_concepts?: boolean[];
     error?: string;
     detail?: string;
   };
-  if (result.error || (typeof result.detail === "string" && result.detail)) {
-    throw new BilledProviderError(args.estimateUsd, undefined, `fal finished with an error. The call was not retried. ${scrub(result.error || result.detail || "")}`);
+  let result: FalResult | null = null;
+  let resultError = "";
+  for (const resultUrl of resultCandidates) {
+    let resultResponse: Response;
+    try {
+      resultResponse = await fetchImpl(resultUrl, {
+        headers: { Authorization: `Key ${args.apiKey}` },
+        signal: AbortSignal.timeout(Math.max(1, deadline - now())),
+      });
+    } catch {
+      resultError = "fal marked the edit complete and the result could not be read. It was not submitted again.";
+      continue;
+    }
+    if (!resultResponse.ok) {
+      const body = await resultResponse.text().catch(() => "");
+      noteHttp("result", resultResponse.status, body);
+      resultError = `fal marked the edit complete and the result was refused. It was not submitted again.${body ? ` ${scrub(body)}` : ""}`;
+      if (resultResponse.status === 404 || resultResponse.status === 405) continue;
+      throw new UncertainBillingError(resultError);
+    }
+    let parsed: FalResult;
+    try {
+      parsed = (await resultResponse.json()) as FalResult;
+    } catch {
+      noteHttp("result", resultResponse.status, "result body was not JSON");
+      resultError = "fal marked the edit complete and the result could not be read. It was not submitted again.";
+      continue;
+    }
+    if (parsed.error || (typeof parsed.detail === "string" && parsed.detail)) {
+      noteHttp("result", 200, JSON.stringify({ error: parsed.error, detail: parsed.detail }));
+      throw new BilledProviderError(args.estimateUsd, undefined, `fal finished with an error. The call was not retried. ${scrub(parsed.error || parsed.detail || "")}`);
+    }
+    if ((parsed.images?.[0]?.url || "").startsWith("https://")) {
+      result = parsed;
+      break;
+    }
+    noteHttp("result", 200, JSON.stringify(parsed));
+    resultError = "fal finished without an image URL. The call was not retried.";
+  }
+  if (!result) {
+    if (resultError.startsWith("fal finished without")) {
+      throw new BilledProviderError(args.estimateUsd, undefined, resultError);
+    }
+    throw new UncertainBillingError(resultError || "fal marked the edit complete and the result was refused. It was not submitted again.");
   }
   const imageUrl = result.images?.[0]?.url || "";
-  if (!imageUrl.startsWith("https://")) {
-    throw new BilledProviderError(args.estimateUsd, undefined, "fal finished without an image URL. The call was not retried.");
-  }
   const imageResponse = await fetchImpl(imageUrl, { signal: AbortSignal.timeout(Math.max(1, deadline - now())) }).catch(() => {
     throw new UncertainBillingError("The fal image URL could not be downloaded. The edit was not submitted again.");
   });

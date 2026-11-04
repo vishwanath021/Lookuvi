@@ -33,6 +33,7 @@ import {
   type BridalStyleId,
 } from "@/data/bridal";
 import { guestSessionId } from "@/lib/guest-session";
+import { postGuestGenerate } from "@/lib/guest-preview";
 import type { SalonConfig } from "@/lib/salon";
 import { tryNowReady } from "@/lib/try-now";
 import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
@@ -247,7 +248,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
           body.set("sessionId", guestSessionId());
           const consentId = (await consent.persist()) || consent.consentId();
           if (consentId) body.set("consentId", consentId);
-          body.set("requestId", crypto.randomUUID());
+          const requestId = crypto.randomUUID();
+          body.set("requestId", requestId);
           body.set("tool", kind === "mehendi" ? "mehendi" : "bridal");
           if (kind === "mehendi") {
             body.set("styleId", mehendiStyle);
@@ -267,7 +269,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
             body.set("blush", blushOn ? "1" : "0");
             body.set("browTint", browOn ? "1" : "0");
           }
-          const res = await fetch("/api/v1/tryon/generate", { method: "POST", body });
+          const res = await postGuestGenerate({ slug: config.slug, body, requestId });
           const data = res.ok ? null : await res.json().catch(() => ({}));
           if (!res.ok) {
             if (data?.error === "VISIT_CAP") visit.applyBody(data);
