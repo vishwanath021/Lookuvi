@@ -27,6 +27,10 @@ export function formatAiInr(value: number) {
 export function friendlyModel(id: string) {
   const model = id.trim();
   if (!model) return "—";
+  if (model.includes("muse-image")) return "Muse";
+  if (model.includes("qwen-image")) return "Qwen";
+  if (model.includes("klein/4b")) return "FLUX.2 Klein 4B";
+  if (model.includes("flux-2/edit")) return "FLUX.2";
   if (model.includes("flux-3") || model.includes("flux/3")) return "FLUX";
   if (model.includes("nano-banana")) return "Gemini image";
   if (model.includes("seedream")) return "Seedream";

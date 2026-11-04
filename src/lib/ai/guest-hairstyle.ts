@@ -21,11 +21,11 @@ import { cropLetterbox } from "@/lib/ai/letterbox";
 import { COLOUR_UNCHANGED_MESSAGE, hairChange } from "@/lib/ai/look-change";
 import { logInfo } from "@/lib/logger";
 import { buildBeardPrompt, buildBrowPrompt, buildColourPrompt, buildNailPrompt } from "@/lib/prompts";
+import { DEFAULT_GUEST_MODEL, GUEST_FAL_MODEL, GUEST_OPENAI_MODEL, guestModelProvider, parseGuestModel, type GuestModelId } from "@/lib/ai/guest-models";
 import { guestLimitMessage } from "@/lib/tools";
 
 /** Guest hairstyles. Model ids stay in this module so the guest route does not name them. */
-export const GUEST_FAL_MODEL = "blackforestlabs/flux-3/edit-image";
-export const GUEST_OPENAI_MODEL = "gpt-image-2.5-sunburst";
+export { DEFAULT_GUEST_MODEL, GUEST_FAL_MODEL, GUEST_MODEL_OPTIONS, GUEST_OPENAI_MODEL, guestModelProvider, parseGuestModel, type GuestModelId } from "@/lib/ai/guest-models";
 
 export type GuestEngine = "fal" | "openai";
 
@@ -79,6 +79,36 @@ export function guestEngineAfterFailure(
 async function setting(key: string) {
   const row = await prisma.platformSetting.findUnique({ where: { key } });
   return row?.value ?? "";
+}
+
+/**
+ * Salon fal/openai override still means FLUX.3 or sunburst.
+ * Otherwise the saved guest model wins. An empty setting stays on sunburst.
+ */
+export async function readGuestModel(tenantId: string): Promise<{ model: GuestModelId; source: "salon" | "platform" }> {
+  if (tenantId) {
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { hairstyleEngine: true } });
+    const override = parseGuestEngine(tenant?.hairstyleEngine || "");
+    if (override === "openai") return { model: GUEST_OPENAI_MODEL, source: "salon" };
+    if (override === "fal") return { model: GUEST_FAL_MODEL, source: "salon" };
+  }
+  const explicit = parseGuestModel(await setting("guest_hairstyle_model"));
+  if (explicit) return { model: explicit, source: "platform" };
+  if ((await setting("guest_hairstyle_engine")) === "fal") return { model: GUEST_FAL_MODEL, source: "platform" };
+  return { model: DEFAULT_GUEST_MODEL, source: "platform" };
+}
+
+export async function saveGuestModel(model: GuestModelId, actorId: string) {
+  const engine = guestModelProvider(model) === "openai" ? "openai" : "fal";
+  await prisma.platformSetting.upsert({
+    where: { key: "guest_hairstyle_model" },
+    update: { value: model },
+    create: { key: "guest_hairstyle_model", value: model },
+  });
+  await saveGuestEngine(engine, actorId);
+  await prisma.auditLog.create({
+    data: { actorId, action: "GUEST_MODEL", target: "platform", meta: JSON.stringify({ model }) },
+  });
 }
 
 /** Salon override wins. An empty override uses sunburst. */
@@ -204,7 +234,8 @@ type GuestEditArgs = {
  * The guest response is a JPEG. Cost and model stay on the ledger.
  */
 async function runGuestEdit(args: GuestEditArgs): Promise<NextResponse | null> {
-  const selected = (await readGuestEngine(args.tenantId)).engine;
+  const chosen = (await readGuestModel(args.tenantId)).model;
+  const selected: GuestEngine = chosen === GUEST_OPENAI_MODEL ? "openai" : "fal";
   const openaiReady = await guestEngineReady("openai");
   const falReady = await guestEngineReady("fal");
   const engine = guestEngineToRun(engineForGuestTool(args.tool, selected), openaiReady, falReady);
@@ -229,7 +260,9 @@ async function runGuestEdit(args: GuestEditArgs): Promise<NextResponse | null> {
       tenantId: args.tenantId,
       source: "tryon",
       tool: args.tool,
-      modelId: guestEngineModel(engine),
+      modelId: guestEngineModel(engine) === chosen || chosen === GUEST_OPENAI_MODEL
+        ? guestEngineModel(engine)
+        : chosen,
       quality: "medium",
       guest: args.guest,
     });

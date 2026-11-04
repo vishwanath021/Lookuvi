@@ -11,7 +11,7 @@ export default async function SuperAiPage() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       <h1 className="page-title">AI</h1>
-      <p className="mt-2 mb-4 text-sm text-muted">One model in use, one fallback.</p>
+      <p className="mt-2 mb-4 text-sm text-muted">Sunburst is the default. Pick another model to try it on guest hairstyles.</p>
       <SuperAiForm initial={initial} salonCapInr={salonSpendCapInr()} />
     </main>
   );
