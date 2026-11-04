@@ -302,7 +302,7 @@ describe("hair picker markup", () => {
     expect(free).toContain("Show all");
     expect(free).toContain("Suggested for you");
     expect(free).toContain("Suits thick wavy hair");
-    expect(free).toContain("/styles/pixie.jpg");
+    expect(free).toContain("/styles/thumbs/pixie.webp");
     expect(free).not.toContain("Get AI suggestions");
     const guest = readFileSync("src/components/tryon/TryOnApp.tsx", "utf8");
     expect(guest).not.toContain("gpt-4.1");
