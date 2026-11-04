@@ -11,6 +11,13 @@ export function isQwenEdit(modelId: string) {
   return modelId === QWEN_EDIT_ID;
 }
 
+/** Qwen, FLUX.2 edit, and Klein 4B copy the reference face unless the prompt names image 1 and image 2. */
+export function usesShortReferencePrompt(modelId: string) {
+  return modelId === QWEN_EDIT_ID
+    || modelId === "fal-ai/flux-2/edit"
+    || modelId === "fal-ai/flux-2/klein/4b/edit";
+}
+
 const ROLES =
   "image 1 is the customer photo to edit. image 2 is the reference only. Edit image 1. Do not copy the face, skin, clothes, pose, or background from image 2.";
 
