@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { benchmarkDir, prepareBenchmark, restoredFromProvider, writeBenchmarkStages } from "@/lib/ai/benchmark";
 import { prepareComparison, prepareGuestReference } from "@/lib/ai/compare-models";
-import { isQwenEdit, tuneQwenGuest } from "@/lib/ai/qwen-prompt";
+import { tuneQwenGuest, usesShortReferencePrompt } from "@/lib/ai/qwen-prompt";
 import type { AskedTexture } from "@/lib/ai/reference-texture";
 import { reviewProviderFace } from "@/lib/face/compose-hair";
 import type { DriftReport } from "@/lib/face/hair-composite";
@@ -114,7 +114,7 @@ export async function executeReferenceEdit(args: {
   const requestedModel = args.modelId?.trim() || "";
   const fluxUse = flux3UseFor(args.source, args.tool);
   const fluxResolution = flux3ResolutionFor(fluxUse);
-  const guest = args.guest && isQwenEdit(requestedModel)
+  const guest = args.guest && usesShortReferencePrompt(requestedModel)
     ? tuneQwenGuest({ tool: args.tool, styleId: args.styleId, ...args.guest })
     : args.guest;
   const prepared = guest

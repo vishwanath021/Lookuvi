@@ -30,6 +30,7 @@ import { queueEntryKey, salonActionItems } from "@/lib/salon-actions";
 import { downloadLookFile, lookDownloadName } from "@/lib/look-result";
 import { normalizeWhatsAppPhone } from "@/lib/whatsapp";
 import { GUEST_PREVIEW_FAILED, postGuestGenerate } from "@/lib/guest-preview";
+import { clearTabLooks, parseTabSession, putTabLook, selfieForEdit, serializeTabSession, tabLookCacheKey, type TabLook, type TabLookMap, type TabTool } from "@/lib/tab-looks";
 
 function poseLine(label: string, value: number | string | null) {
   return (
@@ -207,8 +208,8 @@ export function TryOnApp({
   const [styleId, setStyleId] = useState("");
   const [browThickness, setBrowThickness] = useState<BrowThickness>("natural");
   const [browColour, setBrowColour] = useState<BrowColour>("natural");
-  const [stylePhase, setStylePhase] = useState<"pick" | "result">("pick");
   const [busy, setBusy] = useState(false);
+  const [busyTool, setBusyTool] = useState<TryTool | null>(null);
   const [pickedDensity, setPickedDensity] = useState("");
   const [pickedTexture, setPickedTexture] = useState("");
   const [showAllStyles, setShowAllStyles] = useState(false);
@@ -223,7 +224,10 @@ export function TryOnApp({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [poseNote, setPoseNote] = useState<PlacementDebug | null>(null);
-  const [active, setActive] = useState<Look | null>(null);
+  const [looks, setLooks] = useState<TabLookMap>({});
+  const [rawUrls, setRawUrls] = useState<Partial<Record<TryTool, string>>>({});
+  const [picked, setPicked] = useState<Partial<Record<TryTool, string>>>({});
+  const [cacheReady, setCacheReady] = useState(false);
   const [freshGlow, setFreshGlow] = useState(false);
   const [modelStatus, setModelStatus] = useState<"loading" | "ready" | "error">("loading");
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -236,6 +240,33 @@ export function TryOnApp({
   const consent = usePhotoConsent(config.slug, lang);
   const [zoom, setZoom] = useState(1);
   const [compareOn, setCompareOn] = useState(true);
+
+  useEffect(() => {
+    const saved = parseTabSession(sessionStorage.getItem(tabLookCacheKey(config.slug)));
+    setLooks(saved.looks);
+    const current = saved.looks[firstTool(config, initialTool)];
+    if (current) {
+      setStyleId(current.styleId);
+      setPicked((prev) => ({ ...prev, [current.tool]: current.styleId }));
+    }
+    void restoreShot(saved.face, "face");
+    void restoreShot(saved.hand, "hand");
+    setCacheReady(true);
+    // Restore once per salon. config.slug is the stable key; the object identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.slug, initialTool]);
+
+  useEffect(() => {
+    if (!cacheReady) return;
+    const stored = parseTabSession(sessionStorage.getItem(tabLookCacheKey(config.slug)));
+    const face = faceRef.current?.url.startsWith("data:image/") ? faceRef.current.url : stored.face;
+    const hand = handRef.current?.url.startsWith("data:image/") ? handRef.current.url : stored.hand;
+    try {
+      sessionStorage.setItem(tabLookCacheKey(config.slug), serializeTabSession({ face, hand, looks }));
+    } catch {
+      /* A full session of previews can exceed the browser quota. The in-memory tabs stay. */
+    }
+  }, [looks, config.slug, faceShot, handShot, cacheReady]);
 
   useEffect(() => {
     setSid(sessionId());
@@ -286,7 +317,9 @@ export function TryOnApp({
         serviceKeys: row.style.serviceKeys ?? [],
       }] : [])
     : [];
-  const showResult = stylePhase === "result" && active?.tool === tool && !busy;
+  const active: Look | null = looks[tool] ? { ...looks[tool], raw: rawUrls[tool] } : null;
+  const generatingHere = busy && busyTool === tool;
+  const showResult = Boolean(active) && !generatingHere && !cameraOn;
   useEffect(() => {
     if (!showResult || !active?.id) return;
     setFreshGlow(true);
@@ -418,7 +451,6 @@ export function TryOnApp({
     flushSync(() => {
       setError("");
       setCameraError("");
-      setStylePhase("pick");
       setCameraReady(false);
       setFacing(nextFacing);
       setCameraOn(true);
@@ -502,6 +534,40 @@ export function TryOnApp({
     return classifySkinPhoto(ctx.getImageData(0, 0, 48, 48).data, 48, 48, 4);
   }
 
+  async function restoreShot(dataUrl: string | undefined, slot: "face" | "hand") {
+    if (!dataUrl) return;
+    try {
+      const blob = await (await fetch(dataUrl)).blob();
+      const img = new Image();
+      img.src = dataUrl;
+      await img.decode();
+      const shot = { blob, url: dataUrl, el: img };
+      if (slot === "hand") {
+        handRef.current = shot;
+        setHandShot(shot);
+      } else {
+        faceRef.current = shot;
+        setFaceShot(shot);
+      }
+    } catch {
+      /* A stale session photo is ignored. The customer can take another. */
+    }
+  }
+
+  function dataUrl(blob: Blob) {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function storeLook(look: TabLook) {
+    setLooks((current) => putTabLook(current, look));
+    setPicked((current) => ({ ...current, [look.tool]: look.styleId }));
+  }
+
   async function applyBlob(blob: Blob) {
     const slot = tool === "nails" ? "hand" : "face";
     if (slot === "hand" && (await classifyHand(blob)) === "face") {
@@ -509,9 +575,7 @@ export function TryOnApp({
       setError(t(lang, "faceNotHand"));
       return;
     }
-    const previous = slot === "hand" ? handRef.current : faceRef.current;
-    if (previous) URL.revokeObjectURL(previous.url);
-    const url = URL.createObjectURL(blob);
+    const url = await dataUrl(blob);
     const img = new Image();
     img.src = url;
     await img.decode();
@@ -525,7 +589,8 @@ export function TryOnApp({
       setFaceShot(shot);
     }
     setError("");
-    setStylePhase("pick");
+    const faceTools: TabTool[] = ["style", "colour", "brows", "beard"];
+    setLooks((current) => clearTabLooks(current, slot === "hand" ? ["nails"] : faceTools));
     track("photo_captured", {});
     await recordPhotoConsent();
     continuePending();
@@ -598,17 +663,12 @@ export function TryOnApp({
   }
 
   function resetForAnotherPhoto() {
-    const blobs = new Set<string>();
-    const remember = (url?: string) => {
-      if (url?.startsWith("blob:")) blobs.add(url);
-    };
-    if (active) {
-      remember(active.before);
-      remember(active.after);
-      remember(active.raw);
+    setLooks({});
+    try {
+      sessionStorage.removeItem(tabLookCacheKey(config.slug));
+    } catch {
+      /* The next photo replaces the cache. */
     }
-    for (const url of blobs) URL.revokeObjectURL(url);
-    setActive(null);
     pendingLook.current = null;
     setStyleId("");
     setHairReading(null);
@@ -676,6 +736,7 @@ export function TryOnApp({
 
   function selectLook(chosen: Chosen) {
     setStyleId(chosen.id);
+    setPicked((current) => ({ ...current, [chosen.tool]: chosen.id }));
     setTool(chosen.tool);
     setError("");
     if (!shotRefFor(chosen.tool)) {
@@ -689,8 +750,9 @@ export function TryOnApp({
 
   async function preview(chosen: Chosen) {
     setStyleId(chosen.id);
+    setPicked((current) => ({ ...current, [chosen.tool]: chosen.id }));
     setTool(chosen.tool);
-    const shot = shotRefFor(chosen.tool);
+    const shot = selfieForEdit(shotRefFor(chosen.tool));
     if (!shot) {
       pendingLook.current = chosen;
       setError(t(lang, chosen.tool === "nails" ? "uploadHand" : "addPhotoFirst"));
@@ -702,7 +764,7 @@ export function TryOnApp({
     pendingLook.current = null;
     setError("");
     setPoseNote(null);
-    setStylePhase("pick");
+    setBusyTool(chosen.tool);
     setBusy(true);
     try {
       const consentId = (await recordPhotoConsent()) || "";
@@ -770,14 +832,15 @@ export function TryOnApp({
           }
         }
       }
-      setActive({
+      const before = await dataUrl(shot.blob);
+      const after = await dataUrl(aligned.blob);
+      storeLook({
         id: res.headers.get("x-tryon-id") || crypto.randomUUID(),
         styleId: chosen.id,
         styleName: chosen.name,
         shadeName: chosen.tool === "style" ? shade?.name ?? null : chosen.tool === "colour" ? chosen.name : null,
-        before: URL.createObjectURL(shot.blob),
-        after: URL.createObjectURL(aligned.blob),
-        raw: poseDebug ? URL.createObjectURL(out) : undefined,
+        before,
+        after,
         alignMode: aligned.mode,
         eyeDelta: aligned.eyeDelta,
         serviceKeys: chosen.serviceKeys,
@@ -785,7 +848,7 @@ export function TryOnApp({
         demo: sample,
         lookShare: res.headers.get("x-look-share") || "",
       });
-      setStylePhase("result");
+      if (poseDebug) setRawUrls((current) => ({ ...current, [chosen.tool]: URL.createObjectURL(out) }));
       frameRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       track("generate_succeeded", { styleId: chosen.id });
     } catch {
@@ -794,6 +857,7 @@ export function TryOnApp({
     } finally {
       previewLock.current = false;
       setBusy(false);
+      setBusyTool(null);
     }
   }
 
@@ -815,13 +879,6 @@ export function TryOnApp({
     const item = config.shades.find((shade) => shade.id === id);
     if (!item) return;
     setShadeId(id);
-    if (active?.tool === "colour") {
-      if (active.before.startsWith("blob:")) URL.revokeObjectURL(active.before);
-      if (active.after.startsWith("blob:")) URL.revokeObjectURL(active.after);
-      if (active.raw?.startsWith("blob:")) URL.revokeObjectURL(active.raw);
-      setActive(null);
-      setStylePhase("pick");
-    }
     track("colour_selected", { shade: id });
     selectLook({ id: item.id, name: item.name, serviceKeys: item.serviceKeys ?? [], tool: "colour" });
   }
@@ -950,7 +1007,12 @@ export function TryOnApp({
             role="tab"
             aria-selected={tool === item.id}
             aria-label={item.name}
-            onClick={() => { setTool(item.id); setError(""); setCameraError(""); }}
+            onClick={() => {
+              setTool(item.id);
+              setError("");
+              setCameraError("");
+              setStyleId(picked[item.id] || looks[item.id]?.styleId || "");
+            }}
           >
             <ToolGlyph name={item.icon} />
             {item.label}
@@ -964,10 +1026,10 @@ export function TryOnApp({
       <div>
       <section
         ref={frameRef}
-        className={busy || showResult ? `ai-photo ${showResult ? "is-ready" : "is-working"}${freshGlow ? " is-fresh" : ""}` : "overflow-hidden rounded-[14px] border border-line bg-white shadow-lift"}
+        className={generatingHere || showResult ? `ai-photo ${showResult ? "is-ready" : "is-working"}${freshGlow ? " is-fresh" : ""}` : "overflow-hidden rounded-[14px] border border-line bg-white shadow-lift"}
         aria-label="Photo"
       >
-        {(busy || showResult) && <div className="ai-photo-spin" aria-hidden="true" />}
+        {(generatingHere || showResult) && <div className="ai-photo-spin" aria-hidden="true" />}
         <div className={busy || showResult ? "ai-photo-inner" : "contents"}>
         {showResult && active ? (
           <div className="relative overflow-hidden">
@@ -1071,7 +1133,7 @@ export function TryOnApp({
                 canDownload={Boolean(active)}
               />
             )}
-            {busy && <GeneratingLook tool={tool} />}
+            {generatingHere && <GeneratingLook tool={busyTool || tool} />}
           </div>
         )}
         </div>
