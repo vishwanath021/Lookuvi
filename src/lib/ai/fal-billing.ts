@@ -1,5 +1,6 @@
 import { actualIsKnown, matchFalBillingEvents, type FalBillingEvent } from "@/lib/ai/cost-source";
 import { resolveFalCostKey } from "@/lib/ai/credentials";
+import { clearSpendSummaryCache } from "@/lib/ai/spend";
 import { exactInr } from "@/lib/ai/tiers";
 import { prisma } from "@/lib/prisma";
 
@@ -153,6 +154,7 @@ export async function syncFalBillingCosts(args: {
   const message = pairs.length
     ? `Updated ${pairs.length} fal row${pairs.length === 1 ? "" : "s"} from cost_total.`
     : "fal returned no billing event that matched a ledger row.";
+  if (pairs.length) clearSpendSummaryCache();
   return { ok: true as const, updated: pairs.length, unmatched: skipped, applied, message };
 }
 

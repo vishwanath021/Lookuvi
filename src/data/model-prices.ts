@@ -1,7 +1,8 @@
 /**
- * Guest image prices in rupees. This list is the planning rate for cost maths.
+ * Planning rates for cost maths when a call has no token quote.
+ * The AI settings card does not read this list. It prices every selectable guest model from the provider pages and FX_INR_PER_USD.
  * A ledger row with a provider actual replaces these figures for that image.
- * Calibration tiers are not on this list and are not shown to operators.
+ * Calibration tiers are not on this list.
  */
 export type ModelPrice = {
   id: string;

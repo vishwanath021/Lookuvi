@@ -6,7 +6,7 @@ import { BilledProviderError, UncertainBillingError } from "@/lib/ai/errors";
 import { flux3UsdForResolution } from "@/lib/ai/cost-source";
 import { FAL_NUMBERED_IMAGE_PROMPT, buildFalEditBody, closestFluxAspect, falModel, falUsdRange, flux3ResolutionFor, quoteFalModel } from "@/lib/ai/fal-models";
 import { bufferedInr } from "@/lib/ai/tiers";
-import { falSubmitHeaders, falTimeoutMs, postFalReferenceEdit } from "@/lib/ai/fal-reference";
+import { falQueueResultCandidates, falQueueStatusCandidates, falSubmitHeaders, falTimeoutMs, postFalReferenceEdit } from "@/lib/ai/fal-reference";
 import { productionModelNotice } from "@/lib/ai/model-notices";
 import { executeReferenceEdit } from "@/lib/ai/reference-run";
 import { saveFalKey, savePlatformAi } from "@/lib/ai/settings-store";
@@ -556,5 +556,149 @@ describe("fal and shutdown catalogue", () => {
       sleep: async () => undefined,
     })).rejects.toThrow(/content checker rejected the frame/);
     expect(submits).toBe(1);
+  });
+
+  it("uses the muse result path without /response after a 405 on the short app url", async () => {
+    const seen: string[] = [];
+    const errors: unknown[][] = [];
+    const errorLog = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    const color = await sharp({ create: { width: 30, height: 40, channels: 3, background: "#886655" } }).png().toBuffer();
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      const href = String(url).split("?")[0] || String(url);
+      seen.push(href);
+      if (href.includes("/storage/upload/initiate")) {
+        return json({ upload_url: "https://upload.example/put", file_url: "https://v3.fal.media/files/in.png" });
+      }
+      if (href.startsWith("https://upload.example")) return new Response(null, { status: 200 });
+      if (href.endsWith("/meta/muse-image/edit") && init?.method === "POST") {
+        const posted = JSON.parse(String(init.body)) as { aspect_ratio?: string; output_format?: string; image_urls?: string[]; enable_safety_checker?: boolean };
+        expect(posted.aspect_ratio).toBe("3:4");
+        expect(posted.output_format).toBe("png");
+        expect(posted.image_urls).toHaveLength(2);
+        expect(posted.enable_safety_checker).toBeUndefined();
+        return json({ request_id: "muse-1" });
+      }
+      if (href === "https://queue.fal.run/meta/muse-image/requests/muse-1/status") {
+        return new Response(JSON.stringify({ detail: "Method Not Allowed", authorization: "Key fal-test-key-123456" }), { status: 405 });
+      }
+      if (href === "https://queue.fal.run/meta/muse-image/edit/requests/muse-1/status") {
+        return json({ status: "COMPLETED" });
+      }
+      if (href === "https://queue.fal.run/meta/muse-image/requests/muse-1") {
+        return new Response("missing", { status: 405 });
+      }
+      if (href === "https://queue.fal.run/meta/muse-image/edit/requests/muse-1") {
+        return json({ images: [{ url: "https://v3.fal.media/files/out.png", width: 30, height: 40 }] });
+      }
+      if (href.startsWith("https://v3.fal.media/")) return new Response(new Uint8Array(color), { status: 200 });
+      throw new Error(`unexpected ${href}`);
+    }) as typeof fetch;
+    try {
+      const result = await postFalReferenceEdit({
+        apiKey: "fal-test-key-123456",
+        endpointId: "meta/muse-image/edit",
+        prompt: "Change only the hairstyle.",
+        selfiePng: color,
+        referenceJpeg: color,
+        size: "1024x1536",
+        estimateUsd: 0.01,
+        fetchImpl,
+        now: () => 1_000,
+        deadlineMs: 30_000,
+        sleep: async () => undefined,
+      });
+      expect(result.requestId).toBe("muse-1");
+      expect(seen).toContain("https://queue.fal.run/meta/muse-image/edit/requests/muse-1");
+      expect(seen.some((href) => href.endsWith("/response"))).toBe(false);
+      const logged = JSON.stringify(errors);
+      expect(logged).toContain("405");
+      expect(logged).not.toContain("fal-test-key-123456");
+      expect(logged).not.toContain("Change only the hairstyle");
+    } finally {
+      console.error = errorLog;
+    }
+  });
+
+  it("logs a 422 muse refusal and does not queue a second submit", async () => {
+    const errors: unknown[][] = [];
+    const errorLog = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    let submits = 0;
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      const href = String(url);
+      if (href.includes("/storage/upload/initiate")) {
+        return json({ upload_url: "https://upload.example/put", file_url: "https://v3.fal.media/files/in.png" });
+      }
+      if (href.startsWith("https://upload.example")) return new Response(null, { status: 200 });
+      if (init?.method === "POST") {
+        submits += 1;
+        return new Response(JSON.stringify({ detail: [{ msg: "field required" }], key: "fal-test-key-123456" }), {
+          status: 422,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      throw new Error(`unexpected ${href}`);
+    }) as typeof fetch;
+    const selfie = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#ccbbaa" } }).png().toBuffer();
+    try {
+      await expect(postFalReferenceEdit({
+        apiKey: "fal-test-key-123456",
+        endpointId: "meta/muse-image/edit",
+        prompt: "edit",
+        selfiePng: selfie,
+        referenceJpeg: selfie,
+        size: "1024x1536",
+        estimateUsd: 0.01,
+        fetchImpl,
+      })).rejects.toThrow(/field required/);
+      expect(submits).toBe(1);
+      const logged = JSON.stringify(errors);
+      expect(logged).toContain("422");
+      expect(logged).not.toContain("fal-test-key-123456");
+    } finally {
+      console.error = errorLog;
+    }
+  });
+});
+
+describe("new fal edit schemas", () => {
+  it("keeps queue candidates on the documented paths", () => {
+    expect(falQueueStatusCandidates("meta/muse-image/edit", "abc")).toEqual([
+      "https://queue.fal.run/meta/muse-image/requests/abc/status",
+      "https://queue.fal.run/meta/muse-image/edit/requests/abc/status",
+    ]);
+    expect(falQueueResultCandidates("meta/muse-image/edit", "abc")[0]).toBe("https://queue.fal.run/meta/muse-image/requests/abc");
+    expect(falQueueResultCandidates("fal-ai/flux-2/klein/4b/edit", "abc")).toContain("https://queue.fal.run/fal-ai/flux-2/requests/abc");
+    expect(falQueueStatusCandidates("bytedance/seedream/v5/lite/edit", "abc", "https://queue.fal.run/bytedance/seedream/requests/abc/status")[0])
+      .toBe("https://queue.fal.run/bytedance/seedream/requests/abc/status");
+  });
+
+  it("matches the fetched fal input schemas for the selectable edits", () => {
+    const shared = { prompt: "edit", selfieUrl: "https://cdn.example/a.jpg", referenceUrl: "https://cdn.example/b.jpg", size: "1024x1536" as const, width: 768, height: 1024 };
+    const qwen = buildFalEditBody("fal-ai/qwen-image-edit-2511", shared);
+    const flux = buildFalEditBody("fal-ai/flux-2/edit", shared);
+    const klein = buildFalEditBody("fal-ai/flux-2/klein/4b/edit", shared);
+    const seed = buildFalEditBody("bytedance/seedream/v5/lite/edit", shared);
+    for (const body of [qwen, flux, klein]) {
+      expect(body?.prompt).toBe("edit");
+      expect(body?.image_urls).toEqual(["https://cdn.example/a.jpg", "https://cdn.example/b.jpg"]);
+      expect(body?.image_size).toEqual({ width: 1024, height: 1536 });
+      expect(body?.num_images).toBe(1);
+      expect(body?.enable_safety_checker).toBe(true);
+      expect(body?.output_format).toBe("png");
+    }
+    expect((flux?.image_size as { width: number }).width).toBeGreaterThanOrEqual(512);
+    expect((flux?.image_size as { height: number }).height).toBeLessThanOrEqual(2048);
+    expect(seed).toMatchObject({
+      prompt: "edit",
+      image_urls: ["https://cdn.example/a.jpg", "https://cdn.example/b.jpg"],
+      image_size: { width: 1024, height: 1536 },
+    });
+    expect(seed?.enable_safety_checker).toBeUndefined();
   });
 });

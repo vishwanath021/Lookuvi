@@ -46,6 +46,58 @@ export function logInfo(message: string, meta?: unknown) {
 }
 
 /** One line per provider HTTP call. Never pass images, prompts, or keys. */
+const SECRET_TEXT = /(?:sk-(?:proj-)?[A-Za-z0-9_\-]{8,}|AIza[0-9A-Za-z\-_]{8,}|Key\s+[^\s"]+)/gi;
+
+function stripProviderValue(value: unknown, depth = 0): unknown {
+  if (depth > 4) return "[depth]";
+  if (Array.isArray(value)) return value.slice(0, 6).map((entry) => stripProviderValue(entry, depth + 1));
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      if (/prompt|image|url|authorization|token|key|secret|password|selfie/i.test(key)) {
+        out[key] = "[redacted]";
+        continue;
+      }
+      out[key] = stripProviderValue(entry, depth + 1);
+    }
+    return out;
+  }
+  if (typeof value === "string") return value.length > 160 ? `${value.slice(0, 160)}…` : value;
+  return value;
+}
+
+/** Short provider reply safe for logs. Drops prompts, image URLs, and keys. */
+export function scrubProviderBody(body: string) {
+  let text = body.replace(/\s+/g, " ").trim();
+  try {
+    const parsed = JSON.parse(body) as unknown;
+    if (parsed && typeof parsed === "object") text = JSON.stringify(stripProviderValue(parsed));
+  } catch {
+    // Keep the raw reply when it is not JSON.
+  }
+  text = text.replace(SECRET_TEXT, "[redacted]").replace(/data:[^,\s]{0,40};base64,[A-Za-z0-9+/=]+/g, "[data]");
+  return text.length > 400 ? text.slice(0, 400) : text;
+}
+
+/** One line for a failed provider HTTP call. Never pass the key or the photo. */
+export function logProviderFailure(entry: {
+  provider: string;
+  model: string;
+  salonId?: string;
+  httpStatus?: number;
+  body?: string;
+  requestId?: string;
+}) {
+  logError("provider error", {
+    provider: entry.provider,
+    model: entry.model,
+    salonId: entry.salonId || "",
+    httpStatus: entry.httpStatus ?? 0,
+    body: scrubProviderBody(entry.body || ""),
+    requestId: (entry.requestId || "").slice(0, 128),
+  });
+}
+
 export function logProviderCall(entry: {
   provider: string;
   model: string;

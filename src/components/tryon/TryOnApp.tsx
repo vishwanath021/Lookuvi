@@ -29,6 +29,7 @@ import { guestSectionCopy, guestSections, type GuestSection } from "@/lib/guest-
 import { queueEntryKey, salonActionItems } from "@/lib/salon-actions";
 import { downloadLookFile, lookDownloadName } from "@/lib/look-result";
 import { normalizeWhatsAppPhone } from "@/lib/whatsapp";
+import { GUEST_PREVIEW_FAILED, postGuestGenerate } from "@/lib/guest-preview";
 
 function poseLine(label: string, value: number | string | null) {
   return (
@@ -714,7 +715,8 @@ export function TryOnApp({
       body.set("quality", "standard");
       body.set("consentId", consentId);
       body.set("sessionId", sid || sessionId());
-      body.set("requestId", crypto.randomUUID());
+      const requestId = crypto.randomUUID();
+      body.set("requestId", requestId);
       if (salonToken) body.set("salonToken", salonToken);
       if (chosen.tool === "brows") {
         body.set("browThickness", browThickness);
@@ -728,10 +730,10 @@ export function TryOnApp({
           body.set("faceCount", String(detected.faceCount));
         }
       }
-      const res = await fetch("/api/v1/tryon/generate", { method: "POST", body });
+      const res = await postGuestGenerate({ slug: config.slug, body, requestId });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({ message: t(lang, "creditsEmpty") }));
-        setError(data.message || t(lang, "creditsEmpty"));
+        const data = await res.json().catch(() => ({ message: GUEST_PREVIEW_FAILED }));
+        setError(data.message || GUEST_PREVIEW_FAILED);
         if (poseDebug && data.debug) setPoseNote(data.debug as PlacementDebug);
         track("generate_failed", { styleId: chosen.id });
         return;
@@ -786,6 +788,9 @@ export function TryOnApp({
       setStylePhase("result");
       frameRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       track("generate_succeeded", { styleId: chosen.id });
+    } catch {
+      setError(GUEST_PREVIEW_FAILED);
+      track("generate_failed", { styleId: chosen.id });
     } finally {
       previewLock.current = false;
       setBusy(false);

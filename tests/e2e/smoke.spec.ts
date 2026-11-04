@@ -466,7 +466,8 @@ test("super admin chooses the salon hairstyle model without calling a provider",
   await expect(page.getByRole("heading", { name: "Lookuvi" })).toBeVisible();
   await page.goto("/super/ai");
   await expect(page.getByText("In use").first()).toBeVisible();
-  await expect(page.getByText("₹7")).toBeVisible();
+  await expect(page.getByText("Meta Muse Image")).toBeVisible();
+  await expect(page.getByText("₹3.13")).toBeVisible();
   await artifact(page, "super-provider");
   await page.goto("/s/demo");
   await expect(page.getByText("Reference mode")).toHaveCount(0);

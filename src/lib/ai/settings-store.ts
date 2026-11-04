@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { decryptSecret, encryptSecret, keyHint } from "@/lib/crypto/secret";
 import { allowByoKey } from "@/lib/ai/credentials";
-import { spendSummary } from "@/lib/ai/spend";
+import { cachedSpendSummary, spendCapInr } from "@/lib/ai/spend";
 import { parseTier, tierCatalog, type ImageProviderName, type ModelTier, type TierRequest } from "@/lib/ai/tiers";
 import { DEFAULT_GUEST_ENGINE, DEFAULT_GUEST_MODEL, parseGuestEngine, parseGuestModel, type GuestEngine, type GuestModelId } from "@/lib/ai/guest-hairstyle";
 import { prisma } from "@/lib/prisma";
@@ -23,7 +23,7 @@ export type StoredKeyStatus = { saved: boolean; hint: string };
 export type PlatformAiSettings = SalonAiSettings & {
   calibrationOk: boolean;
   choices: Record<ImageProviderName, TierRequest[]>;
-  spend: { spentInr: number; capInr: number; calls: number };
+  spend: { spentInr: number; capInr: number; calls: number; pending?: boolean };
   openaiKey: StoredKeyStatus;
   geminiKey: StoredKeyStatus;
   falKey: StoredKeyStatus & { enabled: boolean };
@@ -64,11 +64,6 @@ export async function readTierFlags(tenantId: string) {
   return { stored, highEnabled: gate.highEnabled, mediumApproved: gate.mediumApproved };
 }
 
-async function storedStatus(cipherKey: string, hintKey: string): Promise<StoredKeyStatus> {
-  const cipher = await setting(cipherKey);
-  return { saved: Boolean(cipher), hint: cipher ? await setting(hintKey) : "" };
-}
-
 /** The old single slot, classified so an OpenAI key is not shown as a Gemini key. */
 async function legacyKeyStatus(): Promise<{ kind: "openai" | "gemini" | ""; hint: string }> {
   const cipher = await setting("platform_ai_key_cipher");
@@ -86,40 +81,100 @@ async function legacyKeyStatus(): Promise<{ kind: "openai" | "gemini" | ""; hint
   return { kind: "", hint };
 }
 
-export async function platformAiView(): Promise<PlatformAiSettings> {
-  const provider = providerSchema.safeParse(await setting("platform_ai_provider"));
+const PLATFORM_VIEW_KEYS = [
+  "platform_ai_provider",
+  "platform_ai_key_cipher",
+  "platform_ai_key_hint",
+  "platform_ai_high_enabled",
+  "platform_ai_medium_approved",
+  "platform_ai_calibration_ok",
+  "platform_ai_tier",
+  "platform_fal_key_cipher",
+  "platform_fal_key_hint",
+  "platform_fal_enabled",
+  "platform_openai_key_cipher",
+  "platform_openai_key_hint",
+  "platform_gemini_key_cipher",
+  "platform_gemini_key_hint",
+  "platform_fal_billing_key_cipher",
+  "platform_fal_billing_key_hint",
+  "platform_openrouter_key_cipher",
+  "platform_openrouter_key_hint",
+  "platform_openrouter_enabled",
+  "guest_hairstyle_engine",
+  "guest_hairstyle_model",
+  "allow_byo_key",
+] as const;
+
+async function platformMap() {
+  const rows = await prisma.platformSetting.findMany({ where: { key: { in: [...PLATFORM_VIEW_KEYS] } } });
+  const map = new Map(rows.map((row) => [row.key, row.value]));
+  return (key: string) => map.get(key) ?? "";
+}
+
+function statusFrom(read: (key: string) => string, cipherKey: string, hintKey: string): StoredKeyStatus {
+  const cipher = read(cipherKey);
+  return { saved: Boolean(cipher), hint: cipher ? read(hintKey) : "" };
+}
+
+/**
+ * Settings for the AI screen. One settings read, then the month spend.
+ * `spend: "skip"` lets the page paint before the spend aggregate. The form loads that next.
+ * Provider key tests stay on the Test button. This function does not call OpenAI or fal.
+ */
+export async function platformAiView(options?: { spend?: "cached" | "skip" }): Promise<PlatformAiSettings> {
+  const read = await platformMap();
+  const provider = providerSchema.safeParse(read("platform_ai_provider"));
   const active = provider.success ? provider.data : "openai";
-  const legacyCipher = await setting("platform_ai_key_cipher");
-  const gate = await tierGate();
-  const fal = await storedStatus("platform_fal_key_cipher", "platform_fal_key_hint");
-  const openaiDedicated = await storedStatus("platform_openai_key_cipher", "platform_openai_key_hint");
-  const geminiDedicated = await storedStatus("platform_gemini_key_cipher", "platform_gemini_key_hint");
-  const legacy = await legacyKeyStatus();
-  const openaiKey = openaiDedicated.saved ? openaiDedicated : legacy.kind === "openai" ? { saved: true, hint: legacy.hint } : openaiDedicated;
-  const geminiKey = geminiDedicated.saved ? geminiDedicated : legacy.kind === "gemini" ? { saved: true, hint: legacy.hint } : geminiDedicated;
+  const legacyCipher = read("platform_ai_key_cipher");
+  let legacyKind: "openai" | "gemini" | "" = "";
+  let legacyHint = "";
+  if (legacyCipher) {
+    legacyHint = read("platform_ai_key_hint");
+    try {
+      const plain = decryptSecret(legacyCipher);
+      if (plain.startsWith("sk-")) legacyKind = "openai";
+      else if (plain.startsWith("AIza")) legacyKind = "gemini";
+    } catch {
+      legacyKind = "";
+    }
+    if (!legacyKind && (read("platform_ai_provider") === "openai" || read("platform_ai_provider") === "gemini")) {
+      legacyKind = read("platform_ai_provider") as "openai" | "gemini";
+    }
+  }
+  const openaiDedicated = statusFrom(read, "platform_openai_key_cipher", "platform_openai_key_hint");
+  const geminiDedicated = statusFrom(read, "platform_gemini_key_cipher", "platform_gemini_key_hint");
+  const openaiKey = openaiDedicated.saved ? openaiDedicated : legacyKind === "openai" ? { saved: true, hint: legacyHint } : openaiDedicated;
+  const geminiKey = geminiDedicated.saved ? geminiDedicated : legacyKind === "gemini" ? { saved: true, hint: legacyHint } : geminiDedicated;
   const activeStatus = active === "openai" ? openaiKey : geminiKey;
+  const fal = statusFrom(read, "platform_fal_key_cipher", "platform_fal_key_hint");
+  const openRouter = statusFrom(read, "platform_openrouter_key_cipher", "platform_openrouter_key_hint");
+  const guestEngineSetting = read("guest_hairstyle_engine");
+  const spend = options?.spend === "skip"
+    ? { spentInr: 0, capInr: spendCapInr(), calls: 0, pending: true as const }
+    : { ...(await cachedSpendSummary()), pending: false as const };
   return {
     provider: active,
     hasKey: activeStatus.saved || Boolean(legacyCipher),
-    hint: activeStatus.hint || (await setting("platform_ai_key_hint")),
-    allowByo: await allowByoKey(),
-    tier: gate.platformTier,
-    mediumApproved: gate.mediumApproved,
-    highEnabled: gate.highEnabled,
-    calibrationOk: gate.calibrationOk,
+    hint: activeStatus.hint || read("platform_ai_key_hint"),
+    allowByo: read("allow_byo_key") !== "false",
+    tier: parseTier(read("platform_ai_tier")),
+    mediumApproved: read("platform_ai_medium_approved") === "true",
+    highEnabled: read("platform_ai_high_enabled") === "true",
+    calibrationOk: read("platform_ai_calibration_ok") === "true",
     choices: { openai: tierCatalog("openai"), gemini: tierCatalog("gemini") },
-    spend: await spendSummary(),
+    spend,
     openaiKey,
     geminiKey,
-    falKey: { ...fal, enabled: fal.saved && (await setting("platform_fal_enabled")) === "true" },
-    falBillingKey: await storedStatus("platform_fal_billing_key_cipher", "platform_fal_billing_key_hint"),
+    falKey: { ...fal, enabled: fal.saved && read("platform_fal_enabled") === "true" },
+    falBillingKey: statusFrom(read, "platform_fal_billing_key_cipher", "platform_fal_billing_key_hint"),
     openRouterKey: {
-      ...(await storedStatus("platform_openrouter_key_cipher", "platform_openrouter_key_hint")),
-      enabled: Boolean(await setting("platform_openrouter_key_cipher")) && (await setting("platform_openrouter_enabled")) === "true",
+      ...openRouter,
+      enabled: Boolean(read("platform_openrouter_key_cipher")) && read("platform_openrouter_enabled") === "true",
     },
-    guestEngine: parseGuestEngine(await setting("guest_hairstyle_engine")) || DEFAULT_GUEST_ENGINE,
-    guestModel: parseGuestModel(await setting("guest_hairstyle_model"))
-      || ((await setting("guest_hairstyle_engine")) === "fal" ? "blackforestlabs/flux-3/edit-image" : DEFAULT_GUEST_MODEL),
+    guestEngine: parseGuestEngine(guestEngineSetting) || DEFAULT_GUEST_ENGINE,
+    guestModel: parseGuestModel(read("guest_hairstyle_model"))
+      || (guestEngineSetting === "fal" ? "blackforestlabs/flux-3/edit-image" : DEFAULT_GUEST_MODEL),
   };
 }
 
