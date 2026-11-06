@@ -48,7 +48,7 @@ export function AdminNav({
   const main = links.filter((link) => link.section === "main");
   const more = links.filter((link) => link.section === "more");
   return (
-    <div>
+    <div className="print:hidden">
       <button className="btn secondary mb-3 w-full md:hidden" type="button" data-ready={ready ? "yes" : "no"} aria-expanded={open} aria-controls="salon-nav" onClick={() => setOpen((value) => !value)}>
         {open ? "Close menu" : "Menu"}
       </button>

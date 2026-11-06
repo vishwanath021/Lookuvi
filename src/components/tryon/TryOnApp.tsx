@@ -978,7 +978,7 @@ export function TryOnApp({
             const copy = guestSectionCopy(item);
             return (
             <div key={item}>
-              <button type="button" className={`card min-h-24 w-full p-3 text-left ${section === item ? "ring-2 ring-[var(--brand)]" : ""}`} aria-pressed={section === item} aria-label={copy.label} onClick={() => setSection(item)}>
+              <button type="button" className={`card min-h-24 w-full p-3 text-left transition-colors ${section === item ? "guest-tab-active" : "opacity-80"}`} aria-pressed={section === item} data-active={section === item ? "yes" : "no"} aria-label={copy.label} disabled={busy && section !== item} onClick={() => setSection(item)}>
                 <span className="block text-xs text-muted" aria-hidden="true">{copy.hint}</span>
                 <span className="block font-serif text-2xl leading-tight" aria-hidden="true">{copy.label}</span>
               </button>

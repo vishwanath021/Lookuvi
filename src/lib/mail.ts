@@ -10,8 +10,20 @@ export function exposeDevMagicLink() {
   return process.env.ALLOW_DEV_MAGIC_LINK === "true" && process.env.NODE_ENV !== "production";
 }
 
-export const MAIL_NOT_CONFIGURED =
+/** Operator-only detail. Log it on the server; never return it to a browser. */
+export const MAIL_NOT_CONFIGURED_OPERATOR =
   "Email is not configured. Set RESEND_API_KEY or SMTP_URL, and EMAIL_FROM. Until then, reset links and magic links are not sent. An operator can set a password with node scripts/create-super-admin.mjs.";
+
+/** Customer-safe text shown when email sending is unavailable. */
+export const MAIL_NOT_CONFIGURED =
+  "Email links (password reset and sign-in) are temporarily unavailable. Please contact support or your salon admin.";
+
+/** Customer-safe text shown when the provider rejected the message. */
+export const MAIL_SEND_FAILED = "We could not send the email right now. Please try again in a few minutes or contact support.";
+
+export function logMailNotConfigured() {
+  console.warn(`[mail] ${MAIL_NOT_CONFIGURED_OPERATOR}`);
+}
 
 export function mailFooter(kind: "transactional" | "marketing" = "transactional") {
   const company = companyLegalName();

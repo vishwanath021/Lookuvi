@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { lookShareLink } from "@/lib/share-link";
 import { NextResponse } from "next/server";
 import { beardById } from "@/data/beards";
 import { browById, type BrowVariation } from "@/data/brows";
@@ -16,7 +17,6 @@ import { CreditError, reserveCredits, settleCredits } from "@/lib/credits";
 import { releaseTryReservation, settleTryReservation } from "@/lib/try-allowance";
 import { numberEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
-import { appMediaUrl } from "@/lib/storage";
 import { cropLetterbox } from "@/lib/ai/letterbox";
 import { COLOUR_UNCHANGED_MESSAGE, hairChange } from "@/lib/ai/look-change";
 import { logInfo } from "@/lib/logger";
@@ -151,7 +151,7 @@ function lookShareUrl(tenantId: string, requestId: string) {
   if (!requestId) return "";
   try {
     const hours = numberEnv("GENERATION_JOB_TTL_HOURS", 24);
-    return appMediaUrl(`generations/${tenantId}/${requestId}/result.jpg`, Math.max(60, Math.round(hours * 3600)));
+    return lookShareLink(tenantId, requestId, Math.max(60, Math.round(hours * 3600)));
   } catch {
     return "";
   }

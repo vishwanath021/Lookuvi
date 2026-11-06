@@ -98,6 +98,7 @@ export function HairTypePicker({
                 type="button"
                 aria-pressed={card.id === selectedId}
                 className={`relative overflow-hidden rounded-[14px] border bg-white text-left shadow-sm ${card.id === selectedId ? "border-[var(--brand)] ring-2 ring-[var(--brand)]" : "border-line"}`}
+                disabled={busy}
                 onClick={() => onPick(card)}
               >
                 {card.id === selectedId && <span className="check" aria-hidden="true">✓</span>}

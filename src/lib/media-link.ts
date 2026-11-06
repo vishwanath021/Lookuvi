@@ -1,7 +1,10 @@
+import { isShareLink } from "@/lib/share-link";
+
 /** A signed generation URL on this app. Anything else is dropped from a WhatsApp message. */
 export function shareableLookUrl(value: string | null | undefined) {
   if (!value) return "";
   try {
+    if (isShareLink(value)) return new URL(value).toString();
     const url = new URL(value);
     const base = new URL(process.env.APP_BASE_URL || "http://localhost:3000");
     if (url.origin !== base.origin) return "";

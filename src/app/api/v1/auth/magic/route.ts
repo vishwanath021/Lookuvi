@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { appBaseUrl } from "@/lib/env";
 import { tooMany } from "@/lib/http/guard";
-import { MAIL_NOT_CONFIGURED, exposeDevMagicLink, mailConfigured, sendMail } from "@/lib/mail";
+import { MAIL_NOT_CONFIGURED, MAIL_SEND_FAILED, logMailNotConfigured, exposeDevMagicLink, mailConfigured, sendMail } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({ email: z.email() });
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "INVALID" }, { status: 400 });
   const generic = { message: "If that account exists, we sent a sign-in link." };
   if (!mailConfigured() && process.env.NODE_ENV === "production") {
+    logMailNotConfigured();
     return NextResponse.json({ configured: false, message: MAIL_NOT_CONFIGURED }, { status: 503 });
   }
   const email = parsed.data.email.toLowerCase();
@@ -30,12 +31,13 @@ export async function POST(req: Request) {
     if (exposeDevMagicLink()) {
       return NextResponse.json({ ...generic, devUrl: link, configured: false, message: "Email is not configured. Use the dev link on this screen. Set RESEND_API_KEY or SMTP_URL before production." });
     }
+    logMailNotConfigured();
     return NextResponse.json({ configured: false, message: MAIL_NOT_CONFIGURED }, { status: 503 });
   }
   const sent = await sendMail(email, "Your Lookuvi sign-in link", `Sign in: ${link}\nThis link expires in 15 minutes.`).catch(() => false);
   if (!sent) {
     await prisma.magicLink.delete({ where: { id: row.id } }).catch(() => undefined);
-    return NextResponse.json({ configured: true, message: "The sign-in email could not be sent. Check RESEND_API_KEY or SMTP_URL and EMAIL_FROM." }, { status: 502 });
+    return NextResponse.json({ configured: true, message: MAIL_SEND_FAILED }, { status: 502 });
   }
   return NextResponse.json(generic);
 }
