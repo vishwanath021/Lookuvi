@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { appBaseUrl } from "@/lib/env";
 import { tooMany } from "@/lib/http/guard";
-import { MAIL_NOT_CONFIGURED, exposeDevMagicLink, mailConfigured, sendMail } from "@/lib/mail";
+import { MAIL_NOT_CONFIGURED, MAIL_SEND_FAILED, logMailNotConfigured, exposeDevMagicLink, mailConfigured, sendMail } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({ email: z.email() });
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "INVALID" }, { status: 400 });
   if (!mailConfigured() && process.env.NODE_ENV === "production") {
+    logMailNotConfigured();
     return NextResponse.json({ configured: false, message: MAIL_NOT_CONFIGURED }, { status: 503 });
   }
   const email = parsed.data.email.toLowerCase();
@@ -28,12 +29,13 @@ export async function POST(req: Request) {
   const link = `${appBaseUrl()}/login/reset?token=${token}`;
   if (!mailConfigured()) {
     if (exposeDevMagicLink()) return NextResponse.json({ ...generic, devUrl: link, configured: false });
+    logMailNotConfigured();
     return NextResponse.json({ configured: false, message: MAIL_NOT_CONFIGURED }, { status: 503 });
   }
   const sent = await sendMail(email, "Reset your Lookuvi password", `Choose a new password: ${link}\nThis link expires in 30 minutes.`).catch(() => false);
   if (!sent) {
     await prisma.passwordReset.delete({ where: { id: row.id } }).catch(() => undefined);
-    return NextResponse.json({ configured: true, message: "The reset email could not be sent. Check RESEND_API_KEY or SMTP_URL and EMAIL_FROM." }, { status: 502 });
+    return NextResponse.json({ configured: true, message: MAIL_SEND_FAILED }, { status: 502 });
   }
   return NextResponse.json(generic);
 }

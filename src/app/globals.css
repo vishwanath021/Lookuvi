@@ -987,3 +987,15 @@ textarea { min-height: 48px; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* Everyday / Bridal / Groom tabs: the active one is filled, not just ringed (.card's shadow hid the ring). */
+.card.guest-tab-active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--on-brand);
+  box-shadow: 0 0 0 2px var(--brand), 0 8px 20px rgba(62, 48, 75, 0.12);
+}
+.card.guest-tab-active .text-muted { color: var(--on-brand); opacity: 0.85; }
+
+/* While a look is generating the pickers are disabled; show it. */
+.picks-locked button:disabled { opacity: 0.45; cursor: wait; filter: grayscale(0.4); }

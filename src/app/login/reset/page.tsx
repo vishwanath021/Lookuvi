@@ -6,6 +6,7 @@ export default function ResetPasswordPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [isError, setIsError] = useState(false);
   const token = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("token") || "";
 
   async function requestLink(event: React.FormEvent) {
@@ -15,7 +16,12 @@ export default function ResetPasswordPage() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    setIsError(!res.ok);
+    if (!res.ok) {
+      setMessage(res.status === 429 ? "Too many attempts. Please wait a few minutes and try again." : data.message || "Password reset is temporarily unavailable. Please contact support.");
+      return;
+    }
     setMessage(data.message || "If that account exists, we sent a reset link.");
     if (data.devUrl) setMessage(`${data.message} Dev link: ${data.devUrl}`);
   }
@@ -27,8 +33,9 @@ export default function ResetPasswordPage() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ token, password }),
     });
-    const data = await res.json();
-    setMessage(data.message || data.error || "Sent");
+    const data = await res.json().catch(() => ({}));
+    setIsError(!res.ok);
+    setMessage(data.message || (res.ok ? "Password updated. You can sign in now." : "This reset link is invalid or has expired. Request a new one."));
   }
 
   return (
@@ -50,8 +57,15 @@ export default function ResetPasswordPage() {
             <button className="btn w-full" type="submit">Email a reset link</button>
           </form>
         )}
-        {message && <p className="mt-3 text-sm" role="status">{message}</p>}
-        <p className="mt-4 text-sm"><a href="/login">Back to sign in</a></p>
+        {message && (
+          <p
+            className={isError ? "mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" : "mt-3 text-sm"}
+            role={isError ? "alert" : "status"}
+          >
+            {message}
+          </p>
+        )}
+        <a className="btn secondary mt-4 w-full text-center" href="/login" data-testid="back-to-sign-in">Back to sign in</a>
       </div>
     </main>
   );

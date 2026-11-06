@@ -14,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     orderBy: { tenant: { name: "asc" } },
   });
   return (
-    <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 md:grid-cols-[240px_1fr]">
+    <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 md:grid-cols-[240px_1fr] print:block print:max-w-none print:p-0">
       <AdminNav
         role={membership.role}
         name={tenant.name}
@@ -29,7 +29,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       />
       <div className="min-w-0">
         {tenant.status === "EXPIRED" || tenant.status === "SUSPENDED" ? (
-          <p className="mb-4 rounded-xl border border-line bg-sand px-3 py-2 text-sm" role="status">
+          <p className="mb-4 rounded-xl border print:hidden border-line bg-sand px-3 py-2 text-sm" role="status">
             {tenant.status === "EXPIRED" ? "Trial ended. Choose a plan to continue try-ons." : "This salon is paused. Guests cannot try on."}
           </p>
         ) : null}

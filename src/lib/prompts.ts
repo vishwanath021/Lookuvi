@@ -153,11 +153,25 @@ export function buildBridalPrompt(
     live?.makeup || "",
     hairLine,
     `The live mirror choices were ${marks.join(", ")}. Paint those on the real portrait. This is a full look, not a camera filter.`,
+    ...bridalEyeLines(live),
     "Keep the exact same person. Keep the exact face shape, jaw, cheeks, nose, and eyes. Keep the skin texture, pores, and age. Do not slim, lift, smooth, or beautify the face. A finish may even the makeup, but the face underneath stays the same shape and texture.",
     "Keep any bindi, sindoor, and nose pin already in the photo. Do not remove them and do not add a second one.",
     "A portrait, photorealistic, with natural light. No text, logos, watermarks, or extra people.",
     "This is a salon trial preview, not a guarantee of the finished makeup.",
   ].filter(Boolean).join(" ");
+}
+
+/**
+ * Concrete eye and brow instructions. A bare "kajal on" token was too weak: QA saw barely any change.
+ * Each line is clearly visible bridal makeup that never changes the eye or brow shape underneath.
+ */
+export function bridalEyeLines(live?: { kajal?: boolean; lashes?: boolean; brow?: boolean }) {
+  const lines: string[] = [];
+  if (live?.kajal) lines.push("Eyes: apply bold black bridal kajal along the upper and lower lash lines and a short winged liner. It must be clearly visible at phone size.");
+  if (live?.lashes) lines.push("Lashes: add full, dark bridal false lashes on the upper lids, clearly thicker and longer than in image 1.");
+  if (live?.brow) lines.push("Brows: fill and define both eyebrows one to two shades darker with crisp edges, clearly more defined than in image 1. Keep the brow position and natural shape.");
+  if (lines.length) lines.push("Eye makeup and brow definition must be obviously visible, but the eyes themselves stay the same shape, size, and colour.");
+  return lines;
 }
 
 /** Mehendi on the hand in image 1. */

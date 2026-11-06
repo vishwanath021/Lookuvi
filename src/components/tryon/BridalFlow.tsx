@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { BeforeAfter } from "@/components/tryon/BeforeAfter";
+import { alignGeneratedPhoto } from "@/lib/face/align-client";
 import { BridalOwnLook } from "@/components/tryon/BridalOwnLook";
 import { BridalLookCard } from "@/components/tryon/BridalLookCard";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
@@ -287,7 +288,15 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
             if (kind === "mehendi") setHand(mark);
             else setFace(mark);
           }
-          const out = URL.createObjectURL(await res.blob());
+          const raw = await res.blob();
+          const reason = res.headers.get("x-demo-reason") || "";
+          const sample = reason === "no-key" || reason === "spend-cap" || reason === "failover" || reason === "placement";
+          // Same as the everyday tab: warp the provider image onto the selfie frame so the
+          // before/after slider lines up eye to eye and the face sits centred in the frame.
+          const aligned = kind === "look" && !sample
+            ? (await alignGeneratedPhoto(shot.blob, raw, false).catch(() => null))?.blob || raw
+            : raw;
+          const out = URL.createObjectURL(aligned);
           const styleName = kind === "mehendi"
             ? `Mehendi · ${MEHENDI_STYLES.find((item) => item.id === mehendiStyle)?.label || "Bridal"}`
             : chosen?.name || "Bridal look";
@@ -596,6 +605,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               { id: "bridal-selfie", label: "Photo", icon: "photo" },
             ]}
           />
+          {busy ? <p className="rounded-xl border border-line bg-sand px-3 py-2 text-sm" role="status" data-busy-note="yes">Your look is being created. Please wait — choices unlock when it is ready.</p> : null}
+          <fieldset disabled={busy} aria-busy={busy} className={`contents ${busy ? "picks-locked" : ""}`} data-picks-locked={busy ? "yes" : "no"}>
           <StepCard id="bridal-event" title="Event">
             <div className="flex flex-wrap gap-2" role="group" aria-label="Event">
               {BRIDAL_EVENTS.map((item) => (
@@ -624,6 +635,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               </div>
             </div>
           </StepCard>
+          </fieldset>
           <section id="bridal-selfie" ref={resultRef} className="step-card grid gap-3" data-step="selfie" data-photo-cluster="yes">
             <h3 className="text-base font-semibold leading-tight">Photo</h3>
             <SelectionSummary rows={[
@@ -711,7 +723,9 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
 
       {panel === "mehendi" && (
         <div className="mt-4 grid gap-4">
+          <fieldset disabled={busy} aria-busy={busy} className={`contents ${busy ? "picks-locked" : ""}`} data-picks-locked={busy ? "yes" : "no"}>
           <PhotoGrid step="mehendi" label="Mehendi" group="Mehendi" styles={bridalStylesFor(MEHENDI_CARDS)} style={mehendiCategory} onStyle={chooseMehendiCategory} items={mehendiCards} value={mehendiCardId} onChange={(id) => { pickMehendi(id); }} />
+          </fieldset>
           <section id="bridal-hand" className="step-card grid gap-3" data-step="hand">
             <h3 className="text-base font-semibold leading-tight">Photo</h3>
             <p className="text-sm">Hold your hand flat in good light. Fill the photo with your palm.</p>
@@ -798,6 +812,13 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               );
             })}
           </ul>
+          {compared.length === 1 && (
+            <div data-compare-view="before-after">
+              <h3 className="mb-2 font-serif text-xl">Before and after</h3>
+              <p className="mb-2 text-xs text-muted">Tap Compare on a second look to see two looks side by side.</p>
+              <BeforeAfter className="relative aspect-[3/4] w-full touch-none overflow-hidden rounded-xl bg-[#F3F0F8]" before={compared[0].before} after={compared[0].after} beforeLabel="Before" afterLabel={compared[0].name} />
+            </div>
+          )}
           {compared.length === 2 && (
             <div>
               <h3 className="mb-2 font-serif text-xl">Side by side</h3>
