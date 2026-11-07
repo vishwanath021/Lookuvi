@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { queueJson } from "@/lib/queue/http";
+import { dismissAsk, grantTries, markArrived } from "@/lib/at-salon";
 import {
   addWalkIn,
   callNext,
@@ -21,6 +22,9 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start"), id: z.string().min(1) }),
   z.object({ action: z.literal("done"), id: z.string().min(1) }),
   z.object({ action: z.literal("noshow"), id: z.string().min(1) }),
+  z.object({ action: z.literal("arrived"), id: z.string().min(1) }),
+  z.object({ action: z.literal("dismiss"), id: z.string().min(1) }),
+  z.object({ action: z.literal("tries"), id: z.string().min(1), extra: z.number() }),
   z.object({
     action: z.literal("walkin"),
     name: z.string().optional().transform((value) => (value ?? "").trim().slice(0, 80)),
@@ -76,6 +80,15 @@ export async function POST(req: Request) {
     if (body.action === "start") return NextResponse.json(await startEntry(tenant.id, body.id));
     if (body.action === "done") return NextResponse.json(await finishEntry(tenant.id, body.id, "DONE"));
     if (body.action === "noshow") return NextResponse.json(await finishEntry(tenant.id, body.id, "NO_SHOW"));
+    if (body.action === "arrived" || body.action === "dismiss" || body.action === "tries") {
+      const result = body.action === "arrived"
+        ? await markArrived(tenant.id, body.id)
+        : body.action === "dismiss"
+          ? await dismissAsk(tenant.id, body.id)
+          : await grantTries(tenant.id, body.id, body.extra);
+      if (!result.ok) return NextResponse.json({ error: "QUEUE", message: result.message }, { status: result.status });
+      return NextResponse.json(await deskSnapshot(tenant.id));
+    }
     if (body.action === "walkin") return NextResponse.json(await addWalkIn(tenant.id, body));
     if (body.action === "confirm") return NextResponse.json(await confirmRequest(tenant.id, body.id, body));
     if (body.action === "decline") return NextResponse.json(await declineRequest(tenant.id, body.id));

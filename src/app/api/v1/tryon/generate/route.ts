@@ -25,7 +25,9 @@ import { prisma } from "@/lib/prisma";
 import { requestClientIp } from "@/lib/ratelimit";
 import { kolkataDayStart } from "@/lib/queue/day";
 import { refuseMonthlyTries, refundStaleTryReservations, releaseTryReservation, reserveTryCaps, TRY_CAP_STATUSES } from "@/lib/try-allowance";
-import { isPhotoId, loadVisitPhoto, rememberVisitPhoto, refuseVisit, stampVisit } from "@/lib/visit-allowance";
+import { isPhotoId, loadVisitPhoto, rememberVisitPhoto } from "@/lib/visit-allowance";
+import { stampPaidVisit } from "@/lib/at-salon";
+import { gatePaidForm } from "@/lib/at-salon-gate";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 3600;
@@ -88,6 +90,14 @@ export async function POST(req: Request) {
   }
   if (!bridalTool && !tenant.productTryOn) {
     return NextResponse.json({ error: "PRODUCT", message: "Try-on is not available for this salon." }, { status: 404 });
+  }
+
+  const paidGate = await gatePaidForm(form, tenant, sessionId, { countsAsTry: true, legacyVisit: bridalTool });
+  if (paidGate) {
+    return NextResponse.json(
+      { error: paidGate.error, message: paidGate.message, used: "used" in paidGate ? paidGate.used : undefined, allowance: "allowance" in paidGate ? paidGate.allowance : undefined },
+      { status: paidGate.status },
+    );
   }
 
   await ensurePhotoConsent({
@@ -184,11 +194,6 @@ export async function POST(req: Request) {
     if (classifySkinPhoto(small, 48, 48, 3) === "face") {
       return NextResponse.json({ error: "HAND", message: tool === "mehendi" ? "That looks like a face. Upload a photo of your hand for the mehendi." : "That looks like a face. Upload a photo of your hand." }, { status: 400 });
     }
-  }
-
-  if (bridalTool) {
-    const blocked = await refuseVisit(tenant.id, sessionId, tenant.visitTryLimit);
-    if (blocked) return NextResponse.json(blocked, { status: 429 });
   }
 
   const requestId = String(form.get("requestId") || "");
@@ -328,8 +333,8 @@ export async function POST(req: Request) {
     if (response.status === 200 && placementDebug && superUser) {
       response.headers.set("x-placement-debug", JSON.stringify(placementDebug));
     }
-    if (response.status === 200 && bridalTool) {
-      await stampVisit(response, tenant.id, sessionId, tenant.visitTryLimit, servedPhotoId);
+    if (response.status === 200) {
+      await stampPaidVisit(response, tenant, sessionId, String(form.get("deviceId") || ""), servedPhotoId, bridalTool);
     }
     return response;
   };

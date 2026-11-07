@@ -1,5 +1,7 @@
+import QRCode from "qrcode";
 import { PrintButton } from "@/components/PrintButton";
 import { QrCard } from "@/components/qr/QrCard";
+import { counterTarget } from "@/lib/at-salon";
 import { salonWelcomeTarget } from "@/lib/public-url";
 import { pageTenant } from "@/lib/session";
 
@@ -16,6 +18,8 @@ export default async function QrAdminPage() {
     );
   }
   const welcome = await salonWelcomeTarget(tenant.id, tenant.slug);
+  const counter = await counterTarget(tenant.id, tenant.slug);
+  const counterSrc = await QRCode.toDataURL(counter.url, { margin: 1, width: 280, color: { dark: "#12312e", light: "#ffffff" } });
   return (
     <main className="mx-auto max-w-sm">
       <h1 className="page-title print:hidden">QR</h1>
@@ -33,6 +37,11 @@ export default async function QrAdminPage() {
           </div>
         </div>
       )}
+      <section className="card mt-6 p-4 text-center print:hidden" data-counter-qr="yes">
+        <h2 className="font-serif text-2xl">Counter QR (changes daily)</h2>
+        <p className="mt-2 text-sm text-muted">Customers scan this at the counter. It works for today only. A photo of yesterday&apos;s code will not.</p>
+        <img className="mx-auto mt-4 w-56" src={counterSrc} alt="Counter QR that changes daily" />
+      </section>
     </main>
   );
 }

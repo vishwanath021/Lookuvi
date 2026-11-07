@@ -60,6 +60,7 @@ export default async function SettingsPage() {
           productGroom: tenant.productGroom,
           productMakeupStudio: tenant.productMakeupStudio,
           visitTryLimit: tenant.visitTryLimit,
+          tryOnsAtSalon: tenant.tryOnsAtSalon,
           logoUrl: tenant.logoUrl,
           openTime: tenant.openTime,
           closeTime: tenant.closeTime,

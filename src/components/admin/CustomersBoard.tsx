@@ -27,21 +27,42 @@ type Stats = {
 
 type Settings = { remindersOn: boolean; reminderDays: number; whatsappMonthlyCap: number };
 
+type LapsedCustomer = {
+  id: string;
+  name: string;
+  phone: string;
+  phoneLabel: string;
+  visitCount: number;
+  lastVisitLabel: string;
+  optedOut: boolean;
+};
+
+type Lapsed = {
+  summary: string;
+  count: number;
+  weeks6: LapsedCustomer[];
+  months2: LapsedCustomer[];
+  months3: LapsedCustomer[];
+};
+
 export function CustomersBoard({
   role,
   initialCustomers,
   initialStats,
   settings,
   whatsapp,
+  initialLapsed,
 }: {
   role: string;
   initialCustomers: Customer[];
   initialStats: Stats;
   settings: Settings;
   whatsapp: "off" | "template" | "ready";
+  initialLapsed: Lapsed;
 }) {
   const owner = role === "OWNER";
   const [customers, setCustomers] = useState(initialCustomers);
+  const [lapsed, setLapsed] = useState(initialLapsed);
   const [stats, setStats] = useState(initialStats);
   const [form, setForm] = useState(settings);
   const [query, setQuery] = useState("");
@@ -55,6 +76,7 @@ export function CustomersBoard({
     const res = await fetch(`/api/v1/admin/customers?q=${encodeURIComponent(nextQuery)}`);
     const data = await res.json();
     if (data.customers) setCustomers(data.customers);
+    if (data.lapsed) setLapsed(data.lapsed);
     if (data.stats) setStats(data.stats);
     if (data.settings) setForm(data.settings);
   }
@@ -159,6 +181,8 @@ export function CustomersBoard({
         </form>
       ) : null}
 
+      {owner ? <NotBackYet lapsed={lapsed} whatsapp={whatsapp} busy={busy} onSend={(ids) => void act({ action: "comeback", ids })} /> : null}
+
       {notice ? <p className="text-sm" role="status">{notice}</p> : null}
 
       <section className="grid gap-3">
@@ -190,5 +214,66 @@ export function CustomersBoard({
         ))}
       </section>
     </div>
+  );
+}
+
+function NotBackYet({
+  lapsed,
+  whatsapp,
+  busy,
+  onSend,
+}: {
+  lapsed: Lapsed;
+  whatsapp: "off" | "template" | "ready";
+  busy: boolean;
+  onSend: (ids: string[]) => void;
+}) {
+  const ready = whatsapp === "ready";
+  const bands = [
+    { id: "weeks6", title: "6+ weeks", rows: lapsed.weeks6 },
+    { id: "months2", title: "2+ months", rows: lapsed.months2 },
+    { id: "months3", title: "3+ months", rows: lapsed.months3 },
+  ];
+  return (
+    <section className="card grid gap-4 p-4" data-not-back="yes">
+      <div>
+        <h2 className="text-base font-semibold">Not back yet</h2>
+        <p className="mt-1 text-sm" data-lapsed-summary="yes">{lapsed.summary}</p>
+      </div>
+      {!ready ? (
+        <p className="rounded-xl bg-[#f8efdc] px-3 py-2 text-sm" role="status">
+          {whatsapp === "template"
+            ? "The WhatsApp template is still waiting for approval. Nothing can be sent."
+            : "WhatsApp is not connected. Nothing can be sent."}
+        </p>
+      ) : null}
+      {bands.map((band) => (
+        <div key={band.id} className="grid gap-2" data-lapsed-band={band.id}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold">{band.title}</h3>
+            <button
+              className="btn secondary disabled:opacity-40"
+              type="button"
+              disabled={busy || !ready || band.rows.every((row) => row.optedOut)}
+              onClick={() => onSend(band.rows.filter((row) => !row.optedOut).map((row) => row.id))}
+            >
+              Send come-back message
+            </button>
+          </div>
+          {band.rows.length === 0 ? <p className="text-sm text-muted">No one in this group.</p> : null}
+          {band.rows.map((row) => (
+            <article key={`${band.id}-${row.id}`} className="rounded-xl border border-line px-3 py-2" data-lapsed-phone={row.phone}>
+              <p>{row.name || "No name"}</p>
+              <p className="text-sm">{row.phoneLabel}</p>
+              <p className="text-sm text-muted">{row.visitCount} {row.visitCount === 1 ? "visit" : "visits"} · {row.lastVisitLabel}</p>
+              {row.optedOut ? <p className="text-sm">Reminders off</p> : null}
+              <button className="btn secondary mt-2 disabled:opacity-40" type="button" disabled={busy || !ready || row.optedOut} onClick={() => onSend([row.id])}>
+                Send come-back message
+              </button>
+            </article>
+          ))}
+        </div>
+      ))}
+    </section>
   );
 }

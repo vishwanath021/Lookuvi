@@ -5,6 +5,8 @@ import { LegalFooter } from "@/components/legal/LegalFooter";
 import { t } from "@/data/i18n";
 import { QueueWait } from "@/components/guest/QueueWait";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
+import { guestDeviceId } from "@/lib/device-id";
+import { guestSessionId } from "@/lib/guest-session";
 import { parseVisitMemory, rememberVisit, serializeVisitMemory, visitMemoryKey, type VisitMemory } from "@/lib/queue/visit-memory";
 
 type Board = {
@@ -66,19 +68,6 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
     return () => clearInterval(timer);
   }, [board.slug]);
 
-  function deviceId() {
-    const key = "lookuvi-device";
-    try {
-      const saved = localStorage.getItem(key) || "";
-      if (saved.length >= 8) return saved;
-      const next = crypto.randomUUID();
-      localStorage.setItem(key, next);
-      return next;
-    } catch {
-      return "";
-    }
-  }
-
   async function join(nextName: string, nextPhone: string, agreed: boolean) {
     setBusy(true);
     setMessage("");
@@ -94,7 +83,8 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
         consent: agreed,
         requestedDate: request ? date : undefined,
         requestedSlot: request ? slot : undefined,
-        deviceId: deviceId(),
+        deviceId: guestDeviceId(),
+        sessionId: guestSessionId(),
         returnToken: returnToken || undefined,
       }),
     });

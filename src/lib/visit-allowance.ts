@@ -28,10 +28,10 @@ export async function loadVisitPhoto(tenantId: string, sessionId: string, photoI
   return getObject(visitPhotoKey(tenantId, sessionId, photoId));
 }
 
-export async function visitStatus(tenantId: string, sessionId: string, limit: number) {
+export async function visitStatus(tenantId: string, sessionId: string, limit: number, kinds: readonly string[] = VISIT_TRY_KINDS) {
   const [used, grant] = await Promise.all([
     prisma.tryOn.count({
-      where: { tenantId, sessionId, status: "SUCCEEDED", kind: { in: [...VISIT_TRY_KINDS] } },
+      where: { tenantId, sessionId, status: "SUCCEEDED", kind: { in: [...kinds] } },
     }),
     prisma.visitGrant.findUnique({ where: { tenantId_sessionId: { tenantId, sessionId } } }),
   ]);
@@ -40,8 +40,8 @@ export async function visitStatus(tenantId: string, sessionId: string, limit: nu
   return { used, limit, bonus, allowance, allowed: visitAllowed(used, limit, bonus) };
 }
 
-export async function refuseVisit(tenantId: string, sessionId: string, limit: number) {
-  const status = await visitStatus(tenantId, sessionId, limit);
+export async function refuseVisit(tenantId: string, sessionId: string, limit: number, kinds: readonly string[] = VISIT_TRY_KINDS) {
+  const status = await visitStatus(tenantId, sessionId, limit, kinds);
   if (status.allowed) return null;
   return { error: "VISIT_CAP" as const, message: VISIT_CAP_MESSAGE, used: status.used, allowance: status.allowance };
 }
@@ -74,7 +74,7 @@ export async function visitsToday(tenantId: string) {
   });
   const ids = [...new Set(rows.map((row) => row.sessionId))];
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { visitTryLimit: true } });
-  const limit = tenant?.visitTryLimit ?? 3;
+  const limit = tenant?.visitTryLimit ?? 1;
   const listed = [];
   for (const sessionId of ids.slice(0, 12)) {
     const status = await visitStatus(tenantId, sessionId, limit);

@@ -12,6 +12,7 @@ import { loadTenantBySlug, toSalonConfig } from "@/lib/salon";
 import { blockedGuestMessage, isBlockedStatus } from "@/lib/salon-status";
 import { prisma } from "@/lib/prisma";
 import { isSuperSession } from "@/lib/session";
+import { gatePaidForm } from "@/lib/at-salon-gate";
 import type { Gender } from "@/data/styles";
 
 export const runtime = "nodejs";
@@ -75,6 +76,11 @@ export async function POST(req: Request) {
   } catch (error) {
     const code = error instanceof ImageError ? error.code : "DECODE";
     return NextResponse.json({ error: code, message: "Use a JPEG, PNG, or WebP selfie under 2 MB." }, { status: 400 });
+  }
+
+  const paidGate = await gatePaidForm(form, tenant, sessionId, { countsAsTry: tenant.hairSuggestUsesCredits, legacyVisit: false });
+  if (paidGate) {
+    return NextResponse.json({ error: paidGate.error, message: paidGate.message }, { status: paidGate.status });
   }
 
   const config = await toSalonConfig(tenant);

@@ -17,7 +17,9 @@ import { kolkataDayStart } from "@/lib/queue/day";
 import { blockedGuestMessage, isBlockedStatus } from "@/lib/salon-status";
 import { consumePreviewRateShared, guestLimitMessage, type PreviewTool } from "@/lib/tools";
 import { refundStaleTryReservations, reserveTryCaps } from "@/lib/try-allowance";
-import { isPhotoId, loadVisitPhoto, rememberVisitPhoto, refuseVisit, stampVisit } from "@/lib/visit-allowance";
+import { isPhotoId, loadVisitPhoto, rememberVisitPhoto } from "@/lib/visit-allowance";
+import { stampPaidVisit } from "@/lib/at-salon";
+import { gatePaidForm } from "@/lib/at-salon-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,6 +90,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "PRODUCT", message: "Makeup studio is turned off for this salon." }, { status: 404 });
   }
 
+  const paidGate = await gatePaidForm(form, tenant, sessionId, { countsAsTry: true, legacyVisit: true });
+  if (paidGate) {
+    return NextResponse.json(
+      { error: paidGate.error, message: paidGate.message, used: "used" in paidGate ? paidGate.used : undefined, allowance: "allowance" in paidGate ? paidGate.allowance : undefined },
+      { status: paidGate.status },
+    );
+  }
+
   const params = clampLook(lookRaw);
   const presetId = matchingPreset(params);
   const styleId = presetId || "custom";
@@ -135,9 +145,6 @@ export async function POST(req: Request) {
     servedPhotoId = await rememberVisitPhoto(tenant.id, sessionId, jpeg);
   }
 
-  const blocked = await refuseVisit(tenant.id, sessionId, tenant.visitTryLimit);
-  if (blocked) return NextResponse.json(blocked, { status: 429 });
-
   const given = String(form.get("requestId") || "");
   const requestId = /^[A-Za-z0-9_-]{8,80}$/.test(given) ? given : requestToken();
   const claim = await claimGenerationJob({
@@ -159,7 +166,7 @@ export async function POST(req: Request) {
       status: 200,
       headers: { "content-type": "image/jpeg", "cache-control": "no-store", "x-demo-reason": claim.demoReason },
     });
-    await stampVisit(replay, tenant.id, sessionId, tenant.visitTryLimit, servedPhotoId);
+    await stampPaidVisit(replay, tenant, sessionId, String(form.get("deviceId") || ""), servedPhotoId, true);
     return replay;
   }
 
@@ -216,6 +223,6 @@ export async function POST(req: Request) {
     });
   }
   if (!response) response = await demoGuestPreview(shared);
-  if (response.status === 200) await stampVisit(response, tenant.id, sessionId, tenant.visitTryLimit, servedPhotoId);
+  if (response.status === 200) await stampPaidVisit(response, tenant, sessionId, String(form.get("deviceId") || ""), servedPhotoId, true);
   return response;
 }

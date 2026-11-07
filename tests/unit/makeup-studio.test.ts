@@ -203,7 +203,7 @@ describe("makeup studio photoreal route", () => {
 
   it("returns a sample image without spending a credit when the provider is mock", async () => {
     const tenant = await prisma.tenant.create({
-      data: { slug: `makeup-on-${Date.now()}`, name: "On", productMakeupStudio: true, creditBalance: 0, visitTryLimit: 3 },
+      data: { slug: `makeup-on-${Date.now()}`, name: "On", productMakeupStudio: true, creditBalance: 0, visitTryLimit: 3, tryOnsAtSalon: false },
     });
     const res = await renderStudio(new Request("http://localhost/api/v1/makeup-studio/render", { method: "POST", body: form(tenant.slug, await jpeg()) }));
     expect(res.status).toBe(200);

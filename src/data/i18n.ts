@@ -338,6 +338,19 @@ const en: Record<string, string> = {
   queueAheadShort: "{ahead} ahead",
   queueMinShort: "About {min} min",
   queueRequestNote: "Tell us when you would like to come. The salon will confirm.",
+  atSalonLocked: "Your free try-ons open when you reach the salon. Browse and save styles you like, and try them on when you arrive.",
+  atSalonUnlockedOne: "You're in! You have 1 free try-on",
+  atSalonUnlockedMany: "You're in! You have {count} free try-ons",
+  askMoreTries: "Ask staff for more tries",
+  askedMoreTries: "Asked. Staff can add tries.",
+  staffAddedOne: "Staff added 1 try",
+  staffAddedMany: "Staff added {count} tries",
+  askMoreWait: "Please wait a moment before asking again.",
+  queueArrived: "Arrived",
+  queueAddOne: "+1 try",
+  queueWantsTries: "Wants more tries",
+  queueDismissAsk: "Dismiss",
+  queueTriesLine: "{used} used · {left} left",
 };
 
 const hi: Record<string, string> = {
@@ -582,6 +595,14 @@ const hi: Record<string, string> = {
   queueCancel: "रद्द करें",
   queueTryLook: "इंतज़ार में एक लुक आज़माएँ",
   queueJoinLook: "कतार में जुड़ें",
+  atSalonLocked: "मुफ़्त ट्राय-ऑन सैलून पहुँचने पर खुलते हैं। पसंद के स्टाइल देखें और सेव करें, पहुँचकर आज़माएँ।",
+  atSalonUnlockedOne: "आप आ गए! आपके पास 1 मुफ़्त ट्राय-ऑन है",
+  atSalonUnlockedMany: "आप आ गए! आपके पास {count} मुफ़्त ट्राय-ऑन हैं",
+  askMoreTries: "स्टाफ से और ट्राय माँगें",
+  askedMoreTries: "माँग भेज दी। स्टाफ ट्राय जोड़ सकते हैं।",
+  staffAddedOne: "स्टाफ ने 1 ट्राय जोड़ा",
+  staffAddedMany: "स्टाफ ने {count} ट्राय जोड़े",
+  askMoreWait: "फिर से माँगने से पहले थोड़ा रुकें।",
 };
 
 const kn: Record<string, string> = {
@@ -791,6 +812,14 @@ const kn: Record<string, string> = {
   status_PENDING: "ಬಾಕಿ",
   status_CONFIRMED: "ಖಚಿತ",
   status_DECLINED: "ನಿರಾಕರಣೆ",
+  atSalonLocked: "ಉಚಿತ ಟ್ರೈ-ಆನ್ ಸಲೂನ್ ತಲುಪಿದ ಮೇಲೆ ತೆರೆಯುತ್ತವೆ. ಇಷ್ಟದ ಸ್ಟೈಲ್ ನೋಡಿ, ಉಳಿಸಿ, ಬಂದ ಮೇಲೆ ಪ್ರಯತ್ನಿಸಿ.",
+  atSalonUnlockedOne: "ನೀವು ಬಂದಿದ್ದೀರಿ! ನಿಮಗೆ 1 ಉಚಿತ ಟ್ರೈ-ಆನ್ ಇದೆ",
+  atSalonUnlockedMany: "ನೀವು ಬಂದಿದ್ದೀರಿ! ನಿಮಗೆ {count} ಉಚಿತ ಟ್ರೈ-ಆನ್ ಇವೆ",
+  askMoreTries: "ಇನ್ನಷ್ಟು ಟ್ರೈಗೆ ಸಿಬ್ಬಂದಿಯನ್ನು ಕೇಳಿ",
+  askedMoreTries: "ಕೇಳಿದ್ದೀರಿ. ಸಿಬ್ಬಂದಿ ಟ್ರೈ ಸೇರಿಸಬಹುದು.",
+  staffAddedOne: "ಸಿಬ್ಬಂದಿ 1 ಟ್ರೈ ಸೇರಿಸಿದರು",
+  staffAddedMany: "ಸಿಬ್ಬಂದಿ {count} ಟ್ರೈ ಸೇರಿಸಿದರು",
+  askMoreWait: "ಮತ್ತೆ ಕೇಳುವ ಮುನ್ನ ಸ್ವಲ್ಪ ಕಾಯಿರಿ.",
 };
 
 const ta: Record<string, string> = {
@@ -904,6 +933,14 @@ const ta: Record<string, string> = {
   minutesShort: "நிமி",
   consentRequired: "ஸ்டைல் முன்னோட்டத்துக்கு முன் ஒப்புதல் வேண்டும்.",
   ageRequired: "வயது வரியை உறுதி செய்யுங்கள்.",
+  atSalonLocked: "இலவச ட்ரை-ஆன் சலூனுக்கு வந்த பிறகு திறக்கும். பிடித்த ஸ்டைல்களைப் பார்த்து சேமித்து, வந்ததும் முயற்சிக்கவும்.",
+  atSalonUnlockedOne: "வந்துவிட்டீர்கள்! உங்களுக்கு 1 இலவச ட்ரை-ஆன் உள்ளது",
+  atSalonUnlockedMany: "வந்துவிட்டீர்கள்! உங்களுக்கு {count} இலவச ட்ரை-ஆன் உள்ளன",
+  askMoreTries: "மேலும் ட்ரைக்கு ஊழியரிடம் கேளுங்கள்",
+  askedMoreTries: "கேட்டுவிட்டீர்கள். ஊழியர் ட்ரை சேர்க்கலாம்.",
+  staffAddedOne: "ஊழியர் 1 ட்ரை சேர்த்தார்",
+  staffAddedMany: "ஊழியர் {count} ட்ரை சேர்த்தார்",
+  askMoreWait: "மீண்டும் கேட்கும் முன் சிறிது காத்திருங்கள்.",
 };
 
 const te: Record<string, string> = {
@@ -1017,6 +1054,14 @@ const te: Record<string, string> = {
   minutesShort: "నిమి",
   consentRequired: "స్టైల్ ప్రివ్యూకు ముందు అంగీకారం కావాలి.",
   ageRequired: "వయసు వరుసను నిర్ధారించండి.",
+  atSalonLocked: "ఉచిత ట్రై-ఆన్‌లు సెలూన్‌కు వచ్చాక తెరుచుకుంటాయి. నచ్చిన స్టైల్స్ చూసి సేవ్ చేసి, వచ్చాక ప్రయత్నించండి.",
+  atSalonUnlockedOne: "మీరు వచ్చారు! మీకు 1 ఉచిత ట్రై-ఆన్ ఉంది",
+  atSalonUnlockedMany: "మీరు వచ్చారు! మీకు {count} ఉచిత ట్రై-ఆన్‌లు ఉన్నాయి",
+  askMoreTries: "మరిన్ని ట్రైల కోసం సిబ్బందిని అడగండి",
+  askedMoreTries: "అడిగారు. సిబ్బంది ట్రైలు జోడించగలరు.",
+  staffAddedOne: "సిబ్బంది 1 ట్రై జోడించారు",
+  staffAddedMany: "సిబ్బంది {count} ట్రైలు జోడించారు",
+  askMoreWait: "మళ్లీ అడిగే ముందు కాసేపు ఆగండి.",
 };
 
 const mr: Record<string, string> = {
@@ -1130,6 +1175,14 @@ const mr: Record<string, string> = {
   minutesShort: "मिनि",
   consentRequired: "स्टाइल पूर्वावलोकनापूर्वी संमती हवी.",
   ageRequired: "वयाची ओळ निश्चित करा.",
+  atSalonLocked: "मोफत ट्राय-ऑन सलूनमध्ये पोहोचल्यावर उघडतात. आवडते स्टाइल पहा आणि सेव्ह करा, आल्यावर वापरून पाहा.",
+  atSalonUnlockedOne: "तुम्ही आलात! तुमच्याकडे 1 मोफत ट्राय-ऑन आहे",
+  atSalonUnlockedMany: "तुम्ही आलात! तुमच्याकडे {count} मोफत ट्राय-ऑन आहेत",
+  askMoreTries: "आणखी ट्रायसाठी स्टाफला विचारा",
+  askedMoreTries: "विचारले. स्टाफ ट्राय वाढवू शकतो.",
+  staffAddedOne: "स्टाफने 1 ट्राय वाढवला",
+  staffAddedMany: "स्टाफने {count} ट्राय वाढवले",
+  askMoreWait: "पुन्हा विचारण्यापूर्वी थोडा वेळ थांबा.",
 };
 
 export const MESSAGES: Record<Locale, Record<string, string>> = { en, hi, kn, ta, te, mr };

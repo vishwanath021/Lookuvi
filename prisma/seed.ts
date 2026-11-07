@@ -37,6 +37,7 @@ async function main() {
       anonDailyCap: 8,
       memberDailyCap: 30,
       requireLoginToBook: false,
+      tryOnsAtSalon: false,
     },
     create: {
       slug,
@@ -71,6 +72,7 @@ async function main() {
       anonDailyCap: 8,
       memberDailyCap: 30,
       requireLoginToBook: false,
+      tryOnsAtSalon: false,
     },
   });
 

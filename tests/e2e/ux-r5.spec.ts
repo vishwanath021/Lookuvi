@@ -103,7 +103,7 @@ async function shotGuard(page: Page) {
   const prisma = await salonDb();
   await prisma.tenant.update({
     where: { slug: "demo" },
-    data: { productBridal: true, productTryOn: true, creditBalance: 900 },
+    data: { productBridal: true, productTryOn: true, creditBalance: 900, visitTryLimit: 3, tryOnsAtSalon: false },
   });
   await prisma.$disconnect();
 }

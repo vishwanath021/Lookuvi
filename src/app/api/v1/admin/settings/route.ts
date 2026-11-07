@@ -45,6 +45,7 @@ const schema = z.object({
   productGroom: z.boolean().optional(),
   productMakeupStudio: z.boolean().optional(),
   visitTryLimit: z.number().int().min(1).max(20).optional(),
+  tryOnsAtSalon: z.boolean().optional(),
   monthlyTryAllowance: z.number().int().min(0).max(5000).optional(),
   gstin: z.string().max(20).optional().nullable(),
   openTime: z.string().max(8).optional(),

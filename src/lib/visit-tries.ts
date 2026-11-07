@@ -1,7 +1,7 @@
-/** Bridal, groom, and photo makeup previews share one visit budget. Everyday try-on does not. */
+/** Bridal, groom, and photo makeup share one visit budget when try-ons are allowed from home. */
 export const VISIT_TRY_KINDS = ["BRIDAL", "MEHENDI", "GROOM", "GROOM_OWN", "BRIDAL_OWN", "MAKEUP_STUDIO"] as const;
 
-export const DEFAULT_VISIT_TRY_LIMIT = 3;
+export const DEFAULT_VISIT_TRY_LIMIT = 1;
 
 export const VISIT_CAP_MESSAGE = "Ask the salon to unlock more tries";
 

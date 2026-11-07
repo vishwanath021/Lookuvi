@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import { flushSync } from "react-dom";
 import { isPlatformLogo, LookuviMark } from "@/components/brand/LookuviMark";
 import { BeforeAfter } from "@/components/tryon/BeforeAfter";
+import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { LegalFooter } from "@/components/legal/LegalFooter";
@@ -185,6 +187,7 @@ export function TryOnApp({
   showMakeup?: boolean;
 }) {
   const lang = config.defaultLang || "en";
+  const atSalon = useAtSalon();
   const sections = guestSections({ everyday: showEveryday, bridal: showBridal, groom: showGroom, makeup: showMakeup });
   const [section, setSection] = useState<GuestSection>(sections[0] || "everyday");
   const bridalOn = section === "bridal" && showBridal;
@@ -698,6 +701,7 @@ export function TryOnApp({
       body.set("slug", config.slug);
       body.set("consentId", consentId);
       body.set("sessionId", sid || sessionId());
+      body.set("deviceId", guestDeviceId());
       body.set("gender", gender);
       const res = await fetch("/api/v1/tryon/suggest", { method: "POST", body });
       const data = await res.json().catch(() => ({}));
@@ -739,6 +743,7 @@ export function TryOnApp({
     setPicked((current) => ({ ...current, [chosen.tool]: chosen.id }));
     setTool(chosen.tool);
     setError("");
+    if (atSalon.required && !atSalon.unlocked) return;
     if (!shotRefFor(chosen.tool)) {
       pendingLook.current = chosen;
       setError(t(lang, chosen.tool === "nails" ? "uploadHand" : "addPhotoFirst"));
@@ -759,6 +764,7 @@ export function TryOnApp({
       frameRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
+    if (atSalon.required && !atSalon.unlocked) return;
     if (previewLock.current) return;
     previewLock.current = true;
     pendingLook.current = null;
@@ -777,6 +783,7 @@ export function TryOnApp({
       body.set("quality", "standard");
       body.set("consentId", consentId);
       body.set("sessionId", sid || sessionId());
+      body.set("deviceId", guestDeviceId());
       const requestId = crypto.randomUUID();
       body.set("requestId", requestId);
       if (salonToken) body.set("salonToken", salonToken);
@@ -995,6 +1002,7 @@ export function TryOnApp({
       {makeupOn && MakeupPane ? <MakeupPane config={config} /> : null}
       {bridalOn || groomOn || makeupOn ? null : <>
       <h2 className="page-title">{t(lang, "pageTitle")}</h2>
+      <AtSalonNote lang={lang} />
 
       {visibleTools.length > 1 && (
       <div className="seg-fade mt-4">

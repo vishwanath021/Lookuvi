@@ -9,7 +9,8 @@ import {
   returnStats,
   saveReminderSettings,
 } from "@/lib/customers/service";
-import { sendBroadcast } from "@/lib/reminders";
+import { listLapsed } from "@/lib/customers/lapsed";
+import { sendBroadcast, sendComeBack } from "@/lib/reminders";
 import { requireMembership, requireOwner } from "@/lib/session";
 
 const schema = z.discriminatedUnion("action", [
@@ -24,6 +25,7 @@ const schema = z.discriminatedUnion("action", [
     whatsappMonthlyCap: z.number().int(),
   }),
   z.object({ action: z.literal("broadcast"), text: z.string().max(200) }),
+  z.object({ action: z.literal("comeback"), ids: z.array(z.string().min(1).max(40)).min(1).max(100) }),
 ]);
 
 async function member() {
@@ -37,9 +39,14 @@ export async function GET(req: Request) {
   const access = await member();
   if (access instanceof NextResponse) return access;
   const q = new URL(req.url).searchParams.get("q") || "";
-  const [customers, stats] = await Promise.all([listCustomers(access.tenant.id, q), returnStats(access.tenant.id)]);
+  const [customers, stats, lapsed] = await Promise.all([
+    listCustomers(access.tenant.id, q),
+    returnStats(access.tenant.id),
+    listLapsed(access.tenant.id),
+  ]);
   return NextResponse.json({
     customers,
+    lapsed,
     stats: { ...stats, cap: access.tenant.whatsappMonthlyCap },
     settings: {
       remindersOn: access.tenant.remindersOn,
@@ -56,7 +63,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "INVALID", message: "That update was not understood." }, { status: 400 });
   const body = parsed.data;
   const tenantId = access.tenant.id;
-  if (body.action === "settings" || body.action === "broadcast" || body.action === "resume") {
+  if (body.action === "settings" || body.action === "broadcast" || body.action === "resume" || body.action === "comeback") {
     const owner = await requireOwner();
     if ("error" in owner && owner.error) return owner.error;
   }
@@ -72,6 +79,10 @@ export async function POST(req: Request) {
   if (body.action === "resume") return NextResponse.json(await resumeReminders(tenantId, body.id));
   if (body.action === "settings") {
     return NextResponse.json(await saveReminderSettings(tenantId, body));
+  }
+  if (body.action === "comeback") {
+    const result = await sendComeBack(tenantId, body.ids);
+    return NextResponse.json(result, { status: result.ok ? 200 : 400 });
   }
   const result = await sendBroadcast(tenantId, body.text);
   return NextResponse.json(result, { status: result.ok ? 200 : 400 });

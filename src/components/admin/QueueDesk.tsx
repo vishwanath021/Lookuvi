@@ -19,6 +19,10 @@ type Card = {
   requestedSlot: string;
   whatsappUrl: string;
   callUrl: string;
+  arrived?: boolean;
+  wantsTries?: boolean;
+  used?: number;
+  remaining?: number;
 };
 
 type Desk = {
@@ -92,6 +96,26 @@ export function QueueDesk({ initial, lang, showVisits = false }: { initial: Desk
     }
   }
 
+  function addTries(id: string, extra: number) {
+    void act({ action: "tries", id, extra });
+  }
+
+  function tryControls(card: Card) {
+    return (
+      <TryAdder
+        card={card}
+        busy={busy}
+        arrivedLabel={t(lang, "queueArrived")}
+        wantsLabel={t(lang, "queueWantsTries")}
+        dismissLabel={t(lang, "queueDismissAsk")}
+        line={t(lang, "queueTriesLine", { used: card.used ?? 0, left: card.remaining ?? 0 })}
+        onArrive={() => void act({ action: "arrived", id: card.id })}
+        onAdd={(extra) => addTries(card.id, extra)}
+        onDismiss={() => void act({ action: "dismiss", id: card.id })}
+      />
+    );
+  }
+
   function links(card: Card) {
     return (
       <div className="mt-3 flex flex-wrap gap-2">
@@ -129,6 +153,7 @@ export function QueueDesk({ initial, lang, showVisits = false }: { initial: Desk
                     <p className="font-serif text-7xl leading-none" data-queue-token={seat.entry.token}>{seat.entry.token}</p>
                     <p className="break-all text-lg">{seat.entry.name}{seat.entry.serviceName ? ` · ${seat.entry.serviceName}` : ""}</p>
                     {seat.entry.onTheWay ? <p className="text-sm">{t(lang, "queueOnTheWayBadge")}</p> : null}
+                    {tryControls(seat.entry)}
                     <div className="mt-3 flex flex-wrap gap-2">
                       {seat.entry.status === "CALLED" ? (
                         <button className="btn" type="button" disabled={busy} onClick={() => void act({ action: "start", id: seat.entry?.id })}>{t(lang, "queueStart")}</button>
@@ -159,6 +184,7 @@ export function QueueDesk({ initial, lang, showVisits = false }: { initial: Desk
                 <p className="break-all text-lg">{card.name}{card.serviceName ? ` · ${card.serviceName}` : ""}</p>
                 <p className="text-sm text-muted">{t(lang, "queueMinShort", { min: card.waitMin })} · {t(lang, "queueAheadShort", { ahead: card.ahead })}</p>
                 {card.onTheWay ? <p className="text-sm">{t(lang, "queueOnTheWayBadge")}</p> : null}
+                {tryControls(card)}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button className="btn secondary" type="button" disabled={busy} onClick={() => void act({ action: "noshow", id: card.id })}>{t(lang, "queueNoShow")}</button>
                 </div>
@@ -213,6 +239,7 @@ export function QueueDesk({ initial, lang, showVisits = false }: { initial: Desk
                   <article key={card.id} className="card p-4">
                     <p className="text-lg">{card.name}</p>
                     <p className="text-sm">{card.requestedDate} · {card.requestedSlot}</p>
+                    {tryControls(card)}
                     <button className="btn mt-3" type="button" disabled={busy} onClick={() => void act({ action: "done", id: card.id })}>Mark visited</button>
                     {links(card)}
                   </article>
@@ -267,6 +294,78 @@ export function QueueDesk({ initial, lang, showVisits = false }: { initial: Desk
         </form>
       </details>
       <VisitUnlock show={showVisits} />
+    </div>
+  );
+}
+
+function TryAdder({
+  card,
+  busy,
+  arrivedLabel,
+  wantsLabel,
+  dismissLabel,
+  line,
+  onArrive,
+  onAdd,
+  onDismiss,
+}: {
+  card: Card;
+  busy: boolean;
+  arrivedLabel: string;
+  wantsLabel: string;
+  dismissLabel: string;
+  line: string;
+  onArrive: () => void;
+  onAdd: (extra: number) => void;
+  onDismiss: () => void;
+}) {
+  const [custom, setCustom] = useState("");
+  const [note, setNote] = useState("");
+  if (!card.arrived) {
+    return (
+      <button className="btn mt-3" type="button" data-arrived="yes" disabled={busy} onClick={onArrive}>{arrivedLabel}</button>
+    );
+  }
+  return (
+    <div className="mt-3 grid gap-2" data-try-box="yes">
+      <p className="text-sm" data-try-line="yes">{line}</p>
+      {card.wantsTries ? <p className="rounded-xl bg-[#f8efdc] px-3 py-2 text-sm font-medium" data-wants-tries="yes">{wantsLabel}</p> : null}
+      <div className="flex flex-wrap gap-2">
+        {[1, 2, 3].map((extra) => (
+          <button key={extra} className="btn" type="button" disabled={busy} onClick={() => onAdd(extra)}>
+            {extra === 1 ? "+1 try" : `+${extra} tries`}
+          </button>
+        ))}
+        {card.wantsTries ? <button className="btn secondary" type="button" disabled={busy} onClick={onDismiss}>{dismissLabel}</button> : null}
+      </div>
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const amount = Number(custom);
+          if (!Number.isInteger(amount) || amount < 1 || amount > 9) {
+            setNote("Use a whole number from 1 to 9.");
+            return;
+          }
+          setNote("");
+          onAdd(amount);
+          setCustom("");
+        }}
+      >
+        <input
+          className="field narrow"
+          type="number"
+          min={1}
+          max={9}
+          step={1}
+          inputMode="numeric"
+          aria-label="Custom tries"
+          value={custom}
+          onChange={(event) => setCustom(event.target.value)}
+        />
+        <button className="btn secondary" type="submit" disabled={busy}>Add</button>
+      </form>
+      {note ? <p className="text-sm" role="status">{note}</p> : null}
     </div>
   );
 }
