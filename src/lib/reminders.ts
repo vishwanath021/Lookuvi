@@ -6,6 +6,7 @@ import { offerMessage, queueHomeUrl, reminderMessage, tryOnUrl } from "@/lib/que
 import { cleanOffer } from "@/lib/customers/parse";
 import { comeBackSkipMessage, comeBackStep } from "@/lib/customers/comeback";
 import { blockedPhoneSet, phoneBlockedForSalon } from "@/lib/customers/service";
+import { POINTS_REMINDER_TEMPLATE, pointsBalance, pointsBalances } from "@/lib/loyalty";
 
 const OUTREACH_LOCK = 872164;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -74,6 +75,7 @@ async function remindOne(
   env: NotifyEnv,
   now: Date,
 ) {
+  if ((await pointsBalance(salon.id, customer.phone)) > 0) return "points" as const;
   const claimed = await prisma.customer.updateMany({
     where: {
       id: customer.id,
@@ -136,6 +138,7 @@ export async function sweepDueReminders(send: Sender = defaultSend, env: NotifyE
     select: { id: true, name: true, slug: true, reminderDays: true, whatsappMonthlyCap: true },
   });
   let sent = 0;
+  let pointsHeld = 0;
   for (const salon of salons) {
     const days = Math.min(42, Math.max(28, salon.reminderDays || 35));
     const cutoff = new Date(now.getTime() - days * DAY_MS);
@@ -147,10 +150,17 @@ export async function sweepDueReminders(send: Sender = defaultSend, env: NotifyE
     for (const customer of due) {
       const outcome = await remindOne(salon, customer, send, env, now);
       if (outcome === "sent") sent += 1;
+      if (outcome === "points") pointsHeld += 1;
       if (outcome === "cap" || outcome === "template") break;
     }
   }
-  return { sent, reason: "READY" as const, salons: salons.length };
+  return {
+    sent,
+    reason: "READY" as const,
+    salons: salons.length,
+    pointsHeld,
+    pointsTemplate: pointsHeld ? POINTS_REMINDER_TEMPLATE : "",
+  };
 }
 
 export async function sendBroadcast(tenantId: string, text: string, send: Sender = defaultSend, env: NotifyEnv = process.env as NotifyEnv, now = new Date()) {
@@ -242,13 +252,19 @@ export async function sendComeBack(
   if (!ids.length) return { ok: false as const, message: "Choose a customer first.", sent: 0, skipped: 0 };
   const people = await prisma.customer.findMany({ where: { tenantId, id: { in: ids } } });
   const blocked = await blockedPhoneSet(tenantId, people.map((row) => row.phone));
+  const balances = await pointsBalances(tenantId, people.map((row) => row.phone));
   let sent = 0;
   let skipped = 0;
   let held = 0;
+  let pointsHeld = 0;
   let blockedStep: "wait" | "done" | "early" | "" = "";
   for (const person of people) {
     if (person.optedOutAt || blocked.has(person.phone) || person.optOutSource === "STOP") {
       skipped += 1;
+      continue;
+    }
+    if ((balances.get(person.phone) ?? 0) > 0) {
+      pointsHeld += 1;
       continue;
     }
     const prior = await prisma.whatsAppSend.findMany({
@@ -316,6 +332,12 @@ export async function sendComeBack(
       }
     }
   }
+  const pointsNote = pointsHeld
+    ? ` ${pointsHeld} ${pointsHeld === 1 ? "person has" : "people have"} points, so that reminder was not sent. Needed wording: ${POINTS_REMINDER_TEMPLATE}`
+    : "";
+  if (sent === 0 && pointsHeld > 0 && held === 0 && !blockedStep) {
+    return { ok: false as const, message: `Nothing was sent.${pointsNote}`, sent, skipped, pointsHeld };
+  }
   if (sent === 0 && held > 0) return { ok: false as const, message: "The monthly WhatsApp limit is used. Nothing was sent.", sent, skipped };
   if (sent === 0 && blockedStep) return { ok: false as const, message: comeBackSkipMessage(blockedStep), sent, skipped };
   if (sent === 0 && skipped > 0) return { ok: false as const, message: "Those customers have reminders off. Nothing was sent.", sent, skipped };
@@ -323,5 +345,5 @@ export async function sendComeBack(
   const skipNote = skipped ? ` ${skipped} ${skipped === 1 ? "has" : "have"} reminders off.` : "";
   const heldNote = held ? ` ${held} ${held === 1 ? "was" : "were"} not sent because the monthly limit was reached.` : "";
   const peopleWord = sent === 1 ? "person" : "people";
-  return { ok: true as const, message: `Sent to ${sent} ${peopleWord}.${skipNote}${heldNote}`, sent, skipped };
+  return { ok: true as const, message: `Sent to ${sent} ${peopleWord}.${skipNote}${heldNote}${pointsNote}`, sent, skipped, pointsHeld };
 }

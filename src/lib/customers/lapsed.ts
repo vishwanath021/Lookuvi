@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { displayPhone } from "@/lib/customers/parse";
 import { blockedPhoneSet } from "@/lib/customers/service";
+import { pointsBalances } from "@/lib/loyalty";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const IST_MS = 5.5 * 60 * 60 * 1000;
@@ -42,7 +43,8 @@ export async function listLapsed(tenantId: string, now = new Date()) {
     orderBy: { lastVisitAt: "asc" },
     take: 200,
   });
-  const blocked = await blockedPhoneSet(tenantId, rows.map((row) => row.phone));
+  const phones = rows.map((row) => row.phone);
+  const [blocked, balances] = await Promise.all([blockedPhoneSet(tenantId, phones), pointsBalances(tenantId, phones)]);
   const cards = rows.map((row) => {
     const stopped = blocked.has(row.phone) || row.optOutSource === "STOP";
     return {
@@ -50,6 +52,7 @@ export async function listLapsed(tenantId: string, now = new Date()) {
       name: row.name,
       phone: row.phone,
       phoneLabel: displayPhone(row.phone),
+      points: balances.get(row.phone) ?? 0,
       visitCount: row.visitCount,
       lastVisitAt: row.lastVisitAt ? row.lastVisitAt.toISOString() : "",
       lastVisitLabel: row.lastVisitAt ? visitLabel(row.lastVisitAt) : "No visit yet",

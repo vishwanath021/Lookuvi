@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/session";
 import { isAllowedLogoUrl } from "@/lib/logo-url";
 import { hoursWrite } from "@/lib/queue/schedule";
+import { LoyaltyError, replaceRewards } from "@/lib/loyalty";
 import { toolEnabled, type ToolId } from "@/lib/tools";
 
 const schema = z.object({
@@ -53,6 +54,9 @@ const schema = z.object({
   openTime: z.string().max(8).optional(),
   closeTime: z.string().max(8).optional(),
   weeklyHours: z.string().max(4000).optional(),
+  loyaltyOn: z.boolean().optional(),
+  loyaltyPointsPerVisit: z.number().int().min(0).max(50).optional(),
+  rewards: z.array(z.object({ name: z.string().max(60), cost: z.number().int().min(1).max(9999) })).max(5).optional(),
 });
 
 export async function GET() {
@@ -76,7 +80,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "PLAN", message: "Removing the Lookuvi mark needs Pro or Chain." }, { status: 403 });
   }
   const languages = data.languages?.filter(isLocale);
-  const { defaultLang, logoUrl, ...rest } = data;
+  const { defaultLang, logoUrl, rewards, ...rest } = data;
   delete rest.languages;
   const gated: Record<string, ToolId> = {
     toolStyle: "hairstyle",
@@ -110,6 +114,14 @@ export async function PUT(req: Request) {
     delete rest.openTime;
     delete rest.closeTime;
     delete rest.weeklyHours;
+  }
+  if (rewards) {
+    try {
+      await replaceRewards(access.tenant.id, rewards);
+    } catch (error) {
+      if (error instanceof LoyaltyError) return NextResponse.json({ error: "LOYALTY", message: error.message }, { status: 400 });
+      throw error;
+    }
   }
   const tenant = await prisma.tenant.update({
     where: { id: access.tenant.id },

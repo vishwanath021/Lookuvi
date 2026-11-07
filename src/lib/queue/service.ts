@@ -8,6 +8,7 @@ import { effectiveWeek, hoursView, nextBoundary, slotProblem, type HoursTenant }
 import { peopleAhead, serviceMinutes, waitMinutes, type WaitRow } from "@/lib/queue/estimate";
 import { attributeReturn, recordVisit, rememberCustomer } from "@/lib/customers/service";
 import { bindTicket, linkSessionToEntry, tryLineForEntry } from "@/lib/at-salon";
+import { earnVisitPoints, listRewards, LoyaltyError, pointsBalance, pointsBalanceLine, pointsBalances, redeemReward, rewardProgress } from "@/lib/loyalty";
 import { almostMessage, confirmedMessage, deskWhatsAppText, joinedMessage, queueHomeUrl, statusPath, statusUrl, tryOnUrl } from "@/lib/queue/messages";
 import { indianMobile } from "@/lib/queue/phone";
 
@@ -383,7 +384,15 @@ export async function guestTicket(slug: string, ref: string) {
     tryOn: tenant.productTryOn,
     lang: tenant.defaultLang,
     serviceName: row.service?.name || "",
+    ...(await guestPoints(tenant, row.phone)),
   };
+}
+
+async function guestPoints(tenant: { id: string; name: string; loyaltyOn: boolean }, phone: string) {
+  if (!tenant.loyaltyOn || !phone) return { points: null, pointsLine: "", pointsNext: "" };
+  const points = await pointsBalance(tenant.id, phone);
+  const rewards = await listRewards(tenant.id);
+  return { points, pointsLine: pointsBalanceLine(points, tenant.name), pointsNext: rewardProgress(points, rewards) };
 }
 
 export async function guestVisit(input: { slug: string; ref: string; action: "way" | "cancel" | "bind"; ip: string; sessionId?: string; deviceId?: string }) {
@@ -456,7 +465,13 @@ export async function deskSnapshot(tenantId: string, now = new Date()) {
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });
-  const card = (row: EntryRow) => deskCard(tenant.name, tenant.slug, row, state.avgMinutes, entries, state.units, tenant);
+  const everyone = [...entries, ...requests];
+  const balances = tenant.loyaltyOn ? await pointsBalances(tenant.id, everyone.map((row) => row.phone)) : new Map<string, number>();
+  const rewards = tenant.loyaltyOn ? await listRewards(tenant.id) : [];
+  const card = async (row: EntryRow) => ({
+    ...(await deskCard(tenant.name, tenant.slug, row, state.avgMinutes, entries, state.units, tenant)),
+    points: tenant.loyaltyOn && row.phone ? balances.get(row.phone) ?? 0 : null,
+  });
   const serving = await Promise.all(Array.from({ length: state.units }, async (_, index) => {
     const unit = index + 1;
     const entry = entries.find((row) => row.unitSlot === unit && (row.status === "CALLED" || row.status === "IN_SERVICE"));
@@ -487,6 +502,7 @@ export async function deskSnapshot(tenantId: string, now = new Date()) {
     waiting,
     requests: requestCards,
     confirmed,
+    rewards,
   };
 }
 
@@ -544,15 +560,35 @@ export async function returnToLine(tenantId: string, id: string) {
   return deskSnapshot(tenantId);
 }
 
-export async function finishEntry(tenantId: string, id: string, status: "DONE" | "NO_SHOW", send: Sender = notifyGuest) {
-  await requireDesk(tenantId);
+export async function finishEntry(tenantId: string, id: string, status: "DONE" | "NO_SHOW", send: Sender = notifyGuest, staffId = "") {
+  const tenant = await requireDesk(tenantId);
   const row = await prisma.queueEntry.findFirst({ where: { id, tenantId } });
   if (!row) throw new QueueError("NOT_FOUND", "That guest was not found.", 404);
   const allowed = status === "DONE" ? ["CALLED", "IN_SERVICE", "WAITING", "CONFIRMED"] : ["WAITING", "CALLED", "IN_SERVICE"];
   if (!allowed.includes(row.status)) throw new QueueError("STATE", "That guest is already closed.", 409);
   await prisma.queueEntry.update({ where: { id }, data: { status, doneAt: new Date(), unitSlot: null, onTheWay: false } });
-  if (status === "DONE" && row.phone) await recordVisit(tenantId, row.phone, row.name);
+  if (status === "DONE" && row.phone) {
+    await recordVisit(tenantId, row.phone, row.name);
+    if (tenant.loyaltyOn && tenant.loyaltyPointsPerVisit > 0) {
+      await earnVisitPoints({ tenantId, phone: row.phone, visitId: row.id, staffId, points: tenant.loyaltyPointsPerVisit });
+    }
+  }
   await sweepAlerts(tenantId, send);
+  return deskSnapshot(tenantId);
+}
+
+export async function redeemOnEntry(tenantId: string, id: string, rewardId: string, staffId = "") {
+  const tenant = await requireDesk(tenantId);
+  if (!tenant.loyaltyOn) throw new QueueError("STATE", "Loyalty is off for this salon.", 409);
+  const row = await prisma.queueEntry.findFirst({ where: { id, tenantId } });
+  if (!row) throw new QueueError("NOT_FOUND", "That guest was not found.", 404);
+  if (!row.phone) throw new QueueError("PHONE", "Add a mobile number before redeeming points.", 400);
+  try {
+    await redeemReward({ tenantId, phone: row.phone, rewardId, staffId, visitId: row.id });
+  } catch (error) {
+    if (error instanceof LoyaltyError) throw new QueueError("POINTS", error.message, 400);
+    throw error;
+  }
   return deskSnapshot(tenantId);
 }
 

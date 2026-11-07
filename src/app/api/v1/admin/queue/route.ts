@@ -9,6 +9,7 @@ import {
   declineRequest,
   deskSnapshot,
   finishEntry,
+  redeemOnEntry,
   saveQueueSettings,
   setClosedToday,
   setQueueOpen,
@@ -26,6 +27,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start"), id: z.string().min(1) }),
   z.object({ action: z.literal("return"), id: z.string().min(1) }),
   z.object({ action: z.literal("done"), id: z.string().min(1) }),
+  z.object({ action: z.literal("redeem"), id: z.string().min(1), rewardId: z.string().min(1) }),
   z.object({ action: z.literal("noshow"), id: z.string().min(1) }),
   z.object({ action: z.literal("arrived"), id: z.string().min(1) }),
   z.object({ action: z.literal("dismiss"), id: z.string().min(1) }),
@@ -57,14 +59,14 @@ async function desk() {
   const access = await requireMembership();
   if ("error" in access && access.error) return access.error;
   if (!("tenant" in access)) return NextResponse.json({ error: "NO_TENANT" }, { status: 403 });
-  return access.tenant;
+  return access;
 }
 
 export async function GET() {
-  const tenant = await desk();
-  if (tenant instanceof NextResponse) return tenant;
+  const access = await desk();
+  if (access instanceof NextResponse) return access;
   try {
-    return NextResponse.json(await deskSnapshot(tenant.id));
+    return NextResponse.json(await deskSnapshot(access.tenant.id));
   } catch (error) {
     const response = queueJson(error);
     if (response) return response;
@@ -73,8 +75,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const tenant = await desk();
-  if (tenant instanceof NextResponse) return tenant;
+  const access = await desk();
+  if (access instanceof NextResponse) return access;
+  const tenant = access.tenant;
+  const staffId = access.session.user.id;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "INVALID", message: "That update was not understood." }, { status: 400 });
   const body = parsed.data;
@@ -86,8 +90,9 @@ export async function POST(req: Request) {
     if (body.action === "next") return NextResponse.json(await callNext(tenant.id));
     if (body.action === "start") return NextResponse.json(await startEntry(tenant.id, body.id));
     if (body.action === "return") return NextResponse.json(await returnToLine(tenant.id, body.id));
-    if (body.action === "done") return NextResponse.json(await finishEntry(tenant.id, body.id, "DONE"));
-    if (body.action === "noshow") return NextResponse.json(await finishEntry(tenant.id, body.id, "NO_SHOW"));
+    if (body.action === "done") return NextResponse.json(await finishEntry(tenant.id, body.id, "DONE", undefined, staffId));
+    if (body.action === "redeem") return NextResponse.json(await redeemOnEntry(tenant.id, body.id, body.rewardId, staffId));
+    if (body.action === "noshow") return NextResponse.json(await finishEntry(tenant.id, body.id, "NO_SHOW", undefined, staffId));
     if (body.action === "arrived" || body.action === "dismiss" || body.action === "tries") {
       const result = body.action === "arrived"
         ? await markArrived(tenant.id, body.id)

@@ -50,6 +50,9 @@ export function SettingsForm({
     openTime?: string;
     closeTime?: string;
     weeklyHours?: string;
+    loyaltyOn?: boolean;
+    loyaltyPointsPerVisit?: number;
+    rewards?: { name: string; cost: number }[];
   };
   canRemoveBranding: boolean;
   enabledTools?: ToolId[];
@@ -69,6 +72,9 @@ export function SettingsForm({
     openTime: initial.openTime ?? "",
     closeTime: initial.closeTime ?? "",
     weeklyHours: initial.weeklyHours ?? "",
+    loyaltyOn: initial.loyaltyOn ?? true,
+    loyaltyPointsPerVisit: initial.loyaltyPointsPerVisit ?? 1,
+    rewards: initial.rewards ?? [],
   });
   const [message, setMessage] = useState("");
   const [host, setHost] = useState("");
@@ -112,7 +118,12 @@ export function SettingsForm({
     const res = await fetch("/api/v1/admin/settings", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        rewards: form.rewards
+          .filter((reward) => reward.name.trim())
+          .map((reward) => ({ name: reward.name.trim(), cost: Math.min(9999, Math.max(1, Math.round(Number(reward.cost)) || 1)) })),
+      }),
     });
     const data = await res.json();
     setMessage(res.ok ? "Settings saved." : data.message || "Could not save");
@@ -198,6 +209,36 @@ export function SettingsForm({
         <label className="text-sm">Address<input className="field mt-1" value={form.address} onChange={(event) => set("address", event.target.value)} /></label>
         <label className="text-sm">Maps link<input className="field mt-1" value={form.mapsUrl} onChange={(event) => set("mapsUrl", event.target.value)} /></label>
         <label className="text-sm">City<input className="field mt-1" value={form.city} onChange={(event) => set("city", event.target.value)} /></label>
+        <fieldset className="grid gap-2 text-sm" data-loyalty="yes">
+          <legend className="font-medium">Loyalty</legend>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" aria-label="Loyalty" checked={form.loyaltyOn} onChange={(event) => set("loyaltyOn", event.target.checked)} />
+            On
+          </label>
+          <label>Points per visit
+            <input className="field narrow mt-1" type="number" min={0} max={50} aria-label="Points per visit" value={form.loyaltyPointsPerVisit} onChange={(event) => set("loyaltyPointsPerVisit", Number(event.target.value))} />
+          </label>
+          <p className="text-xs text-muted">Staff tap Finish and the guest earns this many points. There is no bill amount yet.</p>
+          {form.rewards.map((reward, index) => (
+            <div key={index} className="grid grid-cols-2 gap-2">
+              <label>Reward
+                <input className="field mt-1" aria-label={`Reward ${index + 1} name`} value={reward.name} maxLength={60} onChange={(event) => {
+                  const rewards = form.rewards.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item);
+                  set("rewards", rewards);
+                }} />
+              </label>
+              <label>Points
+                <input className="field mt-1" type="number" min={1} max={9999} aria-label={`Reward ${index + 1} points`} value={reward.cost} onChange={(event) => {
+                  const rewards = form.rewards.map((item, itemIndex) => itemIndex === index ? { ...item, cost: Number(event.target.value) } : item);
+                  set("rewards", rewards);
+                }} />
+              </label>
+            </div>
+          ))}
+          {form.rewards.length < 5 ? (
+            <button className="btn secondary w-fit" type="button" onClick={() => set("rewards", [...form.rewards, { name: "", cost: 10 }])}>Add reward</button>
+          ) : null}
+        </fieldset>
         <WeekHoursEditor
           openTime={form.openTime}
           closeTime={form.closeTime}
