@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { askMoreTries, atSalonView, redeemCounter } from "@/lib/at-salon";
+import { askMoreTries, atSalonView } from "@/lib/at-salon";
 import { deskUserId } from "@/lib/at-salon-gate";
 import { prisma } from "@/lib/prisma";
 
@@ -8,11 +8,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const postSchema = z.object({
-  action: z.enum(["redeem", "ask"]),
+  action: z.literal("ask"),
   slug: z.string().min(1).max(80),
   sessionId: z.string().min(8).max(80),
   deviceId: z.string().max(80).optional(),
-  code: z.string().max(200).optional(),
 });
 
 async function tenantBySlug(slug: string) {
@@ -41,13 +40,8 @@ export async function POST(req: Request) {
   const body = parsed.data;
   const tenant = await tenantBySlug(body.slug);
   if (!tenant || tenant.deletedAt) return NextResponse.json({ error: "TENANT", message: "Salon not found." }, { status: 404 });
-  if (body.action === "redeem") {
-    const result = await redeemCounter(tenant.id, body.code || "", body.sessionId, body.deviceId || "");
-    if (!result.ok) return NextResponse.json({ error: result.error, message: result.message }, { status: 400 });
-  } else {
-    const result = await askMoreTries(tenant.id, body.sessionId, body.deviceId || "");
-    if (!result.ok) return NextResponse.json({ error: result.error, message: result.message }, { status: result.status });
-  }
+  const result = await askMoreTries(tenant.id, body.sessionId, body.deviceId || "");
+  if (!result.ok) return NextResponse.json({ error: result.error, message: result.message }, { status: result.status });
   const bypass = Boolean(await deskUserId(tenant.id));
   const view = await atSalonView({ tenant, sessionId: body.sessionId, deviceId: body.deviceId, bypass });
   return NextResponse.json(view);

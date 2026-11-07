@@ -664,7 +664,7 @@ model SalonDayUnlock {
   /** session, device, or phone */
   kind      String
   value     String
-  /** arrived or counter */
+  /** arrived */
   source    String
   createdAt DateTime @default(now())
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)

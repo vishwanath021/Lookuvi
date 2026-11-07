@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import { isPlatformLogo, LookuviMark } from "@/components/brand/LookuviMark";
 import { BeforeAfter } from "@/components/tryon/BeforeAfter";
 import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { addSavedPick, readSavedPicks, savedPicksKey, showLockedBrowse, type SavedPick } from "@/lib/at-salon-browse";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
@@ -188,6 +189,8 @@ export function TryOnApp({
 }) {
   const lang = config.defaultLang || "en";
   const atSalon = useAtSalon();
+  const [savedPicks, setSavedPicks] = useState<SavedPick[]>([]);
+  const [savedFlash, setSavedFlash] = useState(false);
   const sections = guestSections({ everyday: showEveryday, bridal: showBridal, groom: showGroom, makeup: showMakeup });
   const [section, setSection] = useState<GuestSection>(sections[0] || "everyday");
   const bridalOn = section === "bridal" && showBridal;
@@ -270,6 +273,10 @@ export function TryOnApp({
       /* A full session of previews can exceed the browser quota. The in-memory tabs stay. */
     }
   }, [looks, config.slug, faceShot, handShot, cacheReady]);
+
+  useEffect(() => {
+    setSavedPicks(readSavedPicks(localStorage.getItem(savedPicksKey(config.slug))));
+  }, [config.slug]);
 
   useEffect(() => {
     setSid(sessionId());
@@ -743,7 +750,7 @@ export function TryOnApp({
     setPicked((current) => ({ ...current, [chosen.tool]: chosen.id }));
     setTool(chosen.tool);
     setError("");
-    if (atSalon.required && !atSalon.unlocked) return;
+    if (showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon)) return;
     if (!shotRefFor(chosen.tool)) {
       pendingLook.current = chosen;
       setError(t(lang, chosen.tool === "nails" ? "uploadHand" : "addPhotoFirst"));
@@ -936,6 +943,20 @@ export function TryOnApp({
   const showActionStrip = showQueue && actionItems.length > 0;
 
   const platformLogo = isPlatformLogo(config.logoUrl);
+  const lockedBrowse = showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon) && !cameraOn && !activeShot && !showResult;
+
+  function saveCurrentStyle() {
+    const chosen = chosenNow();
+    if (!chosen) return;
+    const next = addSavedPick(savedPicks, { tool: chosen.tool, id: chosen.id, name: chosen.name });
+    setSavedPicks(next);
+    setSavedFlash(true);
+    try {
+      localStorage.setItem(savedPicksKey(config.slug), JSON.stringify(next));
+    } catch {
+      /* The list still shows for this visit. */
+    }
+  }
 
   return (
     <div data-salon-mode={salonMode ? "yes" : "no"} className={embed ? "flex min-h-dvh flex-col" : "mx-auto flex min-h-dvh max-w-6xl flex-col px-4"}>
@@ -1030,8 +1051,8 @@ export function TryOnApp({
       </div>
       )}
 
-      <div className="mt-6 grid items-start gap-8 lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]">
-      <div>
+      <div className={`mt-6 grid items-start gap-8 ${lockedBrowse ? "" : "lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]"}`}>
+      {lockedBrowse ? null : <div>
       <section
         ref={frameRef}
         className={generatingHere || showResult ? `ai-photo ${showResult ? "is-ready" : "is-working"}${freshGlow ? " is-fresh" : ""}` : "overflow-hidden rounded-[14px] border border-line bg-white shadow-lift"}
@@ -1225,9 +1246,16 @@ export function TryOnApp({
           <button className="btn secondary" type="button" onClick={() => resetForAnotherPhoto()}>{t(lang, "tryAnotherShort")}</button>
         </div>
       )}
-      </div>
+      </div>}
 
-      <section ref={gridRef} aria-label={tool === "style" ? t(lang, "styles") : tool === "colour" ? t(lang, "shades") : tool === "brows" ? t(lang, "brows") : tool === "beard" ? t(lang, "beards") : t(lang, "nails")}>
+      <section ref={gridRef} data-style-grid="yes" aria-label={tool === "style" ? t(lang, "styles") : tool === "colour" ? t(lang, "shades") : tool === "brows" ? t(lang, "brows") : tool === "beard" ? t(lang, "beards") : t(lang, "nails")}>
+        {lockedBrowse ? (
+          <div className="mb-4 grid gap-2" data-browse-locked="yes">
+            <button className="btn secondary w-fit" type="button" disabled={!chosenNow()} onClick={saveCurrentStyle}>{t(lang, "saveLook")}</button>
+            {savedFlash ? <p className="text-sm" role="status">{t(lang, "atSalonSaved")}</p> : null}
+            {savedPicks.length > 0 ? <p className="text-sm">Saved: {savedPicks.map((item) => item.name).join(", ")}</p> : null}
+          </div>
+        ) : null}
         {tool === "style" && (
           <>
             <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Style audience">
@@ -1235,7 +1263,7 @@ export function TryOnApp({
               {config.showMen && <button className="chip" type="button" aria-pressed={gender === "men"} onClick={() => chooseGender("men")}>{t(lang, "men")}</button>}
               {config.showKids && <button className="chip" type="button" aria-pressed={gender === "kids"} onClick={() => chooseGender("kids")}>{t(lang, "kids")}</button>}
             </div>
-            <HairTypePicker
+            {!lockedBrowse ? <HairTypePicker
               pickerOn={config.hairPickerOn}
               suggestOn={config.hairSuggestOn}
               usesCredits={config.hairSuggestUsesCredits}
@@ -1252,7 +1280,7 @@ export function TryOnApp({
               onShowAll={setShowAllStyles}
               onSuggest={() => void suggestHair()}
               onPick={(card) => selectLook({ id: card.id, name: card.name, serviceKeys: card.serviceKeys, tool: "style" })}
-            />
+            /> : null}
             {config.hairPickerOn && (pickedDensity || pickedTexture) && visibleStyles.length === 0 && (
               <p className="mb-2 text-sm">No style photos for that hair type. Turn on Show all.</p>
             )}
@@ -1271,6 +1299,28 @@ export function TryOnApp({
                 </button>
               ))}
             </div>
+            {lockedBrowse ? (
+              <div className="mt-4">
+                <HairTypePicker
+                  pickerOn={config.hairPickerOn}
+                  suggestOn={false}
+                  usesCredits={false}
+                  density={pickedDensity}
+                  texture={pickedTexture}
+                  showAll={showAllStyles}
+                  suggestions={hairSuggestions}
+                  selectedId={styleId}
+                  busy={busy}
+                  note=""
+                  costLine=""
+                  onDensity={setPickedDensity}
+                  onTexture={setPickedTexture}
+                  onShowAll={setShowAllStyles}
+                  onSuggest={() => undefined}
+                  onPick={(card) => selectLook({ id: card.id, name: card.name, serviceKeys: card.serviceKeys, tool: "style" })}
+                />
+              </div>
+            ) : null}
           </>
         )}
 
