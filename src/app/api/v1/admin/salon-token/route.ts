@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { newSalonNonce, signSalonToken } from "@/lib/preview-access";
 import { prisma } from "@/lib/prisma";
 import { salonGuestOrigin } from "@/lib/public-url";
-import { requireMembership, requireOwner } from "@/lib/session";
+import { requireOwner } from "@/lib/session";
 
 async function salonUrl(slug: string, tenantId: string, nonce: string) {
   if (!nonce) return "";
@@ -12,7 +12,7 @@ async function salonUrl(slug: string, tenantId: string, nonce: string) {
 }
 
 export async function GET() {
-  const access = await requireMembership();
+  const access = await requireOwner();
   if ("error" in access && access.error) return access.error;
   if (!("tenant" in access)) return NextResponse.json({ error: "NO_TENANT" }, { status: 403 });
   const url = await salonUrl(access.tenant.slug, access.tenant.id, access.tenant.salonNonce);

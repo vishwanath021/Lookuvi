@@ -1,4 +1,5 @@
 # Install on the droplet as root: crontab /opt/lookuvi/deploy/backup.cron
-# 00:30 IST is 19:00 UTC. Requires postgresql-client and /opt/lookuvi/.env.production.
+# 00:30 IST is 19:00 UTC.
+# The script uses docker compose --env-file .env.production. Do not source that file.
 SHELL=/bin/sh
 0 19 * * * cd /opt/lookuvi && ./scripts/backup-postgres.sh >> /var/log/lookuvi-backup.log 2>&1

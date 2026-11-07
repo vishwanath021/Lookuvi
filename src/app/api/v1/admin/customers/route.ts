@@ -12,6 +12,7 @@ import {
 } from "@/lib/customers/service";
 import { listLapsed } from "@/lib/customers/lapsed";
 import { sendBroadcast, sendComeBack } from "@/lib/reminders";
+import { customerActionNeedsOwner } from "@/lib/desk-role";
 import { requireMembership, requireOwner } from "@/lib/session";
 
 const schema = z.discriminatedUnion("action", [
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "INVALID", message: "That update was not understood." }, { status: 400 });
   const body = parsed.data;
   const tenantId = access.tenant.id;
-  if (body.action === "settings" || body.action === "broadcast" || body.action === "resume" || body.action === "comeback") {
+  if (customerActionNeedsOwner(body.action)) {
     const owner = await requireOwner();
     if ("error" in owner && owner.error) return owner.error;
   }

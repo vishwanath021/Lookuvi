@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export type StoredObject = { body: Buffer; contentType: string };
@@ -63,6 +63,20 @@ export async function signedGetUrl(key: string, ttlSeconds = 300) {
   return `${base}/api/v1/media?${params.toString()}`;
 }
 
+async function tightenPrivateTree(dir: string) {
+  const root = path.resolve(localRoot());
+  const chain: string[] = [];
+  let current = path.resolve(dir);
+  while (current === root || current.startsWith(root + path.sep)) {
+    chain.push(current);
+    if (current === root) break;
+    current = path.dirname(current);
+  }
+  for (const folder of chain.reverse()) {
+    await chmod(folder, 0o750);
+  }
+}
+
 export async function putObject(key: string, body: Buffer, contentType: string) {
   if (driver() === "s3") {
     const { s3Put } = await import("@/lib/storage/s3");
@@ -70,8 +84,11 @@ export async function putObject(key: string, body: Buffer, contentType: string) 
     return;
   }
   const file = localPath(key);
-  await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, body);
+  const dir = path.dirname(file);
+  await mkdir(dir, { recursive: true, mode: 0o750 });
+  await writeFile(file, body, { mode: 0o640 });
+  await tightenPrivateTree(dir);
+  await chmod(file, 0o640);
 }
 
 export async function getObject(key: string): Promise<Buffer | null> {

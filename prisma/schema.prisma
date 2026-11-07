@@ -326,6 +326,19 @@ model CreditLedger {
   @@index([tenantId, refId])
 }
 
+/// One row per provider payment id so a repeated webhook cannot grant the pack twice.
+model CreditPackGrant {
+  id            String   @id @default(cuid())
+  externalId    String   @unique
+  tenantId      String
+  packId        String
+  provider      String   @default("")
+  invoiceNumber String   @default("")
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
 model Lead {
   id        String   @id @default(cuid())
   tenantId  String

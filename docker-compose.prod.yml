@@ -1,6 +1,7 @@
 # Production stack: Caddy (TLS) → app → Postgres and Redis.
 # Copy .env.production.example to /opt/lookuvi/.env.production and fill it in.
-# Compose interpolation reads that file when you `set -a; . ./.env.production; set +a`.
+# Compose interpolation reads that file via `--env-file .env.production`.
+# Do not shell-source it. Values can contain characters that break `set -a; . .env.production`.
 
 services:
   caddy:

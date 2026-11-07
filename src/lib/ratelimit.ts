@@ -28,10 +28,15 @@ export function clientIp(headerValue: string | null, trustProxy = process.env.TR
   return parts[Math.max(0, parts.length - hops)] || "unknown";
 }
 
-export function requestClientIp(req: { headers: { get(name: string): string | null } }) {
-  if (process.env.TRUST_PROXY !== "true") return "direct";
-  const cf = req.headers.get("cf-connecting-ip");
-  if (cf?.trim()) return cf.trim();
+export function requestClientIp(
+  req: { headers: { get(name: string): string | null } },
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  if (env.TRUST_PROXY !== "true") return "direct";
+  if (env.TRUST_CF_HEADER === "true") {
+    const cf = req.headers.get("cf-connecting-ip");
+    if (cf?.trim()) return cf.trim();
+  }
   return clientIp(req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip"), true);
 }
 
