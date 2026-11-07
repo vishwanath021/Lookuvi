@@ -96,8 +96,87 @@ textarea { min-height: 48px; }
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
   pointer-events: none;
 }
-.btn:hover:not(:disabled):not(.secondary):not(.bar-book):not(.bar-chat):not(.on-photo):not(.ghost) { filter: brightness(1.05); }
-.btn:active:not(:disabled):not(.secondary):not(.bar-book):not(.bar-chat):not(.on-photo):not(.ghost) { filter: brightness(0.97); }
+.btn:hover:not(:disabled):not(.secondary):not(.bar-book):not(.bar-chat):not(.on-photo):not(.ghost):not(.btn-wa) { filter: brightness(1.05); }
+.btn:active:not(:disabled):not(.secondary):not(.bar-book):not(.bar-chat):not(.on-photo):not(.ghost):not(.btn-wa) { filter: brightness(0.97); }
+.btn.btn-wa {
+  background-color: #075E54;
+  background-image: none;
+  color: #ffffff;
+  border-color: #05483f;
+  box-shadow: none;
+  font-size: 16px;
+}
+.btn.btn-wa:hover:not(:disabled) {
+  background-color: #05483f;
+  filter: none;
+}
+.choice-card {
+  appearance: none;
+  font: inherit;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 48px;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 2px solid #3e304b;
+  background: #ffffff;
+  color: #292330;
+  text-align: left;
+  cursor: pointer;
+}
+.choice-card[aria-checked="true"] {
+  background: #f4eef8;
+  box-shadow: inset 0 0 0 2px #3e304b;
+}
+.choice-card.is-disabled {
+  background: #f3f0f8;
+  color: #292330;
+  cursor: not-allowed;
+}
+.choice-radio {
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  margin-top: 0.2rem;
+  border-radius: 999px;
+  border: 2px solid #3e304b;
+  background: #ffffff;
+}
+.choice-card[aria-checked="true"] .choice-radio {
+  background: radial-gradient(circle, #3e304b 0 46%, #ffffff 50%);
+}
+.choice-icon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  place-items: center;
+  color: #3e304b;
+}
+.choice-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  border-radius: 999px;
+  background: #3e304b;
+  color: #ffffff;
+  padding: 0.1rem 0.7rem;
+  font-size: 16px;
+  font-weight: 600;
+}
+.send-panel {
+  position: fixed;
+  z-index: 40;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-top: 1px solid #dfd8e7;
+  background: #ffffff;
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 24px rgba(62, 48, 75, 0.12);
+}
 .btn:disabled,
 .btn-metal:disabled {
   background-color: var(--metal-disabled);

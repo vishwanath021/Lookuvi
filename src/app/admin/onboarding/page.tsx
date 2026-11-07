@@ -24,6 +24,7 @@ export default async function OnboardingPage() {
           openTime: tenant.openTime,
           closeTime: tenant.closeTime,
           weeklyHours: tenant.weeklyHours,
+          reminderMethod: tenant.reminderMethod,
         }}
       />
     </main>

@@ -9,6 +9,7 @@ import { isAllowedLogoUrl } from "@/lib/logo-url";
 import { hoursWrite } from "@/lib/queue/schedule";
 import { LoyaltyError, replaceRewards } from "@/lib/loyalty";
 import { toolEnabled, type ToolId } from "@/lib/tools";
+import { cleanReminderTemplate, MAX_REMINDER_DAYS, MIN_REMINDER_DAYS } from "@/lib/visit-reminders";
 
 const schema = z.object({
   name: z.string().min(2).max(80).optional(),
@@ -57,6 +58,9 @@ const schema = z.object({
   loyaltyOn: z.boolean().optional(),
   loyaltyPointsPerVisit: z.number().int().min(0).max(50).optional(),
   rewards: z.array(z.object({ name: z.string().max(60), cost: z.number().int().min(1).max(9999) })).max(5).optional(),
+  reminderDays: z.number().int().optional(),
+  reminderTemplate: z.string().max(2000).optional(),
+  reminderMethod: z.enum(["MANUAL", "AUTO"]).optional(),
 });
 
 export async function GET() {
@@ -80,7 +84,23 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "PLAN", message: "Removing the Lookuvi mark needs Pro or Chain." }, { status: 403 });
   }
   const languages = data.languages?.filter(isLocale);
-  const { defaultLang, logoUrl, rewards, ...rest } = data;
+  const { defaultLang, logoUrl, rewards, reminderDays, reminderTemplate, reminderMethod, ...rest } = data;
+  if (reminderMethod === "AUTO") {
+    return NextResponse.json({ error: "REMINDER", message: "Automatic sending is not available yet." }, { status: 400 });
+  }
+  const reminderPatch: { reminderDays?: number; reminderTemplate?: string; reminderMethod?: "MANUAL" } = {};
+  if (reminderMethod === "MANUAL") reminderPatch.reminderMethod = "MANUAL";
+  if (reminderDays !== undefined) {
+    if (!Number.isInteger(reminderDays) || reminderDays < MIN_REMINDER_DAYS || reminderDays > MAX_REMINDER_DAYS) {
+      return NextResponse.json({ error: "REMINDER", message: "Use a whole number of days from 28 to 42." }, { status: 400 });
+    }
+    reminderPatch.reminderDays = reminderDays;
+  }
+  if (reminderTemplate !== undefined) {
+    const cleaned = cleanReminderTemplate(reminderTemplate);
+    if (!cleaned.ok) return NextResponse.json({ error: "REMINDER", message: cleaned.message }, { status: 400 });
+    reminderPatch.reminderTemplate = cleaned.text;
+  }
   delete rest.languages;
   const gated: Record<string, ToolId> = {
     toolStyle: "hairstyle",
@@ -128,6 +148,7 @@ export async function PUT(req: Request) {
     data: {
       ...rest,
       ...hoursPatch,
+      ...reminderPatch,
       languages: languages ? JSON.stringify(languages) : undefined,
       defaultLang: defaultLang && isLocale(defaultLang) ? defaultLang : undefined,
       logoUrl,

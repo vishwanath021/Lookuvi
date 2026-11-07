@@ -48,8 +48,12 @@ model Tenant {
   whatsappWalkInJoined Boolean  @default(false)
   /** One WhatsApp reminder after a completed visit. */
   remindersOn         Boolean   @default(true)
-  /** Whole days after lastVisitAt. The owner screen allows 28 to 42. */
-  reminderDays        Int       @default(35)
+  /** Whole days after the last finished visit. Default is 6 weeks. The owner screen allows 28 to 42. */
+  reminderDays        Int       @default(42)
+  /** Plain-text come-back message. Empty uses the built-in English text. Placeholders: {name} {salon} {points} {link}. */
+  reminderTemplate    String    @default("")
+  /** MANUAL: the owner sends from their own WhatsApp. AUTO is reserved and not available yet. */
+  reminderMethod      String    @default("MANUAL")
   /** Reminder and offer sends WhatsApp accepted this Asia/Kolkata month. */
   whatsappMonthlyCap  Int       @default(50)
   /** Succeeded previews included this Asia/Kolkata month. The next one is refused. */
@@ -127,6 +131,7 @@ model Tenant {
   paymentRequests     PaymentRequest[]
   loyaltyRewards      LoyaltyReward[]
   loyaltyEntries      LoyaltyLedger[]
+  visitReminders      VisitReminder[]
 }
 
 model LoyaltyReward {
@@ -775,6 +780,25 @@ model WhatsAppSend {
 
   @@index([tenantId, monthKey, status])
   @@index([tenantId, kind, createdAt])
+}
+
+/// One come-back reminder the owner marked as sent from their own WhatsApp.
+model VisitReminder {
+  id        String    @id @default(cuid())
+  tenantId  String
+  /** 91XXXXXXXXXX, the same phone the customer list uses. */
+  phone     String
+  /** lastVisitAt this reminder covers. A later finished visit makes them due again. */
+  visitAt   DateTime
+  sentAt    DateTime  @default(now())
+  /** MANUAL today. AUTO is reserved for later. */
+  method    String    @default("MANUAL")
+  /** Owner user id. Empty when unknown. */
+  userId    String    @default("")
+  undoneAt  DateTime?
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, phone, sentAt])
 }
 
 /// One join attributed to one reminder send.

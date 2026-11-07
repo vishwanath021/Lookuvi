@@ -140,7 +140,7 @@ export async function sweepDueReminders(send: Sender = defaultSend, env: NotifyE
   let sent = 0;
   let pointsHeld = 0;
   for (const salon of salons) {
-    const days = Math.min(42, Math.max(28, salon.reminderDays || 35));
+    const days = Math.min(42, Math.max(28, salon.reminderDays || 42));
     const cutoff = new Date(now.getTime() - days * DAY_MS);
     const due = await prisma.customer.findMany({
       where: { tenantId: salon.id, needsReminder: true, optedOutAt: null, lastVisitAt: { lte: cutoff } },
