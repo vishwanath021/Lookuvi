@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { t } from "@/data/i18n";
-import { QueueWait } from "@/components/guest/QueueWait";
+import { QueueWait, useDisplayedWait } from "@/components/guest/QueueWait";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
@@ -36,7 +36,9 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
   const [ready, setReady] = useState(false);
   const [others, setOthers] = useState<VisitMemory[]>([]);
   const lang = ticket.lang || "en";
+  const minutes = useDisplayedWait(ticket.waitMin);
   const live = ticket.status === "WAITING" || ticket.status === "CALLED";
+  const terminal = ticket.status === "CANCELLED" || ticket.status === "EXPIRED" || ticket.status === "DONE" || ticket.status === "NO_SHOW";
   const canCancel = live || ticket.status === "REQUESTED" || ticket.status === "CONFIRMED";
   const showComing = ticket.onTheWay && live;
   const showTryLook = ticket.tryOn && (live || ticket.status === "REQUESTED" || ticket.status === "CONFIRMED");
@@ -90,10 +92,27 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
   if (ticket.status === "CANCELLED") line = t(lang, "queueCancelled");
   if (ticket.status === "DONE") line = t(lang, "queueFinished");
   if (ticket.status === "NO_SHOW") line = t(lang, "queueMissed");
+  if (ticket.status === "EXPIRED") line = t(lang, "queueEnded");
 
   const joined = live || ticket.status === "IN_SERVICE"
-    ? t(lang, "queueJoined", { token: ticket.token, min: ticket.waitMin })
+    ? t(lang, "queueJoined", { token: ticket.token, min: minutes })
     : "";
+
+  if (terminal) {
+    const ended = ticket.status === "EXPIRED";
+    const offerAgain = ticket.status === "CANCELLED" || ticket.status === "EXPIRED";
+    return (
+      <div data-status={ticket.status} data-ready={ready ? "yes" : "no"} data-terminal="yes">
+        <p className="mt-6 text-lg" role="status">{ended ? t(lang, "queueEnded") : line}</p>
+        {offerAgain ? (
+          <p className="mt-4">
+            <a className="btn secondary" href={`/s/${slug}/queue`} data-join-again="yes">{t(lang, "queueRejoin")}</a>
+          </p>
+        ) : null}
+        {message ? <p className="mt-3 text-sm" role="status">{message}</p> : null}
+      </div>
+    );
+  }
 
   return (
     <div data-status={ticket.status} data-ready={ready ? "yes" : "no"}>

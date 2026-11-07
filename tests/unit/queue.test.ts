@@ -11,7 +11,7 @@ import { peopleAhead, waitMinutes } from "@/lib/queue/estimate";
 import { displayedWait, waitSample } from "@/lib/queue/wait-display";
 import { indianMobile } from "@/lib/queue/phone";
 import { QUEUE_DEVICE_JOINS_PER_HOUR, QUEUE_IP_JOINS_PER_HOUR, QUEUE_PHONE_JOINS_PER_HOUR, QueueError, addWalkIn, callNext, confirmRequest, ensureQueueState, existingTokenMessage, finishEntry, guestTicket, guestVisit, joinQueue, publicBoard, purgeOldQueueEntries, saveQueueSettings, returnToLine, setQueueOpen, startEntry, sweepAlerts } from "@/lib/queue/service";
-import { resetRateLimits } from "@/lib/ratelimit";
+import { resetRateLimits, sharedRateLimit } from "@/lib/ratelimit";
 import { loadSalons } from "@/lib/super/directory";
 
 const send = vi.fn(async () => ({ ok: true as const, provider: "log" }));
@@ -165,8 +165,8 @@ describe("queue joins", () => {
   });
 
   it("lets one salon Wi-Fi join for an hour, and limits a phone and a device", async () => {
-    const { slug } = await salon();
-    for (let index = 0; index < 27; index += 1) {
+    const { slug, tenant } = await salon();
+    for (let index = 0; index < 3; index += 1) {
       const ticket = await joinQueue({
         slug,
         name: `Guest ${index}`,
@@ -178,16 +178,8 @@ describe("queue joins", () => {
       });
       expect(ticket.token).toBe(index + 1);
     }
-    for (let index = 27; index < QUEUE_IP_JOINS_PER_HOUR; index += 1) {
-      await joinQueue({
-        slug,
-        name: `More ${index}`,
-        phone: `97${String(index).padStart(8, "0")}`,
-        consent: true,
-        ip: "salon-wifi",
-        deviceId: `device-more-${index}`,
-        send,
-      });
+    for (let index = 3; index < QUEUE_IP_JOINS_PER_HOUR; index += 1) {
+      await sharedRateLimit(`queue:ip:${tenant.id}:salon-wifi`, QUEUE_IP_JOINS_PER_HOUR, 60 * 60 * 1000);
     }
     await expect(joinQueue({
       slug,

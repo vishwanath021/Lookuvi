@@ -14,8 +14,8 @@ describe("launch copy", () => {
 
   it("explains the visit code for staff", () => {
     const html = renderToStaticMarkup(createElement(VisitUnlock, { show: true }));
-    expect(html).toContain("Guest short code from the try-on limit screen");
-    expect(html).toContain("Staff enter it here to allow more tries");
+    expect(html).toContain("Guests do not see that code");
+    expect(html).toContain("Add tries from Arrived");
   });
 
   it("tells a guest the join limit is not about free chairs", () => {

@@ -2,6 +2,14 @@
 
 import { useState } from "react";
 
+function safeResetNotice(message: unknown) {
+  const text = typeof message === "string" ? message : "";
+  if (!text || /RESEND_API_KEY|SMTP_URL|EMAIL_FROM|create-super-admin|node scripts/i.test(text)) {
+    return "Password reset is temporarily unavailable. Please contact support.";
+  }
+  return text;
+}
+
 export default function ResetPasswordPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,10 +27,10 @@ export default function ResetPasswordPage() {
     const data = await res.json().catch(() => ({}));
     setIsError(!res.ok);
     if (!res.ok) {
-      setMessage(res.status === 429 ? "Too many attempts. Please wait a few minutes and try again." : data.message || "Password reset is temporarily unavailable. Please contact support.");
+      setMessage(res.status === 429 ? "Too many attempts. Please wait a few minutes and try again." : safeResetNotice(data.message));
       return;
     }
-    setMessage(data.message || "If that account exists, we sent a reset link.");
+    setMessage(safeResetNotice(data.message) || "If that account exists, we sent a reset link.");
     if (data.devUrl) setMessage(`${data.message} Dev link: ${data.devUrl}`);
   }
 
@@ -35,7 +43,7 @@ export default function ResetPasswordPage() {
     });
     const data = await res.json().catch(() => ({}));
     setIsError(!res.ok);
-    setMessage(data.message || (res.ok ? "Password updated. You can sign in now." : "This reset link is invalid or has expired. Request a new one."));
+    setMessage(safeResetNotice(data.message) || (res.ok ? "Password updated. You can sign in now." : "This reset link is invalid or has expired. Request a new one."));
   }
 
   return (

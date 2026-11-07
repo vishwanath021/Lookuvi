@@ -11,6 +11,9 @@ import { bufferedInr, costUsdFromUsage, type UsageNumbers } from "@/lib/ai/tiers
 
 const VISION_URL = "https://api.openai.com/v1/chat/completions";
 const BUSY_MS = 2 * 60 * 1000;
+/** Long enough for a resized portrait. The route budget is 60s. A failure is not retried automatically. */
+export const HAIR_SUGGEST_TIMEOUT_MS = 50_000;
+export const HAIR_READING_RETRY = "We couldn't analyze your photo. Please try again.";
 
 const READING_SCHEMA = {
   type: "object",
@@ -115,7 +118,7 @@ export async function readHairVision(args: { apiKey: string; model: SuggestModel
         response_format: { type: "json_schema", json_schema: { name: "hair_reading", strict: true, schema: READING_SCHEMA } },
         max_completion_tokens: 300,
       }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(HAIR_SUGGEST_TIMEOUT_MS),
     });
   } catch (error) {
     logError("hair suggest vision", { code: error instanceof Error ? error.name : "fetch" });
@@ -303,6 +306,6 @@ export async function runHairSuggest(args: {
       requestId: failed.requestId,
     });
     logError("hair suggest failed", { code: failed.usage ? "unusable" : "unread" });
-    return { ok: false, status: 502, error: "VISION", message: "The hair reading did not complete. It was not sent again." };
+    return { ok: false, status: 502, error: "VISION", message: HAIR_READING_RETRY };
   }
 }

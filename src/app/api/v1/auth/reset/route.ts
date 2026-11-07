@@ -4,7 +4,6 @@ import { hash } from "bcryptjs";
 import { z } from "zod";
 import { tooMany } from "@/lib/http/guard";
 import { prisma } from "@/lib/prisma";
-import { revokeUserSessions } from "@/lib/session-revocation";
 
 const DEMO_PASSWORDS = new Set(["DemoSalon#2026", "DemoStaff#2026", "SuperAdmin#2026"]);
 
@@ -26,9 +25,29 @@ export async function POST(req: Request) {
   if (!row || row.used || row.expiresAt.getTime() < Date.now()) {
     return NextResponse.json({ error: "TOKEN", message: "That reset link has expired." }, { status: 400 });
   }
+  const user = await prisma.user.findUnique({ where: { email: row.email } });
+  if (!user || user.email !== row.email) {
+    return NextResponse.json({ error: "TOKEN", message: "That reset link has expired." }, { status: 400 });
+  }
   const passwordHash = await hash(parsed.data.password, 12);
-  const user = await prisma.user.update({ where: { email: row.email }, data: { passwordHash } });
-  await revokeUserSessions(user.id);
-  await prisma.passwordReset.update({ where: { id: row.id }, data: { used: true } });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const fresh = await tx.passwordReset.findUnique({ where: { id: row.id } });
+      if (!fresh || fresh.used || fresh.email !== user.email || fresh.expiresAt.getTime() < Date.now()) {
+        throw new Error("TOKEN");
+      }
+      const updated = await tx.user.updateMany({
+        where: { id: user.id, email: user.email },
+        data: { passwordHash, sessionVersion: { increment: 1 } },
+      });
+      if (updated.count !== 1) throw new Error("SCOPE");
+      await tx.passwordReset.updateMany({
+        where: { email: user.email, used: false },
+        data: { used: true },
+      });
+    });
+  } catch {
+    return NextResponse.json({ error: "TOKEN", message: "That reset link has expired." }, { status: 400 });
+  }
   return NextResponse.json({ ok: true, message: "Password updated. Sign in with the new password." });
 }

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { actualHeading, actualIsKnown, costSourceLabel } from "@/lib/ai/cost-source";
 import { resolveOpenAIKey } from "@/lib/ai/credentials";
 import { runHairSuggest } from "@/lib/ai/hair-suggest";
+import { suggestStyles } from "@/lib/hair-suitability";
 import { resolveSuggestModel } from "@/lib/ai/suggest-models";
 import { tooMany } from "@/lib/http/guard";
 import { ImageError, sanitizeSelfie } from "@/lib/images";
@@ -66,6 +67,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "MODEL", message: "That suggestion model is not available. Nothing was sent." }, { status: 400 });
   }
   const apiKey = await resolveOpenAIKey();
+  if (!apiKey && process.env.AI_PROVIDER === "mock") {
+    const config = await toSalonConfig(tenant);
+    const styles = config.styles.filter((style) => style.gender === gender.data);
+    const reading = { density: "medium" as const, texture: "wavy" as const, hairline: "medium" as const, faceShape: "oval" as const, confidence: 0.82 };
+    const suggestions = suggestStyles(styles, reading).map((row) => ({
+      id: row.style.id,
+      name: row.style.name,
+      reason: row.reason,
+      serviceKeys: row.style.serviceKeys ?? [],
+    }));
+    return NextResponse.json({ ...reading, cached: false, suggestions });
+  }
   if (!apiKey) {
     return NextResponse.json({ error: "KEY", message: "Hair suggestions need an OpenAI key on the platform. Nothing was sent." }, { status: 503 });
   }

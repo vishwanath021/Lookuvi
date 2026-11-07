@@ -308,7 +308,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
     cached: Boolean(ownKey && ownCache.current.has(ownKey)),
   });
   const counter = tryCounterLabel(visit.used, visit.allowance);
-  const capNote = (text: string) => text ? `${text}${visit.code ? `. Code ${visit.code}` : ""}` : "";
+  const capNote = (text: string) => text;
 
   useEffect(() => {
     if (panel !== "looks" || !looksKey) return;

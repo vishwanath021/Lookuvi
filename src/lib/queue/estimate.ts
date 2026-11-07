@@ -20,9 +20,24 @@ export function peopleAhead<T extends WaitRow>(rows: T[], selfId: string | null)
   return [...serving, ...called, ...waiting];
 }
 
+/** Minutes still left on a service that has already started. A guest who has not started keeps the full block. */
+export function remainingServiceMinutes(fullMinutes: number, startedAt: Date | null | undefined, now: Date) {
+  const full = Math.max(0, Math.floor(Number(fullMinutes) || 0));
+  if (!startedAt) return full;
+  const elapsed = Math.floor((now.getTime() - startedAt.getTime()) / 60_000);
+  return Math.max(0, full - Math.max(0, elapsed));
+}
+
 /** Sum of the minutes ahead, split across the open chairs, stations, or rooms. */
 export function waitMinutes(minutes: number[], units: number) {
   const active = Math.max(1, units);
   const sum = minutes.reduce((total, value) => total + Math.max(1, value), 0);
+  return Math.ceil(sum / active);
+}
+
+/** Same split as waitMinutes, but a finished chair (0 minutes left) does not add another minute. */
+export function waitMinutesRemaining(minutes: number[], units: number) {
+  const active = Math.max(1, units);
+  const sum = minutes.reduce((total, value) => total + Math.max(0, value), 0);
   return Math.ceil(sum / active);
 }

@@ -29,6 +29,28 @@ export function tabLookCacheKey(slug: string) {
   return `lookuvi-tab-looks:v1:${slug}`;
 }
 
+const tabMemory = new Map<string, string>();
+
+/** Prefer the in-tab copy so a remount still has the previews when sessionStorage is full. */
+export function readTabSessionRaw(slug: string) {
+  const mem = tabMemory.get(slug);
+  if (mem) return mem;
+  try {
+    return sessionStorage.getItem(tabLookCacheKey(slug));
+  } catch {
+    return null;
+  }
+}
+
+export function writeTabSessionRaw(slug: string, raw: string) {
+  tabMemory.set(slug, raw);
+  try {
+    sessionStorage.setItem(tabLookCacheKey(slug), raw);
+  } catch {
+    /* Quota. The memory map still restores the screen in this tab. */
+  }
+}
+
 /** A new result replaces only that tab. The other tabs stay. */
 export function putTabLook(map: TabLookMap, look: TabLook): TabLookMap {
   return { ...map, [look.tool]: look };

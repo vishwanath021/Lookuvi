@@ -74,7 +74,7 @@ export function BeforeAfter({
         setFromClientX(event.clientX);
       }}
     >
-      {showAiBadge ? <AiGeneratedBadge lang={lang} /> : null}
+      {showAiBadge ? <AiGeneratedBadge lang={lang} place="banner" /> : null}
       <img src={after} alt={afterLabel} className={`absolute inset-0 h-full w-full object-cover object-center${afterClassName ? ` ${afterClassName}` : ""}`} draggable={false} />
       <img
         src={before}

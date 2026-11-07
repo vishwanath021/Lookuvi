@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { VISIT_CAP_MESSAGE } from "@/lib/visit-tries";
 
 type Visit = { sessionId: string; code: string; used: number; allowance: number };
 
@@ -57,7 +56,7 @@ export function VisitUnlock({ show = true }: { show?: boolean }) {
         </label>
         <button className="btn" type="submit">Unlock</button>
       </form>
-      <p className="text-xs text-muted">Guest short code from the try-on limit screen. Staff enter it here to allow more tries. Shown when a guest sees “{VISIT_CAP_MESSAGE}”.</p>
+      <p className="text-xs text-muted">Guests are asked to tell the desk their name. Add tries from Arrived, or enter the session code listed here. Guests do not see that code.</p>
       {note ? <p className="text-sm" role="status">{note}</p> : null}
     </section>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { UserCameraDialog } from "@/components/tryon/UserCameraDialog";
 
 export type WearSlot = {
   id: string;
@@ -28,7 +29,7 @@ export function WearTiles({
   const [active, setActive] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const slotRef = useRef<string | null>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const galleryRef = useRef<HTMLInputElement>(null);
   const slot = slots.find((item) => item.id === active) || null;
 
@@ -110,23 +111,15 @@ export function WearTiles({
             onClick={(event) => event.stopPropagation()}
           >
             <p className="text-sm font-medium leading-tight">{slot.label}</p>
-            <button className="btn sheen w-full" type="button" onClick={() => cameraRef.current?.click()}>Take photo</button>
+            <button className="btn sheen w-full" type="button" data-photo-action="camera" onClick={() => setCameraOpen(true)}>Take photo</button>
             <button className="btn secondary w-full" type="button" onClick={() => galleryRef.current?.click()}>Upload from gallery</button>
           </div>
         </div>
       ) : null}
-      <input
-        ref={cameraRef}
-        className="sr-only"
-        type="file"
-        accept="image/*"
-        capture="environment"
-        data-wear-capture="camera"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          event.target.value = "";
-          takeFile(file);
-        }}
+      <UserCameraDialog
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={(blob) => takeFile(new File([blob], "photo.jpg", { type: "image/jpeg" }))}
       />
       <input
         ref={galleryRef}
