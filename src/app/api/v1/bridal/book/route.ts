@@ -1,3 +1,4 @@
+import { isPastKolkataDay, PAST_DATE_MESSAGE } from "@/lib/queue/day";
 import { isBlockedStatus } from "@/lib/salon-status";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -27,6 +28,9 @@ export async function POST(req: Request) {
   const tenant = await loadTenantBySlug(parsed.data.slug);
   if (!tenant || isBlockedStatus(tenant.status)) return NextResponse.json({ error: "TENANT" }, { status: 404 });
   if (!tenant.productBridal) return NextResponse.json({ error: "PRODUCT", message: "Bridal is turned off for this salon." }, { status: 404 });
+  if (isPastKolkataDay(parsed.data.eventDate)) {
+    return NextResponse.json({ error: "DATE", message: PAST_DATE_MESSAGE }, { status: 400 });
+  }
   const event = bridalEventById(parsed.data.eventId);
   if (!event) return NextResponse.json({ error: "EVENT", message: "Choose the event." }, { status: 400 });
   const looks = parsed.data.lookIds.map((id) => bridalLookById(id)).filter((look) => look !== null);

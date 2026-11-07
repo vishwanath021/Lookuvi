@@ -23,6 +23,7 @@ describe("look result actions", () => {
     const zoom = renderToStaticMarkup(createElement(LookZoom, { src: "/look.jpg", onClose: () => undefined }));
     expect(zoom).toContain("Zoom in");
     expect(zoom).toContain("Zoom out");
+    expect(zoom).toContain("Reset");
     expect(zoom).toContain("data-zoom=\"open\"");
     expect(zoom).not.toContain("overflow-y-auto");
   });

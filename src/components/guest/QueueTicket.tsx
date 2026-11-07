@@ -104,6 +104,7 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
     return (
       <div data-status={ticket.status} data-ready={ready ? "yes" : "no"} data-terminal="yes">
         <p className="mt-6 text-lg" role="status">{ended ? t(lang, "queueEnded") : line}</p>
+        {ticket.status === "DONE" && ticket.points ? <p className="mt-3 text-sm" data-loyalty-points={ticket.points}>{ticket.pointsLine}</p> : null}
         {offerAgain ? (
           <p className="mt-4">
             <a className="btn secondary" href={`/s/${slug}/queue`} data-join-again="yes">{t(lang, "queueRejoin")}</a>

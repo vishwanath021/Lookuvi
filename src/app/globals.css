@@ -585,6 +585,8 @@ textarea { min-height: 48px; }
   place-items: center;
   overflow: hidden;
   background: #1c1524;
+  touch-action: none;
+  user-select: none;
 }
 .look-zoom img {
   max-width: 100%;
@@ -592,6 +594,7 @@ textarea { min-height: 48px; }
   object-fit: contain;
   touch-action: none;
   transform-origin: center;
+  cursor: grab;
 }
 .look-zoom-close {
   position: absolute;
@@ -607,6 +610,101 @@ textarea { min-height: 48px; }
   gap: 0.6rem;
   transform: translateY(-50%);
 }
+.look-zoom-reset {
+  position: absolute;
+  left: 50%;
+  bottom: max(0.85rem, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  min-height: 48px;
+  min-width: 7.5rem;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: #3e304b;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 0.55rem 1.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+}
+.crop-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem 0.85rem max(0.85rem, env(safe-area-inset-bottom));
+  background: #1c1524;
+  color: #fff;
+}
+.crop-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+.crop-stage {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  place-items: center;
+  overflow: hidden;
+}
+.crop-frame {
+  position: relative;
+  max-width: 100%;
+  margin: 2.25rem;
+}
+.crop-frame img {
+  display: block;
+  max-width: 100%;
+  max-height: min(62vh, 640px);
+  object-fit: contain;
+  user-select: none;
+}
+.crop-box {
+  position: absolute;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 9999px rgba(12, 8, 16, 0.55);
+  touch-action: none;
+  cursor: move;
+}
+.crop-handle {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  touch-action: none;
+  cursor: grab;
+}
+.crop-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  border: 3px solid #3e304b;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.crop-handle-nw { left: 0; top: 0; transform: translate(-50%, -50%); }
+.crop-handle-ne { right: 0; top: 0; transform: translate(50%, -50%); }
+.crop-handle-sw { left: 0; bottom: 0; transform: translate(-50%, 50%); }
+.crop-handle-se { right: 0; bottom: 0; transform: translate(50%, 50%); }
+.crop-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.crop-actions .btn { width: 100%; min-height: 52px; font-size: 17px; }
 .bridal-shimmer {
   background-color: #f3e6d8;
   background-image: linear-gradient(100deg, rgba(243, 230, 216, 0) 20%, rgba(255, 250, 245, 0.95) 45%, rgba(243, 230, 216, 0) 70%);

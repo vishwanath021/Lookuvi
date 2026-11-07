@@ -1,3 +1,4 @@
+import "@/lib/zod-jitless";
 import { z } from "zod";
 
 const optionalId = z.string().trim().max(80).optional().catch(undefined);

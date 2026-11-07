@@ -7,6 +7,7 @@ import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio } from "@/components/tryon/LiveStudio";
 import { LookResultActions, PhotoActions, ResultZoom } from "@/components/tryon/LookResultActions";
+import { CropPhotoButton } from "@/components/tryon/PhotoCrop";
 import { LargeFrame, LiveTray, MakeupSwatches, SelectionSummary, StepCard, StepRail, TryBar, scrollToStep } from "@/components/tryon/LookStepper";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import { OWN_LOOK_SLOTS, type OwnLookSlotId } from "@/data/bridal-own";
@@ -379,6 +380,9 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
           liveLabel="Live capture"
           trayReady={camReady}
           onShutter={() => void captureLive()}
+          onCrop={async (blob) => {
+            storeShot("face", await shotFromBlob(await shrinkPhoto(blob, OWN_SELFIE_EDGE)));
+          }}
           preview={result && !busy ? (
             <>
               <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" />
@@ -436,6 +440,7 @@ function PhotoBox({
   preview = null,
   trayReady = false,
   onShutter,
+  onCrop,
 }: {
   boxRef: (node: HTMLDivElement | null) => void;
   name: string;
@@ -452,6 +457,7 @@ function PhotoBox({
   preview?: ReactNode;
   trayReady?: boolean;
   onShutter?: () => void;
+  onCrop?: (blob: Blob) => void | Promise<void>;
 }) {
   const body = live ? camera : preview ? preview : (
     <>
@@ -471,6 +477,7 @@ function PhotoBox({
         <PhotoActions settled={Boolean(preview)} className="mt-2 grid w-full max-w-[28rem] gap-2">
           <button className="btn sheen" type="button" onClick={onLive}>{liveLabel}</button>
           <button className="btn secondary" type="button" onClick={onUpload}>{large ? "Upload" : "Use photo"}</button>
+          {shot && onCrop ? <CropPhotoButton src={shot.url} onApply={onCrop} /> : null}
         </PhotoActions>
       )}
     </div>
