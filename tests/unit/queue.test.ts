@@ -10,7 +10,7 @@ import { kolkataDayKey } from "@/lib/queue/day";
 import { peopleAhead, waitMinutes } from "@/lib/queue/estimate";
 import { displayedWait, waitSample } from "@/lib/queue/wait-display";
 import { indianMobile } from "@/lib/queue/phone";
-import { QUEUE_DEVICE_JOINS_PER_HOUR, QUEUE_IP_JOINS_PER_HOUR, QUEUE_PHONE_JOINS_PER_HOUR, QueueError, addWalkIn, callNext, confirmRequest, ensureQueueState, existingTokenMessage, finishEntry, guestTicket, guestVisit, joinQueue, publicBoard, purgeOldQueueEntries, saveQueueSettings, setQueueOpen, startEntry, sweepAlerts } from "@/lib/queue/service";
+import { QUEUE_DEVICE_JOINS_PER_HOUR, QUEUE_IP_JOINS_PER_HOUR, QUEUE_PHONE_JOINS_PER_HOUR, QueueError, addWalkIn, callNext, confirmRequest, ensureQueueState, existingTokenMessage, finishEntry, guestTicket, guestVisit, joinQueue, publicBoard, purgeOldQueueEntries, saveQueueSettings, returnToLine, setQueueOpen, startEntry, sweepAlerts } from "@/lib/queue/service";
 import { resetRateLimits } from "@/lib/ratelimit";
 import { loadSalons } from "@/lib/super/directory";
 
@@ -103,6 +103,10 @@ describe("queue joins", () => {
     expect(send.mock.calls.filter((call) => call[0].kind === "almost")).toHaveLength(0);
     const row = await prisma.queueEntry.findFirstOrThrow({ where: { cancelToken: first.ref } });
     expect(row.status).toBe("CALLED");
+    const back = await returnToLine(tenant.id, row.id);
+    expect(back.serving.every((seat) => !seat.entry)).toBe(true);
+    expect(back.waiting.some((card) => card.id === row.id)).toBe(true);
+    await callNext(tenant.id, send);
     expect(row.alertSentAt).toBeNull();
     await finishEntry(tenant.id, row.id, "DONE", send);
     await callNext(tenant.id, send);
@@ -111,6 +115,7 @@ describe("queue joins", () => {
 
   it("sends an online guest one near-turn alert and does not send it again when they are called", async () => {
     const { slug, tenant } = await salon();
+    await prisma.tenant.update({ where: { id: tenant.id }, data: { whatsappAlmostOn: true } });
     await saveQueueSettings(tenant.id, { units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "LIVE", unitLabel: "chair" });
     const ticket = await joinQueue({ slug, name: "Asha", phone: "9876500111", consent: true, ip: "near", send });
     expect(ticket.waitMin).toBe(0);
@@ -122,9 +127,10 @@ describe("queue joins", () => {
     expect(send.mock.calls[1][0].kind).toBe("almost");
   });
 
-  it("sends a walk-in with a phone only the join message", async () => {
+  it("sends a walk-in with a phone only the join message when the salon asks for it", async () => {
     const { slug, tenant } = await salon();
     await saveQueueSettings(tenant.id, { units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "LIVE", unitLabel: "chair" });
+    await prisma.tenant.update({ where: { id: tenant.id }, data: { whatsappWalkInJoined: true } });
     send.mockClear();
     await addWalkIn(tenant.id, { name: "Phone", phone: "9876500112" }, send);
     expect(send.mock.calls).toHaveLength(1);
@@ -139,6 +145,10 @@ describe("queue joins", () => {
     expect(send.mock.calls[0][0].parameters[5]).toBe(`http://localhost:3000/s/${slug}`);
     await addWalkIn(tenant.id, { name: "Desk" }, send);
     expect(send.mock.calls).toHaveLength(1);
+    await prisma.tenant.update({ where: { id: tenant.id }, data: { whatsappWalkInJoined: false } });
+    send.mockClear();
+    await addWalkIn(tenant.id, { name: "Quiet", phone: "9876500199" }, send);
+    expect(send.mock.calls).toHaveLength(0);
     await expect(addWalkIn(tenant.id, { name: "Bad", phone: "12345" }, send)).rejects.toMatchObject({ code: "PHONE" });
   });
 

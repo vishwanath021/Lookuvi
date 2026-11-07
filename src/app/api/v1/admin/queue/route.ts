@@ -11,6 +11,7 @@ import {
   finishEntry,
   saveQueueSettings,
   setQueueOpen,
+  returnToLine,
   startEntry,
 } from "@/lib/queue/service";
 import { requireMembership } from "@/lib/session";
@@ -20,6 +21,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("pause") }),
   z.object({ action: z.literal("next") }),
   z.object({ action: z.literal("start"), id: z.string().min(1) }),
+  z.object({ action: z.literal("return"), id: z.string().min(1) }),
   z.object({ action: z.literal("done"), id: z.string().min(1) }),
   z.object({ action: z.literal("noshow"), id: z.string().min(1) }),
   z.object({ action: z.literal("arrived"), id: z.string().min(1) }),
@@ -78,6 +80,7 @@ export async function POST(req: Request) {
     if (body.action === "pause") return NextResponse.json(await setQueueOpen(tenant.id, false));
     if (body.action === "next") return NextResponse.json(await callNext(tenant.id));
     if (body.action === "start") return NextResponse.json(await startEntry(tenant.id, body.id));
+    if (body.action === "return") return NextResponse.json(await returnToLine(tenant.id, body.id));
     if (body.action === "done") return NextResponse.json(await finishEntry(tenant.id, body.id, "DONE"));
     if (body.action === "noshow") return NextResponse.json(await finishEntry(tenant.id, body.id, "NO_SHOW"));
     if (body.action === "arrived" || body.action === "dismiss" || body.action === "tries") {

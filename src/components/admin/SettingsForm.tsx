@@ -43,6 +43,8 @@ export function SettingsForm({
     productMakeupStudio?: boolean;
     visitTryLimit: number;
     tryOnsAtSalon?: boolean;
+    whatsappAlmostOn?: boolean;
+    whatsappWalkInJoined?: boolean;
     logoUrl: string | null;
     openTime?: string;
     closeTime?: string;
@@ -60,6 +62,8 @@ export function SettingsForm({
     ...initial,
     productMakeupStudio: initial.productMakeupStudio ?? false,
     tryOnsAtSalon: initial.tryOnsAtSalon ?? true,
+    whatsappAlmostOn: initial.whatsappAlmostOn ?? false,
+    whatsappWalkInJoined: initial.whatsappWalkInJoined ?? false,
     openTime: initial.openTime ?? "",
     closeTime: initial.closeTime ?? "",
   });
@@ -176,6 +180,18 @@ export function SettingsForm({
           )}
         </div>
         <label className="text-sm">WhatsApp<input className="field mt-1" value={form.whatsapp} onChange={(event) => set("whatsapp", event.target.value)} /></label>
+        <fieldset className="grid gap-2 text-sm">
+          <legend className="font-medium">WhatsApp messages</legend>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" aria-label="Almost your turn message" checked={form.whatsappAlmostOn} onChange={(event) => set("whatsappAlmostOn", event.target.checked)} />
+            Almost your turn message
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" aria-label="Joined message for walk-ins" checked={form.whatsappWalkInJoined} onChange={(event) => set("whatsappWalkInJoined", event.target.checked)} />
+            Joined message for walk-ins added by staff
+          </label>
+          <p className="text-xs text-muted">Both are off until you turn them on. Guests who join from home still get the joined message. Booking confirmed stays on.</p>
+        </fieldset>
         <label className="text-sm">Address<input className="field mt-1" value={form.address} onChange={(event) => set("address", event.target.value)} /></label>
         <label className="text-sm">Maps link<input className="field mt-1" value={form.mapsUrl} onChange={(event) => set("mapsUrl", event.target.value)} /></label>
         <label className="text-sm">City<input className="field mt-1" value={form.city} onChange={(event) => set("city", event.target.value)} /></label>

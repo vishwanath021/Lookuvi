@@ -58,7 +58,7 @@ export function LookPicker({
         ))}
       </div>
       {visible.length === 0 ? <p className="mt-3 text-sm text-muted">{category === "saved" && !query ? "No saved styles yet." : "No matches."}</p> : null}
-      <div className="mt-3 grid grid-cols-3 gap-2 lg:grid-cols-4">
+      <div className="look-grid mt-3 grid grid-cols-3 gap-2 lg:grid-cols-4">
         {visible.map((item) => {
           const on = item.id === selectedId;
           return (

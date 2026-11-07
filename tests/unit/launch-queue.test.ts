@@ -25,7 +25,7 @@ async function resetSalons() {
 
 async function salon(slug: string, name: string) {
   const tenant = await prisma.tenant.create({
-    data: { slug, name, productQueue: true, productTryOn: true, whatsapp: "919800011122" },
+    data: { slug, name, productQueue: true, productTryOn: true, whatsapp: "919800011122", whatsappAlmostOn: true },
   });
   const service = await prisma.service.create({
     data: { tenantId: tenant.id, key: "cut", name: "Haircut", priceInr: 400, durationMin: 20 },

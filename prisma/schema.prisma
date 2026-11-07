@@ -42,6 +42,10 @@ model Tenant {
   visitTryLimit       Int       @default(1)
   /** Free AI try-ons wait until the guest is at the salon today. Off for the sales demo. */
   tryOnsAtSalon       Boolean   @default(true)
+  /** WhatsApp when a waiting guest is nearly due. Off until the owner turns it on. */
+  whatsappAlmostOn    Boolean   @default(false)
+  /** WhatsApp when staff add a walk-in who has a phone. Off until the owner turns it on. */
+  whatsappWalkInJoined Boolean  @default(false)
   /** One WhatsApp reminder after a completed visit. */
   remindersOn         Boolean   @default(true)
   /** Whole days after lastVisitAt. The owner screen allows 28 to 42. */

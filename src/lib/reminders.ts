@@ -4,6 +4,7 @@ import { kolkataMonthKey } from "@/lib/queue/day";
 import { notifyGuest, templateFor, whatsAppConfigured, type NotifyEnv, type NotifyMessage, type NotifyResult } from "@/lib/notify";
 import { offerMessage, queueHomeUrl, reminderMessage, tryOnUrl } from "@/lib/queue/messages";
 import { cleanOffer } from "@/lib/customers/parse";
+import { comeBackSkipMessage, comeBackStep } from "@/lib/customers/comeback";
 import { blockedPhoneSet, phoneBlockedForSalon } from "@/lib/customers/service";
 
 const OUTREACH_LOCK = 872164;
@@ -244,9 +245,26 @@ export async function sendComeBack(
   let sent = 0;
   let skipped = 0;
   let held = 0;
+  let blockedStep: "wait" | "done" | "early" | "" = "";
   for (const person of people) {
     if (person.optedOutAt || blocked.has(person.phone) || person.optOutSource === "STOP") {
       skipped += 1;
+      continue;
+    }
+    const prior = await prisma.whatsAppSend.findMany({
+      where: {
+        tenantId,
+        customerId: person.id,
+        kind: "reminder",
+        status: "SENT",
+        ...(person.lastVisitAt ? { createdAt: { gte: person.lastVisitAt } } : {}),
+      },
+      select: { createdAt: true },
+    });
+    const step = comeBackStep(person.lastVisitAt, prior.map((row) => row.createdAt), now);
+    if (step !== "send") {
+      skipped += 1;
+      blockedStep = step;
       continue;
     }
     const claimed = await prisma.customer.updateMany({
@@ -299,6 +317,7 @@ export async function sendComeBack(
     }
   }
   if (sent === 0 && held > 0) return { ok: false as const, message: "The monthly WhatsApp limit is used. Nothing was sent.", sent, skipped };
+  if (sent === 0 && blockedStep) return { ok: false as const, message: comeBackSkipMessage(blockedStep), sent, skipped };
   if (sent === 0 && skipped > 0) return { ok: false as const, message: "Those customers have reminders off. Nothing was sent.", sent, skipped };
   if (sent === 0) return { ok: false as const, message: "Nothing was sent.", sent, skipped };
   const skipNote = skipped ? ` ${skipped} ${skipped === 1 ? "has" : "have"} reminders off.` : "";

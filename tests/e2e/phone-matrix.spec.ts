@@ -192,8 +192,12 @@ test("owner: open and pause the queue, add walk-ins, then Next, Done, and No-sho
   await expect(page.getByText("Matrix Phone", { exact: true })).toBeVisible();
   await page.locator("[data-call-next='yes']:visible").click();
   await expect(page.getByRole("heading", { name: "Chairs" })).toBeVisible();
-  await expect(page.locator("article").filter({ hasText: "Matrix Phone" }).getByRole("button", { name: "Done" })).toBeVisible();
-  await page.locator("article").filter({ hasText: "Matrix Phone" }).getByRole("button", { name: "Done" }).click();
+  const called = page.locator("article").filter({ hasText: "Matrix Phone" });
+  await expect(called.getByRole("button", { name: "Start", exact: true })).toBeVisible();
+  await expect(called.getByRole("button", { name: "Not here" })).toBeVisible();
+  await expect(called.getByRole("button", { name: "Done" })).toHaveCount(0);
+  await called.getByRole("button", { name: "Start", exact: true }).click();
+  await called.getByRole("button", { name: "Done" }).click();
   await expect(page.getByText("Matrix Phone")).toHaveCount(0);
 
   await page.getByLabel("Walk-in name").fill("Matrix Desk");
