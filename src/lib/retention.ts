@@ -4,7 +4,7 @@ import { syncFalBillingCosts } from "@/lib/ai/fal-billing";
 import { numberEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { sweepDueReminders } from "@/lib/reminders";
-import { purgeOldQueueEntries, sweepAllQueues } from "@/lib/queue/service";
+import { expireDueVisits, purgeOldQueueEntries, sweepAllQueues } from "@/lib/queue/service";
 import { deleteObject } from "@/lib/storage";
 import { expireTrials } from "@/lib/trial";
 
@@ -30,11 +30,12 @@ export async function runRetention() {
   const oldBuckets = new Date(Date.now() - 48 * 60 * 60 * 1000);
   await prisma.rateBucket.deleteMany({ where: { resetAt: { lt: oldBuckets } } }).catch(() => undefined);
   const queue = await purgeOldQueueEntries().catch(() => 0);
+  const queueExpired = await expireDueVisits().catch(() => 0);
   const alerts = await sweepAllQueues().catch(() => ({ sent: 0, salons: 0 }));
   const reminders = await sweepDueReminders().catch(() => ({ sent: 0, reason: "FAIL", salons: 0 }));
   const expired = await expireTrials().catch(() => 0);
   const costSync = await syncFalBillingCosts().then((row) => (row.ok ? row.updated : 0)).catch(() => 0);
-  return { jobs: staleJobs.length, benchmarks: staleRuns.length, queue, alerts: alerts.sent, reminders: reminders.sent, expired, costSync };
+  return { jobs: staleJobs.length, benchmarks: staleRuns.length, queue, queueExpired, alerts: alerts.sent, reminders: reminders.sent, expired, costSync };
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;

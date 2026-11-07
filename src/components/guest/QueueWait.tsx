@@ -5,7 +5,7 @@ import { t } from "@/data/i18n";
 import { displayedWait, waitSample } from "@/lib/queue/wait-display";
 
 /** Counts the server wait down once a minute. Resamples when the server figure changes; never remounts on poll. */
-function useDisplayedWait(serverWait: number) {
+export function useDisplayedWait(serverWait: number) {
   const [sample, setSample] = useState(() => ({ wait: serverWait, at: Date.now() }));
   const [now, setNow] = useState(() => Date.now());
   const next = waitSample(sample, serverWait, Date.now());

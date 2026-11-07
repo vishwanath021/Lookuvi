@@ -16,16 +16,54 @@ export function resetRateLimits() {
 }
 
 /**
- * When the load balancer overwrites or appends X-Forwarded-For, the trusted hop is the
- * rightmost address (or TRUSTED_PROXY_HOPS from the right). The left-most value is client-supplied.
- * Without TRUST_PROXY the header is ignored so a caller cannot pick a fresh bucket.
+ * Addresses that belong to a reverse proxy, a Docker bridge, or a loopback hop.
+ * They are not a customer. Using one of them as a rate-limit key puts every guest in one bucket.
+ */
+export function isPrivateOrLocalIp(value: string) {
+  const ip = value.trim().toLowerCase().replace(/^::ffff:/, "");
+  if (!ip || ip === "::1" || ip === "localhost") return true;
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+  if (!match) return false;
+  const parts = match.slice(1).map(Number);
+  if (parts.some((part) => part > 255)) return false;
+  const [a, b] = parts;
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  return false;
+}
+
+/** True when this value must not be a shared public rate-limit key. */
+export function isSharedProxyAddress(ip: string) {
+  return !ip || ip === "unknown" || ip === "direct" || ip === "proxy" || isPrivateOrLocalIp(ip);
+}
+
+function publicIp(value: string) {
+  const ip = value.trim().replace(/^::ffff:/i, "");
+  if (!ip || ip.length > 64 || /\s/.test(ip)) return "";
+  if (isPrivateOrLocalIp(ip)) return "";
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) return ip;
+  if (ip.includes(":") && /^[0-9a-fA-F:]+$/.test(ip)) return ip;
+  return "";
+}
+
+/**
+ * Trust X-Forwarded-For only when the app is behind the known reverse proxy (TRUST_PROXY).
+ * Caddy overwrites the header with the connecting client and may leave a private hop on the right.
+ * Walk from the right and skip private/proxy hops so customers are not collapsed onto the proxy address.
+ * The left-most value is never preferred: a caller can spoof it. Without TRUST_PROXY the header is ignored.
  */
 export function clientIp(headerValue: string | null, trustProxy = process.env.TRUST_PROXY === "true") {
-  if (!headerValue) return "unknown";
+  if (!headerValue || !trustProxy) return "unknown";
   const parts = headerValue.split(",").map((part) => part.trim()).filter(Boolean);
-  if (!trustProxy || parts.length === 0) return "unknown";
-  const hops = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS || 1));
-  return parts[Math.max(0, parts.length - hops)] || "unknown";
+  if (parts.length === 0) return "unknown";
+  for (let index = parts.length - 1; index >= 0; index -= 1) {
+    const ip = publicIp(parts[index]);
+    if (ip) return ip;
+  }
+  return "proxy";
 }
 
 export function requestClientIp(
@@ -34,8 +72,8 @@ export function requestClientIp(
 ) {
   if (env.TRUST_PROXY !== "true") return "direct";
   if (env.TRUST_CF_HEADER === "true") {
-    const cf = req.headers.get("cf-connecting-ip");
-    if (cf?.trim()) return cf.trim();
+    const cf = publicIp(req.headers.get("cf-connecting-ip") || "");
+    if (cf) return cf;
   }
   return clientIp(req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip"), true);
 }

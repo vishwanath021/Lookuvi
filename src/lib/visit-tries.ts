@@ -3,7 +3,7 @@ export const VISIT_TRY_KINDS = ["BRIDAL", "MEHENDI", "GROOM", "GROOM_OWN", "BRID
 
 export const DEFAULT_VISIT_TRY_LIMIT = 1;
 
-export const VISIT_CAP_MESSAGE = "Ask the salon to unlock more tries";
+export const VISIT_CAP_MESSAGE = "Ask the salon to unlock more tries. Tell the desk your name and they can add more from Arrived.";
 
 export type CachedLook = { url: string; name: string; before: string };
 

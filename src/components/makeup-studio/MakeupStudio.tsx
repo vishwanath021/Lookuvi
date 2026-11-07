@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
+import { UserCameraDialog } from "@/components/tryon/UserCameraDialog";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import { useVisitTries } from "@/components/tryon/useVisitTries";
 import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
@@ -84,7 +85,7 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
   const consent = usePhotoConsent(config.slug, config.defaultLang || "en");
   const visit = useVisitTries(config.slug);
   const uploadRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const photoRef = useRef<Photo | null>(null);
   const [photo, setPhoto] = useState<Photo | null>(null);
@@ -283,7 +284,7 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
       </button>
       <div className="flex gap-2">
         <button className="btn secondary flex-1" type="button" onClick={() => uploadRef.current?.click()}>Upload</button>
-        <button className="btn secondary flex-1" type="button" onClick={() => cameraRef.current?.click()}>Take photo</button>
+        <button className="btn secondary flex-1" type="button" data-photo-action="camera" onClick={() => consent.gate(() => setCameraOpen(true))}>Take photo</button>
       </div>
       {visit.atLimit ? <p className="text-sm text-muted">{VISIT_CAP_MESSAGE}</p> : null}
       {demo ? <p className="text-xs text-muted">Sample</p> : null}
@@ -294,7 +295,11 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
   return (
     <section data-makeup-studio="on" data-makeup-status={status} className="relative">
       <input ref={uploadRef} data-makeup-upload className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void onFile(event.target.files?.[0])} />
-      <input ref={cameraRef} data-makeup-camera className="sr-only" type="file" accept="image/*" capture="user" onChange={(event) => void onFile(event.target.files?.[0])} />
+      <UserCameraDialog
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={(blob) => { void onFile(new File([blob], "selfie.jpg", { type: "image/jpeg" })); }}
+      />
       <ConsentSheet open={consent.open} lang={config.defaultLang || "en"} onAgree={(ageGate) => void consent.agree(ageGate)} onClose={consent.close} />
       <div className="md:grid md:grid-cols-[240px_minmax(0,1fr)_240px] md:items-start md:gap-4">
         <div className="max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:max-h-[52dvh] max-md:overflow-y-auto max-md:rounded-t-2xl max-md:border max-md:border-line max-md:bg-white max-md:p-3 max-md:shadow-[0_-8px_24px_rgba(62,48,75,0.12)] md:contents">
@@ -313,7 +318,7 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
               <p className="font-serif text-2xl">Makeup</p>
               <div className="flex w-full max-w-xs gap-2">
                 <button className="btn secondary flex-1" type="button" onClick={() => uploadRef.current?.click()}>Upload</button>
-                <button className="btn flex-1" type="button" onClick={() => cameraRef.current?.click()}>Take photo</button>
+                <button className="btn flex-1" type="button" data-photo-action="camera" onClick={() => consent.gate(() => setCameraOpen(true))}>Take photo</button>
               </div>
             </div>
           ) : (

@@ -10,7 +10,7 @@ import { possessesWithdrawSession } from "@/lib/data-request";
 import { customerActionNeedsOwner, queueActionNeedsOwner } from "@/lib/desk-role";
 import { prisma } from "@/lib/prisma";
 import { requestClientIp } from "@/lib/ratelimit";
-import { deleteObject, putObject } from "@/lib/storage";
+import { deleteObject, getObject, putObject } from "@/lib/storage";
 
 describe("embed content security policy", () => {
   it("keeps the nonce script policy and only relaxes frame-ancestors", () => {
@@ -35,7 +35,7 @@ describe("client ip", () => {
   };
 
   it("ignores cf-connecting-ip unless TRUST_CF_HEADER is true", () => {
-    expect(requestClientIp({ headers }, { TRUST_PROXY: "true" })).toBe("127.0.0.1");
+    expect(requestClientIp({ headers }, { TRUST_PROXY: "true" })).toBe("198.51.100.10");
     expect(requestClientIp({ headers }, { TRUST_PROXY: "true", TRUST_CF_HEADER: "true" })).toBe("203.0.113.50");
     expect(requestClientIp({ headers }, { TRUST_PROXY: "false", TRUST_CF_HEADER: "true" })).toBe("direct");
   });
@@ -55,6 +55,7 @@ describe("private object modes", () => {
     const dirMode = (await stat(path.dirname(file))).mode & 0o777;
     expect(fileMode).toBe(0o640);
     expect(dirMode).toBe(0o750);
+    expect((await getObject(key))?.toString()).toBe("jpeg");
     await deleteObject(key);
   });
 

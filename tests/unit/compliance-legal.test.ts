@@ -14,6 +14,7 @@ import {
   DEFAULT_GRIEVANCE_OFFICER_EMAIL,
   DEFAULT_GRIEVANCE_OFFICER_NAME,
   DEFAULT_POSTAL_ADDRESS,
+  DEFAULT_SUPPORT_EMAIL,
   FOUNDERS,
 } from "@/lib/legal";
 
@@ -47,7 +48,9 @@ describe("compliance legal pages", () => {
     expect(privacy).toContain("outside India");
     expect(privacy).toContain("Cookies");
     expect(privacy).toContain("targeted advertising");
-    expect(privacy).toContain(DEFAULT_POSTAL_ADDRESS);
+    expect(privacy).toContain("Hyderabad, Telangana, India");
+    expect(privacy).not.toContain("Kismatpur");
+    expect(privacy).toContain(DEFAULT_SUPPORT_EMAIL);
     const terms = renderToStaticMarkup(createElement(TermsPage));
     expect(terms).toContain("unlawful");
     expect(terms).toContain("/refund");

@@ -300,7 +300,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
     cached: Boolean(ownKey && cache.current.has(ownKey)),
   });
   const counter = tryCounterLabel(visit.used, visit.allowance);
-  const capNote = ownButton.note ? `${ownButton.note}${visit.code ? `. Code ${visit.code}` : ""}` : "";
+  const capNote = ownButton.note || "";
 
   useEffect(() => {
     if (!ownKey) return;

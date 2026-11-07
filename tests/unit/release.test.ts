@@ -4,9 +4,11 @@ import { clientIp, rateLimit, resetRateLimits, sharedRateLimit } from "@/lib/rat
 import { deleteObject, getObject, putObject } from "@/lib/storage";
 
 describe("release controls", () => {
-  it("trusts the right-most forwarded hop and ignores the header otherwise", () => {
+  it("trusts a public client behind the proxy and ignores a private hop", () => {
     expect(clientIp("spoofed, 203.0.113.8", true)).toBe("203.0.113.8");
     expect(clientIp("203.0.113.8", true)).toBe("203.0.113.8");
+    expect(clientIp("203.0.113.9, 172.18.0.4", true)).toBe("203.0.113.9");
+    expect(clientIp("172.18.0.4", true)).toBe("proxy");
     expect(clientIp("spoofed, 203.0.113.8", false)).toBe("unknown");
   });
 

@@ -8,14 +8,22 @@
 }
 
 {$APP_DOMAIN}, www.{$APP_DOMAIN} {
-	reverse_proxy app:3000
+	reverse_proxy app:3000 {
+		# Overwrite, do not append. A browser-supplied X-Forwarded-For must not choose the rate-limit key.
+		# The app then skips any private hop a later proxy appends and keeps this client address.
+		header_up X-Forwarded-For {http.request.remote.host}
+		header_up X-Real-IP {http.request.remote.host}
+	}
 }
 
 *.try.{$ROOT_DOMAIN} {
 	tls {
 		on_demand
 	}
-	reverse_proxy app:3000
+	reverse_proxy app:3000 {
+		header_up X-Forwarded-For {http.request.remote.host}
+		header_up X-Real-IP {http.request.remote.host}
+	}
 }
 
 # Verified custom domains. The ask endpoint refuses any host that is not on file.
@@ -23,5 +31,8 @@ https:// {
 	tls {
 		on_demand
 	}
-	reverse_proxy app:3000
+	reverse_proxy app:3000 {
+		header_up X-Forwarded-For {http.request.remote.host}
+		header_up X-Real-IP {http.request.remote.host}
+	}
 }

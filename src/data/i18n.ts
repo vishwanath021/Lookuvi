@@ -294,6 +294,7 @@ const en: Record<string, string> = {
   queueWaitingConfirm: "Waiting for the salon to confirm.",
   queueConfirmedWhen: "Confirmed for {date} at {slot}.",
   queueCancelled: "This visit was cancelled.",
+  queueEnded: "This visit has ended.",
   queueFinished: "This visit is finished.",
   queueMissed: "This token was marked as a no-show.",
   queueOnWay: "I'm on my way",

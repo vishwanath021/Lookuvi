@@ -38,6 +38,7 @@ export function HairTypePicker({
   onTexture,
   onSuggest,
   onPick,
+  suggestLabel = "Get AI suggestions",
 }: {
   pickerOn: boolean;
   suggestOn: boolean;
@@ -53,6 +54,7 @@ export function HairTypePicker({
   onTexture: (value: string) => void;
   onSuggest: () => void;
   onPick: (card: HairSuggestionCard) => void;
+  suggestLabel?: string;
 }) {
   if (!pickerOn && !suggestOn && suggestions.length === 0) return null;
   return (
@@ -74,7 +76,7 @@ export function HairTypePicker({
       )}
       {suggestOn && (
         <div className="mt-3">
-          <button className="btn secondary" type="button" disabled={busy} onClick={onSuggest}>Get AI suggestions</button>
+          <button className="btn secondary" type="button" disabled={busy} onClick={onSuggest}>{busy ? "Reading your photo…" : suggestLabel}</button>
           {usesCredits && <p className="mt-1 text-xs text-muted">Uses 1 salon credit for a new photo. The same photo is free.</p>}
         </div>
       )}

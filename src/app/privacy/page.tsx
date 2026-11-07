@@ -2,12 +2,11 @@
 import Link from "next/link";
 import { PrivacyRequest } from "@/components/PrivacyRequest";
 import { LegalFooter } from "@/components/legal/LegalFooter";
-import { companyLegalName, postalAddress, supportEmail } from "@/lib/legal";
+import { companyLegalName, supportEmail } from "@/lib/legal";
 
 export default function PrivacyPage() {
   const contact = supportEmail();
   const company = companyLegalName();
-  const postal = postalAddress();
   return (
     <main className="mx-auto max-w-2xl px-5 py-10">
       <p className="text-sm text-muted"><Link href="/">Lookuvi</Link></p>
@@ -53,7 +52,7 @@ export default function PrivacyPage() {
         <h2 className="font-serif text-2xl">Cross-border transfers</h2>
         <p>When AI processors or CDN/DNS providers handle data abroad, that is a cross-border transfer for the purposes of producing your preview or delivering the site. By agreeing to the photo notice you acknowledge those processors may receive the photo for that purpose only.</p>
 
-        <p>Platform contact: {contact}. Registered postal address: <strong>{postal}</strong>.</p>
+        <p>Platform contact: {contact}. {company}, Hyderabad, Telangana, India.</p>
         <PrivacyRequest />
       </div>
       <LegalFooter company={company} />

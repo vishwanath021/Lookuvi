@@ -35,7 +35,7 @@ import { queueEntryKey, salonActionItems } from "@/lib/salon-actions";
 import { downloadLookFile, lookDownloadName } from "@/lib/look-result";
 import { normalizeWhatsAppPhone } from "@/lib/whatsapp";
 import { GUEST_PREVIEW_FAILED, postGuestGenerate } from "@/lib/guest-preview";
-import { clearTabLooks, parseTabSession, putTabLook, selfieForEdit, serializeTabSession, tabLookCacheKey, type TabLook, type TabLookMap, type TabTool } from "@/lib/tab-looks";
+import { clearTabLooks, parseTabSession, putTabLook, readTabSessionRaw, selfieForEdit, serializeTabSession, tabLookCacheKey, writeTabSessionRaw, type TabLook, type TabLookMap, type TabTool } from "@/lib/tab-looks";
 
 function poseLine(label: string, value: number | string | null) {
   return (
@@ -146,6 +146,34 @@ function sessionId() {
   return guestSessionId();
 }
 
+function friendlyHairMessage(message: string) {
+  if (!message || /did not complete|not sent again|timeout|abort|vision/i.test(message)) {
+    return "We couldn't analyze your photo. Please try again.";
+  }
+  return message;
+}
+
+async function shrinkForSuggest(blob: Blob) {
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      return blob;
+    }
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const next = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.8));
+    return next && next.size < blob.size ? next : blob;
+  } catch {
+    return blob;
+  }
+}
+
 export function TryOnApp({
   config,
   embed = false,
@@ -216,6 +244,7 @@ export function TryOnApp({
   const [suggestNote, setSuggestNote] = useState("");
   const [suggestCost, setSuggestCost] = useState("");
   const [suggestBusy, setSuggestBusy] = useState(false);
+  const [suggestFailed, setSuggestFailed] = useState(false);
   const previewLock = useRef(false);
   const faceRef = useRef<Shot | null>(null);
   const handRef = useRef<Shot | null>(null);
@@ -243,7 +272,7 @@ export function TryOnApp({
   const [compareOn, setCompareOn] = useState(true);
 
   useEffect(() => {
-    const saved = parseTabSession(sessionStorage.getItem(tabLookCacheKey(config.slug)));
+    const saved = parseTabSession(readTabSessionRaw(config.slug));
     setLooks(saved.looks);
     const current = saved.looks[firstTool(config, initialTool)];
     if (current) {
@@ -259,14 +288,10 @@ export function TryOnApp({
 
   useEffect(() => {
     if (!cacheReady) return;
-    const stored = parseTabSession(sessionStorage.getItem(tabLookCacheKey(config.slug)));
+    const stored = parseTabSession(readTabSessionRaw(config.slug));
     const face = faceRef.current?.url.startsWith("data:image/") ? faceRef.current.url : stored.face;
     const hand = handRef.current?.url.startsWith("data:image/") ? handRef.current.url : stored.hand;
-    try {
-      sessionStorage.setItem(tabLookCacheKey(config.slug), serializeTabSession({ face, hand, looks }));
-    } catch {
-      /* A full session of previews can exceed the browser quota. The in-memory tabs stay. */
-    }
+    writeTabSessionRaw(config.slug, serializeTabSession({ face, hand, looks }));
   }, [looks, config.slug, faceShot, handShot, cacheReady]);
 
   useEffect(() => {
@@ -465,8 +490,7 @@ export function TryOnApp({
       setCameraOn(false);
       setCameraReady(false);
       setVideoEl(null);
-      setCameraError("");
-      pickFile(captureRef.current);
+      setCameraError(t(lang, "cameraError"));
       return;
     }
     // Ask in this click, before React paints, so the browser still treats it as the user gesture.
@@ -690,6 +714,7 @@ export function TryOnApp({
   function resetForAnotherPhoto() {
     setLooks({});
     try {
+      writeTabSessionRaw(config.slug, serializeTabSession({ looks: {} }));
       sessionStorage.removeItem(tabLookCacheKey(config.slug));
     } catch {
       /* The next photo replaces the cache. */
@@ -714,11 +739,13 @@ export function TryOnApp({
     const consentId = (await recordPhotoConsent()) || "";
     if (suggestBusy || busy) return;
     setSuggestBusy(true);
+    setSuggestFailed(false);
     setError("");
     setSuggestNote("");
     try {
+      const photo = await shrinkForSuggest(faceShot.blob);
       const body = new FormData();
-      body.set("photo", faceShot.blob, "selfie.jpg");
+      body.set("photo", photo, "selfie.jpg");
       body.set("slug", config.slug);
       body.set("consentId", consentId);
       body.set("sessionId", sid || sessionId());
@@ -727,7 +754,10 @@ export function TryOnApp({
       const res = await fetch("/api/v1/tryon/suggest", { method: "POST", body });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.message || "Could not read that photo.");
+        const friendly = friendlyHairMessage(typeof data.message === "string" ? data.message : "");
+        setError(friendly);
+        setSuggestNote(friendly);
+        setSuggestFailed(true);
         return;
       }
       setHairReading({
@@ -742,6 +772,11 @@ export function TryOnApp({
       const low = Number(data.confidence) < 0.4;
       setSuggestNote(low ? "Check the hair type." : "");
       setSuggestCost("");
+    } catch {
+      const friendly = friendlyHairMessage("");
+      setError(friendly);
+      setSuggestNote(friendly);
+      setSuggestFailed(true);
     } finally {
       setSuggestBusy(false);
     }
@@ -1341,6 +1376,7 @@ export function TryOnApp({
                       onDensity={setPickedDensity}
                       onTexture={setPickedTexture}
                       onSuggest={() => void suggestHair()}
+                      suggestLabel={suggestFailed ? "Try again" : "Get AI suggestions"}
                       onPick={(card) => selectLook({ id: card.id, name: card.name, serviceKeys: card.serviceKeys, tool: "style" })}
                     />
                   </div>

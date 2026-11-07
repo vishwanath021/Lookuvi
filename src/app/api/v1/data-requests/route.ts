@@ -1,10 +1,17 @@
+import { createHash } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { possessesWithdrawSession } from "@/lib/data-request";
-import { tooMany } from "@/lib/http/guard";
 import { readGuestToken } from "@/lib/preview-access";
 import { prisma } from "@/lib/prisma";
+import { isSharedProxyAddress, requestClientIp, sharedRateLimit } from "@/lib/ratelimit";
+
+const HOUR_MS = 60 * 60 * 1000;
+
+function contactKey(slug: string, contact: string) {
+  return createHash("sha256").update(`${slug}:${contact.trim().toLowerCase()}`).digest("hex").slice(0, 32);
+}
 
 const bodySchema = z.object({
   slug: z.string().min(1),
@@ -15,12 +22,27 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const limited = await tooMany(req, "data-request", 10, 60 * 60 * 1000);
-  if (limited) return limited;
+  const ip = requestClientIp(req);
+  if (!isSharedProxyAddress(ip)) {
+    const byIp = await sharedRateLimit(`data-request:ip:${ip}`, 40, HOUR_MS);
+    if (!byIp.ok) {
+      return NextResponse.json(
+        { error: "RATE", message: "Too many requests from this connection. Wait a few minutes and try again." },
+        { status: 429 },
+      );
+    }
+  }
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "INVALID" }, { status: 400 });
   const tenant = await prisma.tenant.findUnique({ where: { slug: parsed.data.slug } });
   if (!tenant) return NextResponse.json({ error: "TENANT" }, { status: 404 });
+  const byContact = await sharedRateLimit(`data-request:who:${contactKey(tenant.slug, parsed.data.contact)}`, 8, HOUR_MS);
+  if (!byContact.ok) {
+    return NextResponse.json(
+      { error: "RATE", message: "That phone or email already sent a few requests this hour. Wait and try again, or email support." },
+      { status: 429 },
+    );
+  }
   let withdrew = false;
   if (parsed.data.kind === "withdraw" && parsed.data.sessionId) {
     const guest = readGuestToken((await cookies()).get("helix_guest")?.value);

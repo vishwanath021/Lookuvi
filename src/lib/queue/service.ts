@@ -5,7 +5,9 @@ import { sharedRateLimit } from "@/lib/ratelimit";
 import { notifyGuest, type NotifyMessage, type NotifyResult } from "@/lib/notify";
 import { kolkataDayKey } from "@/lib/queue/day";
 import { effectiveWeek, hoursView, nextBoundary, slotProblem, type HoursTenant } from "@/lib/queue/schedule";
-import { peopleAhead, serviceMinutes, waitMinutes, type WaitRow } from "@/lib/queue/estimate";
+import { peopleAhead, remainingServiceMinutes, serviceMinutes, waitMinutesRemaining, type WaitRow } from "@/lib/queue/estimate";
+import { visitShouldExpire } from "@/lib/queue/expiry";
+import { isSharedProxyAddress } from "@/lib/ratelimit";
 import { attributeReturn, recordVisit, rememberCustomer } from "@/lib/customers/service";
 import { bindTicket, linkSessionToEntry, tryLineForEntry } from "@/lib/at-salon";
 import { earnVisitPoints, listRewards, LoyaltyError, pointsBalance, pointsBalanceLine, pointsBalances, redeemReward, rewardProgress } from "@/lib/loyalty";
@@ -20,10 +22,15 @@ export class QueueError extends Error {
 
 type Sender = (message: NotifyMessage) => Promise<NotifyResult>;
 
-/** One salon Wi-Fi can admit a full hour of guests. Abuse is limited per phone and per device. */
-export const QUEUE_IP_JOINS_PER_HOUR = 60;
-export const QUEUE_PHONE_JOINS_PER_HOUR = 4;
-export const QUEUE_DEVICE_JOINS_PER_HOUR = 8;
+/** One public IP (salon Wi-Fi or a carrier NAT) can admit a busy hour. Abuse is limited per phone and per device, per salon. */
+export const QUEUE_IP_JOINS_PER_HOUR = 240;
+export const QUEUE_PHONE_JOINS_PER_HOUR = 8;
+export const QUEUE_DEVICE_JOINS_PER_HOUR = 12;
+export function slotFullMessage(units: number) {
+  const chairs = Math.max(1, units);
+  const label = chairs === 1 ? "1 chair" : `${chairs} chairs`;
+  return `That time is full. This salon can take ${label} at the same time. Choose another time.`;
+}
 export const QUEUE_JOIN_RATE_MESSAGE = "Too many joins from this phone or device this hour. Wait and try again. This is not about free chairs.";
 const HOUR_MS = 60 * 60 * 1000;
 export { REQUEST_SLOT_EARLIEST, REQUEST_SLOT_LATEST } from "@/lib/queue/hours";
@@ -81,17 +88,19 @@ async function loadDay(tenantId: string, dayKey: string) {
   return { state, entries: entries as EntryRow[], dayKey };
 }
 
-function minutesOf(row: EntryRow, avgMinutes: number) {
-  return serviceMinutes(row.service?.durationMin, avgMinutes);
+function minutesOf(row: EntryRow, avgMinutes: number, now = new Date()) {
+  const full = serviceMinutes(row.service?.durationMin, avgMinutes);
+  if (row.status !== "IN_SERVICE") return full;
+  return remainingServiceMinutes(full, row.startedAt, now);
 }
 
-function timing(entries: EntryRow[], selfId: string | null, avgMinutes: number, units: number) {
+function timing(entries: EntryRow[], selfId: string | null, avgMinutes: number, units: number, now = new Date()) {
   const self = selfId ? entries.find((row) => row.id === selfId) : null;
   if (self && self.status !== "WAITING") return { ahead: 0, waitMin: 0 };
   const ahead = peopleAhead(entries.map(asWait), selfId);
   const byId = new Map(entries.map((row) => [row.id, row]));
-  const minutes = ahead.map((row) => minutesOf(byId.get(row.id) || entries[0], avgMinutes));
-  return { ahead: ahead.length, waitMin: waitMinutes(minutes, units) };
+  const minutes = ahead.map((row) => minutesOf(byId.get(row.id) || entries[0], avgMinutes, now));
+  return { ahead: ahead.length, waitMin: waitMinutesRemaining(minutes, units) };
 }
 
 function tokenTaken(error: unknown) {
@@ -103,6 +112,19 @@ async function createQueuedEntry(data: Omit<Prisma.QueueEntryUncheckedCreateInpu
   for (let attempt = 0; attempt < 6; attempt += 1) {
     try {
       return await prisma.$transaction(async (tx) => {
+        if (data.status === "REQUESTED" && data.requestedDate && data.requestedSlot) {
+          const state = await tx.queueState.findUnique({ where: { tenantId: data.tenantId } });
+          const units = Math.max(1, state?.units ?? 1);
+          const taken = await tx.queueEntry.count({
+            where: {
+              tenantId: data.tenantId,
+              requestedDate: data.requestedDate,
+              requestedSlot: data.requestedSlot,
+              status: { in: ["REQUESTED", "CONFIRMED"] },
+            },
+          });
+          if (taken >= units) throw new QueueError("FULL", slotFullMessage(units), 409);
+        }
         const last = await tx.queueEntry.aggregate({
           where: { tenantId: data.tenantId, dayKey: data.dayKey },
           _max: { token: true },
@@ -148,6 +170,7 @@ function ticket(slug: string, row: EntryRow, mode: string, waitMin: number, ahea
     requestedDate: row.requestedDate,
     requestedSlot: row.requestedSlot,
     statusPath: statusPath(slug, row.cancelToken),
+    dayKey: row.dayKey,
     existing,
     message: existing ? existingTokenMessage(row.token, row.name) : "",
   };
@@ -205,6 +228,31 @@ export async function sweepAllQueues(send: Sender = notifyGuest) {
   return { sent, salons: states.length };
 }
 
+async function expireTenantVisits(tenant: { id: string; weeklyHours?: string | null; openTime?: string | null; closeTime?: string | null }, now = new Date()) {
+  const rows = await prisma.queueEntry.findMany({
+    where: { tenantId: tenant.id, status: { in: [...LIVE_ACTIVE, ...REQUEST_ACTIVE] } },
+    select: { id: true, status: true, dayKey: true, requestedDate: true, joinedAt: true },
+    take: 400,
+  });
+  const ids = rows.filter((row) => visitShouldExpire({ ...row, now, source: tenant })).map((row) => row.id);
+  if (!ids.length) return 0;
+  const updated = await prisma.queueEntry.updateMany({
+    where: { id: { in: ids }, tenantId: tenant.id, status: { in: [...LIVE_ACTIVE, ...REQUEST_ACTIVE] } },
+    data: { status: "EXPIRED", doneAt: now, unitSlot: null },
+  });
+  return updated.count;
+}
+
+export async function expireDueVisits(now = new Date()) {
+  const tenants = await prisma.tenant.findMany({
+    where: { productQueue: true, deletedAt: null },
+    select: { id: true, weeklyHours: true, openTime: true, closeTime: true },
+  });
+  let expired = 0;
+  for (const tenant of tenants) expired += await expireTenantVisits(tenant, now);
+  return expired;
+}
+
 async function requireQueueTenant(slug: string) {
   const tenant = await prisma.tenant.findUnique({ where: { slug } });
   if (!tenant || tenant.deletedAt || !tenant.productQueue) throw new QueueError("PRODUCT", "The queue is not available for this salon.", 404);
@@ -216,6 +264,7 @@ async function requireQueueTenant(slug: string) {
 
 export async function publicBoard(slug: string) {
   const tenant = await requireQueueTenant(slug);
+  await expireTenantVisits(tenant);
   const dayKey = kolkataDayKey();
   const { state, entries } = await loadDay(tenant.id, dayKey);
   const services = await prisma.service.findMany({
@@ -279,6 +328,7 @@ export async function joinQueue(input: {
 }) {
   const send = input.send || notifyGuest;
   const tenant = await requireQueueTenant(input.slug);
+  await expireTenantVisits(tenant, input.now);
   const phone = indianMobile(input.phone);
   if (!phone) throw new QueueError("PHONE", "Enter a 10-digit Indian mobile number.", 400);
   if (!input.consent) throw new QueueError("CONSENT", "Tick the box to receive queue updates on this phone.", 400);
@@ -320,7 +370,9 @@ export async function joinQueue(input: {
     if (!view.accepting) throw new QueueError("CLOSED", view.hoursMessage || "The queue is paused. Please ask at the desk.", 403);
   }
 
-  const ipLimit = await sharedRateLimit(`queue:ip:${input.ip}`, QUEUE_IP_JOINS_PER_HOUR, HOUR_MS);
+  const ipLimit = isSharedProxyAddress(input.ip)
+    ? { ok: true as const }
+    : await sharedRateLimit(`queue:ip:${tenant.id}:${input.ip}`, QUEUE_IP_JOINS_PER_HOUR, HOUR_MS);
   const phoneLimit = await sharedRateLimit(`queue:phone:${tenant.id}:${phone}`, QUEUE_PHONE_JOINS_PER_HOUR, HOUR_MS);
   const deviceLimit = device
     ? await sharedRateLimit(`queue:device:${tenant.id}:${device}`, QUEUE_DEVICE_JOINS_PER_HOUR, HOUR_MS)
@@ -370,6 +422,7 @@ function deviceKey(value: string | undefined) {
 
 export async function guestTicket(slug: string, ref: string) {
   const tenant = await requireQueueTenant(slug);
+  await expireTenantVisits(tenant);
   const row = await prisma.queueEntry.findFirst({
     where: { cancelToken: ref, tenantId: tenant.id },
     include: { service: { select: { name: true, durationMin: true } } },
@@ -449,6 +502,7 @@ async function deskCard(tenantName: string, slug: string, row: EntryRow, avgMinu
 export async function deskSnapshot(tenantId: string, now = new Date()) {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant?.productQueue) throw new QueueError("PRODUCT", "The queue is not available for this salon.", 404);
+  await expireTenantVisits(tenant, now);
   const dayKey = kolkataDayKey(now);
   const { state, entries } = await loadDay(tenantId, dayKey);
   const view = hoursView(tenant, state.isOpen, now);
@@ -687,9 +741,23 @@ export async function confirmRequest(tenantId: string, id: string, input: { date
   const date = (input.date || row.requestedDate).trim();
   const slot = (input.slot || row.requestedSlot).trim();
   checkSlot(date, slot, tenant);
-  await prisma.queueEntry.update({
-    where: { id },
-    data: { status: "CONFIRMED", requestedDate: date, requestedSlot: slot },
+  await prisma.$transaction(async (tx) => {
+    const state = await tx.queueState.findUnique({ where: { tenantId } });
+    const units = Math.max(1, state?.units ?? 1);
+    const taken = await tx.queueEntry.count({
+      where: {
+        tenantId,
+        requestedDate: date,
+        requestedSlot: slot,
+        status: { in: ["REQUESTED", "CONFIRMED"] },
+        id: { not: id },
+      },
+    });
+    if (taken >= units) throw new QueueError("FULL", slotFullMessage(units), 409);
+    await tx.queueEntry.update({
+      where: { id },
+      data: { status: "CONFIRMED", requestedDate: date, requestedSlot: slot },
+    });
   });
   if (row.phone) {
     await safeSend(send, {

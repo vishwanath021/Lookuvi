@@ -7,6 +7,7 @@ import { QueueWait } from "@/components/guest/QueueWait";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
+import { kolkataDayKey } from "@/lib/queue/day";
 import { parseVisitMemory, rememberVisit, serializeVisitMemory, visitMemoryKey, type VisitMemory } from "@/lib/queue/visit-memory";
 
 type Board = {
@@ -41,6 +42,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [visits, setVisits] = useState<VisitMemory[]>([]);
+  const [endedRefs, setEndedRefs] = useState<Set<string>>(new Set());
   const [returnToken, setReturnToken] = useState("");
   const request = board.mode === "REQUEST";
   const hoursClosed = !request && Boolean(board.hoursClosed);
@@ -55,6 +57,29 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
       setVisits([]);
     }
   }, [board.slug]);
+
+  useEffect(() => {
+    const today = kolkataDayKey();
+    const stale = visits.filter((visit) => visit.dayKey && visit.dayKey < today).map((visit) => visit.ref);
+    if (stale.length) setEndedRefs((current) => new Set([...current, ...stale]));
+    const live = visits.filter((visit) => !visit.dayKey || visit.dayKey >= today);
+    let stop = false;
+    void Promise.all(live.map(async (visit) => {
+      const res = await fetch(`/api/v1/queue/status?slug=${encodeURIComponent(board.slug)}&ref=${encodeURIComponent(visit.ref)}`);
+      const data = await res.json().catch(() => null);
+      const status = data && typeof data.status === "string" ? data.status : "";
+      if (stop || !status) return "";
+      if (status === "EXPIRED" || status === "CANCELLED" || status === "DONE" || status === "NO_SHOW") return visit.ref;
+      return "";
+    })).then((refs) => {
+      if (stop) return;
+      const gone = refs.filter(Boolean);
+      if (gone.length) setEndedRefs((current) => new Set([...current, ...gone]));
+    }).catch(() => undefined);
+    return () => {
+      stop = true;
+    };
+  }, [board.slug, visits]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -101,7 +126,12 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
       setHeldPath(typeof data.statusPath === "string" ? data.statusPath : "");
       return;
     }
-    const next = rememberVisit(visits, { name: nextName, phone: nextPhone, ref: data.ref });
+    const next = rememberVisit(visits, {
+      name: nextName,
+      phone: nextPhone,
+      ref: data.ref,
+      dayKey: typeof data.dayKey === "string" ? data.dayKey : kolkataDayKey(),
+    });
     localStorage.setItem(visitMemoryKey(board.slug), serializeVisitMemory(next));
     window.location.href = data.statusPath;
   }
@@ -118,9 +148,9 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
       {board.todayHours ? <p className="mt-2 text-sm" data-today-hours={board.todayHours}>{t(lang, "queueTodayLine", { hours: board.todayHours })}</p> : null}
       {board.nextOpen ? <p className="text-sm" data-next-open={board.nextOpen}>{t(lang, "queueOpensAt", { when: board.nextOpen })}</p> : null}
       <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted">{board.open ? t(lang, "queueOpenNow") : t(lang, "queueClosedNow")}</p>
-      {visits.length ? (
-        <div className="card mt-4 grid gap-3 p-4" data-queue-visits={visits.length}>
-          {visits.map((visit) => (
+      {visits.some((visit) => !endedRefs.has(visit.ref)) ? (
+        <div className="card mt-4 grid gap-3 p-4" data-queue-visits={visits.filter((visit) => !endedRefs.has(visit.ref)).length}>
+          {visits.filter((visit) => !endedRefs.has(visit.ref)).map((visit) => (
             <div key={visit.ref} className="grid gap-2 border-b border-line pb-3 last:border-b-0 last:pb-0">
               <p>{t(lang, "queueWelcome", { name: visit.name || visit.phone })}</p>
               <a className="btn secondary" href={`/s/${board.slug}/q/${visit.ref}`}>{t(lang, "queueSeePlace")}</a>

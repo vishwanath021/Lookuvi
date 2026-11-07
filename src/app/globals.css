@@ -499,14 +499,17 @@ textarea { min-height: 48px; }
 }
 .live-tray {
   display: grid;
-  justify-items: center;
+  justify-items: stretch;
   gap: 0.65rem;
   width: 100%;
   max-width: 28rem;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: #fff;
   padding: 0.7rem 0.7rem 0.85rem;
+  position: relative;
+  z-index: 5;
 }
 .live-tray .live-row { color: var(--aubergine); }
 .live-tray .live-pill,
@@ -1101,9 +1104,13 @@ textarea { min-height: 48px; }
   display: flex;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 6px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
   padding: 2px 2px 4px;
   scrollbar-width: none;
 }

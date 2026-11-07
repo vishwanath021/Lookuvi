@@ -41,6 +41,7 @@ import { guestSessionId } from "@/lib/guest-session";
 import { postGuestGenerate } from "@/lib/guest-preview";
 import type { SalonConfig } from "@/lib/salon";
 import { tryNowReady } from "@/lib/try-now";
+import { rememberGenerated, readGenerated } from "@/lib/generated-session";
 import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
 import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
 
@@ -92,6 +93,37 @@ type SavedLook = {
 
 type Shot = { blob: Blob; url: string; digest: string; serverId?: string };
 type LookResult = CachedLook & { after: string; share: string; lookId: string; kind: "look" | "mehendi" };
+
+const lookCaches = new Map<string, Map<string, LookResult>>();
+
+function sharedLookCache(slug: string, kind: string) {
+  const id = `${slug}:${kind}`;
+  let map = lookCaches.get(id);
+  if (!map) {
+    map = new Map();
+    lookCaches.set(id, map);
+  }
+  return map;
+}
+
+function generatedKey(slug: string) {
+  return `lookuvi-generated:${slug}`;
+}
+
+function resultFromStored(slug: string): LookResult | null {
+  const saved = readGenerated(generatedKey(slug))[0];
+  if (!saved) return null;
+  const kind = saved.kind === "mehendi" ? "mehendi" : "look";
+  return {
+    url: saved.after,
+    name: saved.name,
+    before: saved.before,
+    after: saved.after,
+    share: saved.share || "",
+    lookId: saved.lookId || "",
+    kind,
+  };
+}
 
 const MAX_SAVED = 6;
 
@@ -159,7 +191,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   const [busy, setBusy] = useState(false);
   const [busyKind, setBusyKind] = useState<null | "look" | "mehendi">(null);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<LookResult | null>(null);
+  const [result, setResult] = useState<LookResult | null>(() => resultFromStored(config.slug));
   const [saved, setSaved] = useState<SavedLook[]>([]);
   const [compare, setCompare] = useState<string[]>([]);
   const [name, setName] = useState("");
@@ -183,8 +215,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   const [camError, setCamError] = useState("");
   const [liveLook, setLiveLook] = useState(false);
   const [served, setServed] = useState({ look: "", mehendi: "" });
-  const lookCache = useRef(new Map<string, LookResult>());
-  const mehendiCache = useRef(new Map<string, LookResult>());
+  const lookCache = useRef(sharedLookCache(config.slug, "look"));
+  const mehendiCache = useRef(sharedLookCache(config.slug, "mehendi"));
   const visit = useVisitTries(config.slug);
   const eventLooks = looksForEvent(eventId);
   const looks = cardsForStyle(eventLooks, lookStyle);
@@ -200,7 +232,25 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   useEffect(() => {
     if (!result || busy) return;
     resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [result, busy]);
+    let cancel = false;
+    void (async () => {
+      const after = result.after.startsWith("data:") ? result.after : await blobUrlToData(result.after).catch(() => "");
+      const before = result.before.startsWith("data:") ? result.before : await blobUrlToData(result.before).catch(() => "");
+      if (cancel || !after.startsWith("data:")) return;
+      rememberGenerated(generatedKey(config.slug), {
+        id: `${result.kind}:${result.lookId}:${result.name}`,
+        name: result.name,
+        before,
+        after,
+        kind: result.kind,
+        lookId: result.lookId,
+        share: result.share,
+      });
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [result, busy, config.slug]);
 
   async function fileToShot(file: File) {
     const blob = file.slice(0, file.size, file.type || "image/jpeg");
@@ -565,7 +615,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
     cached: Boolean(mehendiKey && mehendiCache.current.has(mehendiKey)),
   });
   const counter = tryCounterLabel(visit.used, visit.allowance);
-  const capNote = (text: string) => text ? `${text}${visit.code ? `. Code ${visit.code}` : ""}` : "";
+  const capNote = (text: string) => text;
 
   useEffect(() => {
     if (panel !== "looks" || !lookKey) return;
@@ -701,9 +751,11 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               </LiveTray>
             ) : busyKind === "look" ? null : (
               <PhotoActions settled={result?.kind === "look"} className="grid w-full max-w-[28rem] gap-2">
-                <button className="btn sheen" type="button" onClick={() => beginLive("face", false)}>Take selfie</button>
-                <button className="btn secondary" type="button" onClick={() => consent.gate(() => bridalFile.current?.click())}>Upload</button>
-                <button className="btn secondary" type="button" onClick={() => beginLive("face", true)}>Live capture</button>
+                <button className="btn sheen" type="button" data-photo-action="selfie" onClick={() => beginLive("face", false)}>Take selfie</button>
+                <p className="text-center text-xs text-muted">Front camera, one still photo. No live makeup.</p>
+                <button className="btn secondary" type="button" data-photo-action="upload" onClick={() => consent.gate(() => bridalFile.current?.click())}>Upload</button>
+                <button className="btn secondary" type="button" data-photo-action="live" onClick={() => beginLive("face", true)}>Live capture</button>
+                <p className="text-center text-xs text-muted">Front camera with live lip colour while you frame the photo.</p>
                 <input ref={bridalFile} className="sr-only" type="file" accept="image/*" data-photo="bridal" onChange={(event) => {
                   const file = event.target.files?.[0];
                   event.target.value = "";
