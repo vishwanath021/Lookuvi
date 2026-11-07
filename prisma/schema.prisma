@@ -38,8 +38,10 @@ model Tenant {
   productGroom        Boolean   @default(false)
   /** Photo makeup on one picture. Off until the owner turns it on. */
   productMakeupStudio Boolean   @default(false)
-  /** Real bridal and groom previews one customer can spend during a visit. */
-  visitTryLimit       Int       @default(3)
+  /** Free paid previews for one visit. 1 unless the owner raises it or staff add tries. */
+  visitTryLimit       Int       @default(1)
+  /** Free AI try-ons wait until the guest is at the salon today. Off for the sales demo. */
+  tryOnsAtSalon       Boolean   @default(true)
   /** One WhatsApp reminder after a completed visit. */
   remindersOn         Boolean   @default(true)
   /** Whole days after lastVisitAt. The owner screen allows 28 to 42. */
@@ -103,6 +105,7 @@ model Tenant {
   queueState          QueueState?
   queueEntries        QueueEntry[]
   visitGrants         VisitGrant[]
+  salonUnlocks        SalonDayUnlock[]
   whatsappSends       WhatsAppSend[]
   customerReturns     CustomerReturn[]
   broadcasts          SalonBroadcast[]
@@ -620,13 +623,54 @@ model QueueEntry {
   cancelToken   String    @unique
   onTheWay      Boolean   @default(false)
   consentAt     DateTime?
+  /** Browser session that joined or opened this ticket. */
+  sessionId     String    @default("")
+  /** Persistent device id from the guest phone. */
+  deviceId      String    @default("")
+  /** Staff marked this guest as in the salon. */
+  arrivedAt     DateTime?
+  /** Guest asked for more tries. Cleared when staff add tries or dismiss. */
+  wantsTriesAt  DateTime?
+  /** Last batch staff added, so the phone can say how many. */
+  lastGrant     Int       @default(0)
+  lastGrantAt   DateTime?
   tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   service       Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  sessions      QueueSession[]
 
   @@unique([tenantId, dayKey, token])
   @@index([tenantId, dayKey, status])
   @@index([tenantId, phone])
+  @@index([tenantId, dayKey, deviceId])
   @@index([joinedAt])
+}
+
+/// Every browser session that belongs to one queue token today.
+model QueueSession {
+  id        String     @id @default(cuid())
+  entryId   String
+  sessionId String
+  entry     QueueEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, sessionId])
+  @@index([sessionId])
+}
+
+/// Proof the guest is at this salon for one Asia/Kolkata day. Yesterday's code does not match.
+model SalonDayUnlock {
+  id        String   @id @default(cuid())
+  tenantId  String
+  dayKey    String
+  /** session, device, or phone */
+  kind      String
+  value     String
+  /** arrived or counter */
+  source    String
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dayKey, kind, value])
+  @@index([tenantId, dayKey])
 }
 
 /// Fixed-window counter shared by every app instance. The id is the limit key plus the window.

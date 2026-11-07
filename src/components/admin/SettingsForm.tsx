@@ -42,6 +42,7 @@ export function SettingsForm({
     productGroom: boolean;
     productMakeupStudio?: boolean;
     visitTryLimit: number;
+    tryOnsAtSalon?: boolean;
     logoUrl: string | null;
     openTime?: string;
     closeTime?: string;
@@ -58,6 +59,7 @@ export function SettingsForm({
   const [form, setForm] = useState({
     ...initial,
     productMakeupStudio: initial.productMakeupStudio ?? false,
+    tryOnsAtSalon: initial.tryOnsAtSalon ?? true,
     openTime: initial.openTime ?? "",
     closeTime: initial.closeTime ?? "",
   });
@@ -153,6 +155,14 @@ export function SettingsForm({
   return (
     <div className="space-y-4">
       <form className="card grid gap-3 p-4" onSubmit={save}>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" data-setting="at-salon" aria-label="Try-ons only at the salon" checked={form.tryOnsAtSalon} onChange={(event) => set("tryOnsAtSalon", event.target.checked)} />
+          Try-ons only at the salon
+        </label>
+        <p className="text-xs text-muted">Free try-ons start when the customer is at the salon. Staff can add more at the queue.</p>
+        <label className="text-sm">Free try-ons per visit
+          <input className="field narrow mt-1" type="number" min={1} max={20} aria-label="Tries per visit" value={form.visitTryLimit} onChange={(event) => set("visitTryLimit", Number(event.target.value))} />
+        </label>
         <label className="text-sm">Salon name<input className="field mt-1" aria-label="Salon name" value={form.name} onChange={(event) => set("name", event.target.value)} /></label>
         <div className="text-sm">
           <span className="block">Salon logo</span>
@@ -187,11 +197,6 @@ export function SettingsForm({
           <label className="flex items-center gap-2"><input type="checkbox" aria-label="Bridal" checked={form.productBridal} onChange={(event) => set("productBridal", event.target.checked)} /> Bridal</label>
           <label className="flex items-center gap-2"><input type="checkbox" aria-label="Groom" checked={form.productGroom} onChange={(event) => set("productGroom", event.target.checked)} /> Groom</label>
           <label className="flex items-center gap-2"><input type="checkbox" aria-label="Makeup studio" checked={form.productMakeupStudio} onChange={(event) => set("productMakeupStudio", event.target.checked)} /> Makeup studio</label>
-          {form.productBridal || form.productGroom || form.productMakeupStudio ? (
-            <label className="text-sm">Tries per visit
-              <input className="field narrow mt-1" type="number" min={1} max={20} aria-label="Tries per visit" value={form.visitTryLimit} onChange={(event) => set("visitTryLimit", Number(event.target.value))} />
-            </label>
-          ) : null}
         </fieldset>
         {showTryOn ? <>
         <fieldset className="grid gap-2 text-sm">

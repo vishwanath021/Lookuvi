@@ -33,6 +33,8 @@ import {
   type BridalEventId,
   type BridalStyleId,
 } from "@/data/bridal";
+import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import { postGuestGenerate } from "@/lib/guest-preview";
 import type { SalonConfig } from "@/lib/salon";
@@ -132,6 +134,7 @@ async function blobUrlToData(url: string) {
 }
 
 export function BridalFlow({ config }: { config: SalonConfig }) {
+  const atSalon = useAtSalon();
   const [eventId, setEventId] = useState<BridalEventId>("wedding");
   const [panel, setPanel] = useState<"looks" | "own" | "mehendi" | "saved">("looks");
   const [lookStyle, setLookStyle] = useState<BridalStyleId>(defaultBridalStyle(BRIDAL_LOOKS));
@@ -208,6 +211,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
 
   async function generate(kind: "look" | "mehendi", shot: Shot, overrides?: { finishId?: string; lipId?: string; makeupId?: string; hairId?: string }) {
     if (busy) return;
+    if (atSalon.required && !atSalon.unlocked) return;
     const finish = overrides?.finishId || finishId;
     const lip = overrides?.lipId || lipId;
     const makeup = overrides?.makeupId ?? makeupId;
@@ -247,6 +251,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
           attachSelfie(body, shot, kind === "mehendi" ? "hand.jpg" : "selfie.jpg");
           body.set("slug", config.slug);
           body.set("sessionId", guestSessionId());
+          body.set("deviceId", guestDeviceId());
           const consentId = (await consent.persist()) || consent.consentId();
           if (consentId) body.set("consentId", consentId);
           const requestId = crypto.randomUUID();
@@ -706,6 +711,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
             {result?.kind === "look" && !busy ? (
               <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} shareUrl={result.share} kind="bridal" />
             ) : null}
+            <AtSalonNote lang={config.defaultLang || "en"} />
             <TryBar
               label={lookButton.label}
               enabled={lookButton.enabled}
@@ -774,6 +780,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
             {result?.kind === "mehendi" && !busy ? (
               <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} shareUrl={result.share} kind="bridal" />
             ) : null}
+            <AtSalonNote lang={config.defaultLang || "en"} />
             <TryBar
               label={mehendiButton.label}
               enabled={mehendiButton.enabled}

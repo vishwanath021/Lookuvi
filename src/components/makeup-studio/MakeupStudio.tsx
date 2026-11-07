@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import { useVisitTries } from "@/components/tryon/useVisitTries";
+import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import { detectStudioFace, type StudioFace } from "@/lib/makeup-studio/detect";
 import {
@@ -78,6 +80,7 @@ async function uploadBlob(canvas: HTMLCanvasElement) {
 }
 
 export function MakeupStudio({ config }: { config: SalonConfig }) {
+  const atSalon = useAtSalon();
   const consent = usePhotoConsent(config.slug, config.defaultLang || "en");
   const visit = useVisitTries(config.slug);
   const uploadRef = useRef<HTMLInputElement>(null);
@@ -182,6 +185,7 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
   async function runPhotoreal() {
     const current = photoRef.current;
     if (!current || !face || busy) return;
+    if (atSalon.required && !atSalon.unlocked) return;
     if (visit.atLimit) {
       setNote(VISIT_CAP_MESSAGE);
       return;
@@ -193,6 +197,7 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
       const body = new FormData();
       body.set("slug", config.slug);
       body.set("sessionId", guestSessionId());
+      body.set("deviceId", guestDeviceId());
       body.set("look", JSON.stringify(params));
       body.set("requestId", crypto.randomUUID());
       if (consentId) body.set("consentId", consentId);
@@ -272,6 +277,7 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
 
   const actions = (
     <div className="grid gap-2">
+      <AtSalonNote lang={config.defaultLang || "en"} />
       <button className="btn w-full" type="button" disabled={!face || busy || visit.atLimit} onClick={() => consent.gate(() => { void runPhotoreal(); })}>
         {busy ? "Working…" : `Photoreal · ${counter}`}
       </button>

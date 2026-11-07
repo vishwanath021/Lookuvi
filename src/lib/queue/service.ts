@@ -7,6 +7,7 @@ import { kolkataDayKey } from "@/lib/queue/day";
 import { liveJoinWindow, requestWindow } from "@/lib/queue/hours";
 import { peopleAhead, serviceMinutes, waitMinutes, type WaitRow } from "@/lib/queue/estimate";
 import { attributeReturn, recordVisit, rememberCustomer } from "@/lib/customers/service";
+import { bindTicket, linkSessionToEntry, tryLineForEntry } from "@/lib/at-salon";
 import { almostMessage, confirmedMessage, deskWhatsAppText, joinedMessage, queueHomeUrl, statusPath, statusUrl, tryOnUrl } from "@/lib/queue/messages";
 import { indianMobile } from "@/lib/queue/phone";
 
@@ -48,6 +49,10 @@ type EntryRow = {
   alertSentAt: Date | null;
   cancelToken: string;
   onTheWay: boolean;
+  sessionId: string;
+  deviceId: string;
+  arrivedAt: Date | null;
+  wantsTriesAt: Date | null;
   service: { name: string; durationMin: number | null } | null;
 };
 
@@ -268,6 +273,7 @@ export async function joinQueue(input: {
   ip: string;
   deviceId?: string;
   returnToken?: string;
+  sessionId?: string;
   send?: Sender;
 }) {
   const send = input.send || notifyGuest;
@@ -289,6 +295,8 @@ export async function joinQueue(input: {
 
   const dayKey = state.mode === "REQUEST" ? requestedDate : kolkataDayKey();
   const active = state.mode === "REQUEST" ? REQUEST_ACTIVE : LIVE_ACTIVE;
+  const sessionId = (input.sessionId || "").trim().slice(0, 80);
+  const device = deviceKey(input.deviceId);
   const existing = await prisma.queueEntry.findFirst({
     where: { tenantId: tenant.id, phone, status: { in: active }, ...(state.mode === "LIVE" ? { dayKey } : {}) },
     include: { service: { select: { name: true, durationMin: true } } },
@@ -301,11 +309,11 @@ export async function joinQueue(input: {
       return ticket(tenant.slug, existing as EntryRow, state.mode, wait.waitMin, wait.ahead, true);
     }
     await rememberCustomer({ tenantId: tenant.id, phone, name });
+    if (sessionId.length >= 8) await linkSessionToEntry(existing.id, sessionId, device);
     if (input.returnToken) await attributeReturn({ tenantId: tenant.id, phone, linkToken: input.returnToken });
     return ticket(tenant.slug, existing as EntryRow, state.mode, wait.waitMin, wait.ahead, false);
   }
 
-  const device = deviceKey(input.deviceId);
   const ipLimit = await sharedRateLimit(`queue:ip:${input.ip}`, QUEUE_IP_JOINS_PER_HOUR, HOUR_MS);
   const phoneLimit = await sharedRateLimit(`queue:phone:${tenant.id}:${phone}`, QUEUE_PHONE_JOINS_PER_HOUR, HOUR_MS);
   const deviceLimit = device
@@ -325,7 +333,10 @@ export async function joinQueue(input: {
     requestedDate: state.mode === "REQUEST" ? requestedDate : "",
     requestedSlot: state.mode === "REQUEST" ? requestedSlot : "",
     consentAt: new Date(),
+    sessionId,
+    deviceId: device,
   });
+  if (sessionId.length >= 8) await linkSessionToEntry(created.id, sessionId, device);
   await rememberCustomer({ tenantId: tenant.id, phone, name });
   if (input.returnToken) await attributeReturn({ tenantId: tenant.id, phone, linkToken: input.returnToken });
   const loaded = await loadDay(tenant.id, dayKey);
@@ -370,7 +381,12 @@ export async function guestTicket(slug: string, ref: string) {
   };
 }
 
-export async function guestVisit(input: { slug: string; ref: string; action: "way" | "cancel"; ip: string }) {
+export async function guestVisit(input: { slug: string; ref: string; action: "way" | "cancel" | "bind"; ip: string; sessionId?: string; deviceId?: string }) {
+  if (input.action === "bind") {
+    const linked = await bindTicket({ slug: input.slug, ref: input.ref, sessionId: input.sessionId || "", deviceId: input.deviceId });
+    if (!linked.ok) throw new QueueError(linked.code, linked.message, linked.status);
+    return guestTicket(input.slug, input.ref);
+  }
   const limit = await sharedRateLimit(`queue:visit:${input.ip}`, 30, 10 * 60 * 1000);
   if (!limit.ok) throw new QueueError("RATE", "Too many taps. Wait a moment.", 429);
   const tenant = await requireQueueTenant(input.slug);
@@ -391,7 +407,7 @@ export async function guestVisit(input: { slug: string; ref: string; action: "wa
   return guestTicket(input.slug, input.ref);
 }
 
-function deskCard(tenantName: string, slug: string, row: EntryRow, avgMinutes: number, entries: EntryRow[], units: number) {
+async function deskCard(tenantName: string, slug: string, row: EntryRow, avgMinutes: number, entries: EntryRow[], units: number, tenant: { id: string; visitTryLimit: number; tryOnsAtSalon: boolean }) {
   const wait = timing(entries, row.id, avgMinutes, units);
   const text = deskWhatsAppText(tenantName, row.token, row.name, { home: queueHomeUrl(slug), tryOn: tryOnUrl(slug) });
   const phone = row.phone;
@@ -411,6 +427,7 @@ function deskCard(tenantName: string, slug: string, row: EntryRow, avgMinutes: n
     requestedSlot: row.requestedSlot,
     whatsappUrl: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : "",
     callUrl: phone ? `tel:+${phone}` : "",
+    ...(await tryLineForEntry(row, tenant)),
   };
 }
 
@@ -432,12 +449,17 @@ export async function deskSnapshot(tenantId: string) {
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });
-  const card = (row: EntryRow) => deskCard(tenant.name, tenant.slug, row, state.avgMinutes, entries, state.units);
-  const serving = Array.from({ length: state.units }, (_, index) => {
+  const card = (row: EntryRow) => deskCard(tenant.name, tenant.slug, row, state.avgMinutes, entries, state.units, tenant);
+  const serving = await Promise.all(Array.from({ length: state.units }, async (_, index) => {
     const unit = index + 1;
     const entry = entries.find((row) => row.unitSlot === unit && (row.status === "CALLED" || row.status === "IN_SERVICE"));
-    return { unit, entry: entry ? card(entry) : null };
-  });
+    return { unit, entry: entry ? await card(entry) : null };
+  }));
+  const [waiting, requestCards, confirmed] = await Promise.all([
+    Promise.all(entries.filter((row) => row.status === "WAITING").map(card)),
+    Promise.all((requests as EntryRow[]).filter((row) => row.status === "REQUESTED").map((row) => deskCard(tenant.name, tenant.slug, row, state.avgMinutes, [], state.units, tenant))),
+    Promise.all((requests as EntryRow[]).filter((row) => row.status === "CONFIRMED").map((row) => deskCard(tenant.name, tenant.slug, row, state.avgMinutes, [], state.units, tenant))),
+  ]);
   return {
     salon: tenant.name,
     state: {
@@ -450,9 +472,9 @@ export async function deskSnapshot(tenantId: string) {
     },
     services,
     serving,
-    waiting: entries.filter((row) => row.status === "WAITING").map(card),
-    requests: (requests as EntryRow[]).filter((row) => row.status === "REQUESTED").map((row) => deskCard(tenant.name, tenant.slug, row, state.avgMinutes, [], state.units)),
-    confirmed: (requests as EntryRow[]).filter((row) => row.status === "CONFIRMED").map((row) => deskCard(tenant.name, tenant.slug, row, state.avgMinutes, [], state.units)),
+    waiting,
+    requests: requestCards,
+    confirmed,
   };
 }
 

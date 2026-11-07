@@ -19,6 +19,8 @@ import {
   type BridalStyleId,
 } from "@/data/bridal";
 import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
+import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
 import { tryNowReady } from "@/lib/try-now";
@@ -39,6 +41,7 @@ function remember(current: Shot | undefined, next: Shot) {
 }
 
 export function BridalOwnLook({ config }: { config: SalonConfig }) {
+  const atSalon = useAtSalon();
   const [face, setFace] = useState<Shot | null>(null);
   const [items, setItems] = useState<Partial<Record<OwnLookSlotId, Shot>>>({});
   const [makeupStyle, setMakeupStyle] = useState<BridalStyleId>(defaultBridalStyle(BRIDAL_MAKEUP));
@@ -217,6 +220,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
 
   async function generate() {
     if (busy || !face || !chosen) return;
+    if (atSalon.required && !atSalon.unlocked) return;
     const problem = payloadProblem([
       ...(face.serverId ? [] : [{ label: "selfie", size: face.blob.size }]),
       ...OWN_LOOK_SLOTS.flatMap((slot) => {
@@ -249,6 +253,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
           attachSelfie(body, face, "selfie.jpg");
           body.set("slug", config.slug);
           body.set("sessionId", guestSessionId());
+          body.set("deviceId", guestDeviceId());
           const consentId = (await consent.persist()) || consent.consentId();
           if (consentId) body.set("consentId", consentId);
           body.set("requestId", crypto.randomUUID());
@@ -384,6 +389,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
         {result && !busy ? (
           <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} kind="bridal" />
         ) : null}
+        <AtSalonNote lang={config.defaultLang || "en"} />
         <TryBar
           label={ownButton.label}
           enabled={ownButton.enabled}

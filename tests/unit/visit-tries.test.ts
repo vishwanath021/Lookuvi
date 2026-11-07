@@ -86,11 +86,11 @@ describe("visit allowance", () => {
     const groom = readFileSync("src/app/api/v1/groom/route.ts", "utf8");
     const own = readFileSync("src/app/api/v1/bridal/own/route.ts", "utf8");
     const generate = readFileSync("src/app/api/v1/tryon/generate/route.ts", "utf8");
-    expect(groom.indexOf("refuseVisit")).toBeLessThan(groom.indexOf("generateGroom("));
+    expect(groom.indexOf("gatePaidForm")).toBeLessThan(groom.indexOf("generateGroom("));
     expect(groom.indexOf("loadVisitPhoto")).toBeLessThan(groom.indexOf("generateGroom("));
-    expect(own.indexOf("refuseVisit")).toBeLessThan(own.indexOf("generateOwnLook("));
+    expect(own.indexOf("gatePaidForm")).toBeLessThan(own.indexOf("generateOwnLook("));
     expect(own).toContain("loadVisitPhoto");
-    expect(generate.indexOf("await refuseVisit")).toBeLessThan(generate.indexOf("await runGuestLookIfReady"));
+    expect(generate.indexOf("gatePaidForm")).toBeLessThan(generate.indexOf("await runGuestLookIfReady"));
     expect(generate).toContain("loadVisitPhoto");
   });
 });

@@ -22,7 +22,9 @@ import { auth } from "@/auth";
 import { consumePreviewRateShared, guestLimitMessage } from "@/lib/tools";
 import { kolkataDayStart } from "@/lib/queue/day";
 import { refundStaleTryReservations, releaseTryReservation, reserveTryCaps, settleTryReservation } from "@/lib/try-allowance";
-import { isPhotoId, loadVisitPhoto, rememberVisitPhoto, refuseVisit, stampVisit } from "@/lib/visit-allowance";
+import { isPhotoId, loadVisitPhoto, rememberVisitPhoto } from "@/lib/visit-allowance";
+import { stampPaidVisit } from "@/lib/at-salon";
+import { gatePaidForm } from "@/lib/at-salon-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -117,6 +119,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "PRODUCT", message: "Bridal is turned off for this salon." }, { status: 404 });
   }
 
+  const paidGate = await gatePaidForm(form, tenant, sessionId, { countsAsTry: true, legacyVisit: true });
+  if (paidGate) {
+    return NextResponse.json(
+      { error: paidGate.error, message: paidGate.message, used: "used" in paidGate ? paidGate.used : undefined, allowance: "allowance" in paidGate ? paidGate.allowance : undefined },
+      { status: paidGate.status },
+    );
+  }
+
   await ensurePhotoConsent({
     tenantId: tenant.id,
     sessionId,
@@ -139,9 +149,6 @@ export async function POST(req: Request) {
     }
     servedPhotoId = await rememberVisitPhoto(tenant.id, sessionId, selfie);
   }
-  const blocked = await refuseVisit(tenant.id, sessionId, tenant.visitTryLimit);
-  if (blocked) return NextResponse.json(blocked, { status: 429 });
-
   const items: { id: string; bytes: Buffer }[] = [];
   for (const slot of OWN_LOOK_SLOTS) {
     const file = form.get(slot.id);
@@ -298,7 +305,7 @@ export async function POST(req: Request) {
       status: 200,
       headers: guestPreviewHeaders({ tryOnId: tryOn.id, creditsLeft: balance?.creditBalance ?? 0 }),
     });
-    await stampVisit(response, tenant.id, sessionId, tenant.visitTryLimit, servedPhotoId);
+    await stampPaidVisit(response, tenant, sessionId, String(form.get("deviceId") || ""), servedPhotoId, true);
     return response;
   } catch (error) {
     await releaseTryReservation(reservationId).catch(() => undefined);

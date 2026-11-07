@@ -7,7 +7,9 @@ import { requestClientIp } from "@/lib/ratelimit";
 const schema = z.object({
   slug: z.string().min(1),
   ref: z.string().min(8).max(80),
-  action: z.enum(["way", "cancel"]),
+  action: z.enum(["way", "cancel", "bind"]),
+  sessionId: z.string().max(80).optional(),
+  deviceId: z.string().max(80).optional(),
 });
 
 export async function POST(req: Request) {

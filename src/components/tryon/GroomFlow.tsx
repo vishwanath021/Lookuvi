@@ -20,6 +20,8 @@ import {
   type GroomSlotId,
 } from "@/data/groom";
 import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
+import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
 import { tryNowReady } from "@/lib/try-now";
@@ -39,6 +41,7 @@ function remember(current: Shot | undefined, next: Shot) {
 }
 
 export function GroomFlow({ config }: { config: SalonConfig }) {
+  const atSalon = useAtSalon();
   const [panel, setPanel] = useState<Panel>("looks");
   const [hairId, setHairId] = useState(GROOM_HAIR[0]?.id || "");
   const [beardId, setBeardId] = useState("");
@@ -202,6 +205,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
   async function generate(kind: Panel) {
     const shot = kind === "own" ? ownFace : face;
     if (busy || !shot) return;
+    if (atSalon.required && !atSalon.unlocked) return;
     const key = previewKey(kind, shot);
     const cache = kind === "own" ? ownCache.current : looksCache.current;
     const cached = cache.get(key);
@@ -224,6 +228,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
           attachSelfie(body, shot, "selfie.jpg");
           body.set("slug", config.slug);
           body.set("sessionId", guestSessionId());
+          body.set("deviceId", guestDeviceId());
           const consentId = (await consent.persist()) || consent.consentId();
           if (consentId) body.set("consentId", consentId);
           body.set("requestId", crypto.randomUUID());
@@ -380,6 +385,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
             {result?.panel === "looks" && !busy && panel === "looks" ? (
               <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} kind="groom" />
             ) : null}
+            <AtSalonNote lang={config.defaultLang || "en"} />
             <TryBar
               label={looksButton.label}
               enabled={looksButton.enabled}
@@ -445,6 +451,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
             {result?.panel === "own" && !busy && panel === "own" ? (
               <LookResultActions slug={config.slug} name={result.name} imageUrl={result.after} kind="groom" />
             ) : null}
+            <AtSalonNote lang={config.defaultLang || "en"} />
             <TryBar
               label={ownButton.label}
               enabled={ownButton.enabled}

@@ -223,3 +223,86 @@ export async function sendBroadcast(tenantId: string, text: string, send: Sender
   const templateNote = stop === "template" ? " The offer template failed after that." : "";
   return { ok: true as const, message: `Sent to ${sent} people.${tail}${templateNote}`, sent, held };
 }
+
+/** Owner asks a lapsed customer to come back. Same reminder template, cap, opt-out, and lock. */
+export async function sendComeBack(
+  tenantId: string,
+  customerIds: string[],
+  send: Sender = defaultSend,
+  env: NotifyEnv = process.env as NotifyEnv,
+  now = new Date(),
+) {
+  const ready = outreachReady(env, "reminder");
+  if (ready === "OFF") return { ok: false as const, message: "WhatsApp is not connected. Nothing was sent.", sent: 0, skipped: 0 };
+  if (ready === "TEMPLATE") return { ok: false as const, message: "The WhatsApp template is not ready yet. Nothing was sent.", sent: 0, skipped: 0 };
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  if (!tenant) return { ok: false as const, message: "Salon not found.", sent: 0, skipped: 0 };
+  const ids = [...new Set(customerIds.map((id) => id.trim()).filter(Boolean))].slice(0, 100);
+  if (!ids.length) return { ok: false as const, message: "Choose a customer first.", sent: 0, skipped: 0 };
+  const people = await prisma.customer.findMany({ where: { tenantId, id: { in: ids } } });
+  const blocked = await blockedPhoneSet(tenantId, people.map((row) => row.phone));
+  let sent = 0;
+  let skipped = 0;
+  let held = 0;
+  for (const person of people) {
+    if (person.optedOutAt || blocked.has(person.phone) || person.optOutSource === "STOP") {
+      skipped += 1;
+      continue;
+    }
+    const claimed = await prisma.customer.updateMany({
+      where: {
+        id: person.id,
+        optedOutAt: null,
+        OR: [{ reminderLockUntil: null }, { reminderLockUntil: { lt: now } }],
+      },
+      data: { reminderLockUntil: new Date(now.getTime() + LOCK_MS) },
+    });
+    if (claimed.count !== 1) {
+      skipped += 1;
+      continue;
+    }
+    const slot = await claimSlot({
+      tenantId,
+      cap: tenant.whatsappMonthlyCap,
+      kind: "reminder",
+      phone: person.phone,
+      customerId: person.id,
+      monthKey: kolkataMonthKey(now),
+    });
+    if (!slot?.linkToken) {
+      await prisma.customer.update({ where: { id: person.id }, data: { reminderLockUntil: null } });
+      held += 1;
+      continue;
+    }
+    let result: NotifyResult;
+    try {
+      result = await send(
+        { ...reminderMessage({ salon: tenant.name, join: `${queueHomeUrl(tenant.slug)}?r=${slot.linkToken}`, tryOn: tryOnUrl(tenant.slug) }), to: person.phone },
+        env,
+      );
+    } catch {
+      result = { ok: false, provider: "none", error: "NETWORK" };
+    }
+    if (result.ok && result.provider === "whatsapp") {
+      await prisma.whatsAppSend.update({ where: { id: slot.id }, data: { status: "SENT", provider: "whatsapp" } });
+      await prisma.customer.update({ where: { id: person.id }, data: { reminderLockUntil: null } });
+      sent += 1;
+    } else {
+      await prisma.whatsAppSend.update({
+        where: { id: slot.id },
+        data: { status: "FAILED", provider: result.provider, error: (result.error || "FAILED").slice(0, 40) },
+      });
+      await prisma.customer.update({ where: { id: person.id }, data: { reminderLockUntil: null } });
+      if (result.error === "TEMPLATE") {
+        return { ok: false as const, message: "The WhatsApp template is not ready yet. Nothing was sent.", sent, skipped };
+      }
+    }
+  }
+  if (sent === 0 && held > 0) return { ok: false as const, message: "The monthly WhatsApp limit is used. Nothing was sent.", sent, skipped };
+  if (sent === 0 && skipped > 0) return { ok: false as const, message: "Those customers have reminders off. Nothing was sent.", sent, skipped };
+  if (sent === 0) return { ok: false as const, message: "Nothing was sent.", sent, skipped };
+  const skipNote = skipped ? ` ${skipped} ${skipped === 1 ? "has" : "have"} reminders off.` : "";
+  const heldNote = held ? ` ${held} ${held === 1 ? "was" : "were"} not sent because the monthly limit was reached.` : "";
+  const peopleWord = sent === 1 ? "person" : "people";
+  return { ok: true as const, message: `Sent to ${sent} ${peopleWord}.${skipNote}${heldNote}`, sent, skipped };
+}

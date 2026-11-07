@@ -244,7 +244,7 @@ describe("monthly try-on allowance", () => {
   afterEach(cleanup);
 
   it("refuses the next preview when this month's included tries are used", async () => {
-    const alpha = await salon("return-tries", { monthlyTryAllowance: 1, productTryOn: true });
+    const alpha = await salon("return-tries", { monthlyTryAllowance: 1, productTryOn: true, tryOnsAtSalon: false });
     expect(await refuseMonthlyTries(alpha.id, 1)).toBeNull();
     await prisma.tryOn.create({ data: { tenantId: alpha.id, sessionId: "session-12", kind: "STYLE", status: "SUCCEEDED" } });
     expect((await refuseMonthlyTries(alpha.id, 1))?.error).toBe("MONTHLY_CAP");

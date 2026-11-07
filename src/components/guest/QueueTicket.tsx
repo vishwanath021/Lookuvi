@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { t } from "@/data/i18n";
 import { QueueWait } from "@/components/guest/QueueWait";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
+import { guestDeviceId } from "@/lib/device-id";
+import { guestSessionId } from "@/lib/guest-session";
 import { otherBookings, parseVisitMemory, visitMemoryKey, type VisitMemory } from "@/lib/queue/visit-memory";
 
 type Ticket = {
@@ -38,6 +40,11 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
 
   useEffect(() => {
     setReady(true);
+    void fetch("/api/v1/queue/visit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug, ref: ticket.ref, action: "bind", sessionId: guestSessionId(), deviceId: guestDeviceId() }),
+    }).catch(() => undefined);
     try {
       setOthers(otherBookings(parseVisitMemory(localStorage.getItem(visitMemoryKey(slug))), ticket.ref));
     } catch {

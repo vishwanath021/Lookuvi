@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { SalonPaused } from "@/components/guest/SalonPaused";
 import { TryOnUnavailable } from "@/components/guest/TryOnUnavailable";
+import { AtSalonProvider } from "@/components/guest/AtSalonNote";
 import { TryOnApp } from "@/components/tryon/TryOnApp";
 import { usingDemoProvider } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
@@ -56,6 +57,7 @@ export default async function SalonPage({
     }
   }
   return (
+    <AtSalonProvider slug={tenant.slug} lang={config.defaultLang}>
     <TryOnApp
       config={config}
       initialTool={query.tool}
@@ -72,5 +74,6 @@ export default async function SalonPage({
       showGroom={tenant.productGroom}
       showMakeup={tenant.productMakeupStudio}
     />
+    </AtSalonProvider>
   );
 }

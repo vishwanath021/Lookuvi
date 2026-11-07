@@ -1,4 +1,5 @@
 import { CustomersBoard } from "@/components/admin/CustomersBoard";
+import { listLapsed } from "@/lib/customers/lapsed";
 import { listCustomers, returnStats } from "@/lib/customers/service";
 import { templateFor, whatsAppConfigured, type NotifyEnv } from "@/lib/notify";
 import { pageTenant } from "@/lib/session";
@@ -15,9 +16,10 @@ export default async function CustomersPage() {
       </main>
     );
   }
-  const [customers, stats] = await Promise.all([
+  const [customers, stats, lapsed] = await Promise.all([
     listCustomers(tenant.id, ""),
     returnStats(tenant.id),
+    listLapsed(tenant.id),
   ]);
   const env = process.env as NotifyEnv;
   const whatsapp = !whatsAppConfigured(env) ? "off" : !templateFor("reminder", env) || !templateFor("offer", env) ? "template" : "ready";
@@ -30,6 +32,7 @@ export default async function CustomersPage() {
         initialStats={{ ...stats, cap: tenant.whatsappMonthlyCap }}
         settings={{ remindersOn: tenant.remindersOn, reminderDays: tenant.reminderDays, whatsappMonthlyCap: tenant.whatsappMonthlyCap }}
         whatsapp={whatsapp}
+        initialLapsed={lapsed}
       />
     </main>
   );
