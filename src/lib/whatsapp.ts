@@ -1,3 +1,8 @@
+import { whatsAppDate } from "@/lib/whatsapp-format";
+
+/** Shown after the bridal trial form opens WhatsApp. Exact casing, including Salon. */
+export const BRIDAL_TRIAL_SENT = "Sent to the Salon on WhatsApp";
+
 export type WhatsAppInput = {
   phone: string;
   salonName: string;
@@ -39,7 +44,7 @@ export function buildBridalTrialText(input: {
   const who = input.name.trim() ? `${input.name.trim()}: ` : "";
   const looks = input.looks.filter(Boolean).join(", ") || "a bridal look";
   const links = input.urls.filter(Boolean).join(" ");
-  const core = `Hi! ${who}I'd like a bridal trial for my ${input.eventLabel} on ${input.eventDate}. Looks: ${looks}.`;
+  const core = `Hi! ${who}I'd like a bridal trial for my ${input.eventLabel} on ${whatsAppDate(input.eventDate)}. Looks: ${looks}.`;
   return links ? `${core} ${links}` : core;
 }
 

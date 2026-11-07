@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ownerFeatures } from "@/lib/features";
 import { requireMembership } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { whatsAppSchedule } from "@/lib/whatsapp-format";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 
 const schema = z.object({ status: z.enum(["CONFIRMED", "DECLINED"]) });
@@ -18,9 +19,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const booking = await prisma.booking.findFirst({ where: { id, tenantId: access.tenant.id }, include: { customer: true } });
   if (!booking) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   await prisma.booking.update({ where: { id }, data: { status: parsed.data.status } });
+  const when = whatsAppSchedule(booking.preferredAt);
   const text = parsed.data.status === "CONFIRMED"
-    ? `Hi ${booking.customer.name || ""}, ${access.tenant.name} can take your request (${booking.lookName || "a visit"}) around ${booking.preferredAt}. Reply to confirm.`
-    : `Hi ${booking.customer.name || ""}, ${access.tenant.name} cannot take ${booking.preferredAt}. Reply with another time.`;
+    ? `Hi ${booking.customer.name || ""}, ${access.tenant.name} can take your request (${booking.lookName || "a visit"}) around ${when}. Reply to confirm.`
+    : `Hi ${booking.customer.name || ""}, ${access.tenant.name} cannot take ${when}. Reply with another time.`;
   const link = buildWhatsAppLink({
     phone: booking.customer.phone,
     salonName: access.tenant.name,

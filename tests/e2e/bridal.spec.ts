@@ -145,7 +145,8 @@ test("guest can pick an event and a look, refine it, try mehendi, save, compare,
   expect(text).toContain("Lakshmi");
   expect(text).toContain("bridal trial");
   expect(text).toContain("Wedding");
-  expect(text).toContain("2026-12-20");
+  expect(text).toContain("20 December 2026");
+  expect(text).not.toContain("2026-12-20");
   expect(text).toContain("Telugu Muhurtham Classic");
   await popup.close();
 

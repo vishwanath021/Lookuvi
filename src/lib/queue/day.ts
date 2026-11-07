@@ -12,6 +12,13 @@ export function kolkataToday(now = new Date()) {
   return kolkataDayKey(now);
 }
 
+/** A YYYY-MM-DD calendar day before today in Asia/Kolkata. Today is allowed. */
+export function isPastKolkataDay(iso: string, now = new Date()) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) && iso < kolkataDayKey(now);
+}
+
+export const PAST_DATE_MESSAGE = "Choose today or a later date.";
+
 /** YYYY-MM in Asia/Kolkata. Same month the try-on allowance and WhatsApp cap use. */
 export function kolkataMonthKey(now = new Date()) {
   return kolkataDayKey(now).slice(0, 7);

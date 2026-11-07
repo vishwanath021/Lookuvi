@@ -1,3 +1,4 @@
+import "@/lib/zod-jitless";
 import { z } from "zod";
 import { decryptSecret, encryptSecret, keyHint } from "@/lib/crypto/secret";
 import { allowByoKey } from "@/lib/ai/credentials";

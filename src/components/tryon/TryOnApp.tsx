@@ -14,6 +14,7 @@ import { AiGeneratedBadge } from "@/components/legal/AiGeneratedBadge";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LookPicker } from "@/components/tryon/LookPicker";
 import { LiveStudio, StudioRail } from "@/components/tryon/LiveStudio";
+import { CropPhotoButton } from "@/components/tryon/PhotoCrop";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import { BrowCard } from "@/components/tryon/BrowCard";
 import { ColourStage } from "@/components/tryon/ColourStage";
@@ -1210,6 +1211,12 @@ export function TryOnApp({
         )}
         </div>
       </section>
+
+      {activeShot && !cameraOn ? (
+        <div className="mt-3">
+          <CropPhotoButton src={activeShot.url} disabled={busy} onApply={(blob) => applyBlob(blob)} />
+        </div>
+      ) : null}
 
       {(cameraOn || activeShot || showResult) && (
         <p className="mt-3 text-center text-sm text-muted">

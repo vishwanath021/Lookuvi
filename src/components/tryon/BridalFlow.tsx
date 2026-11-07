@@ -10,6 +10,7 @@ import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
 import { LiveStudio } from "@/components/tryon/LiveStudio";
 import { LookResultActions, PhotoActions, ResultZoom } from "@/components/tryon/LookResultActions";
+import { CropPhotoButton } from "@/components/tryon/PhotoCrop";
 import { LargeFrame, LiveTray, MakeupSwatches, SelectionSummary, StepCard, StepRail, TryBar, scrollToStep } from "@/components/tryon/LookStepper";
 import { useVisitTries } from "@/components/tryon/useVisitTries";
 import { MakeupStage } from "@/components/tryon/MakeupStage";
@@ -43,7 +44,9 @@ import type { SalonConfig } from "@/lib/salon";
 import { tryNowReady } from "@/lib/try-now";
 import { rememberGenerated, readGenerated } from "@/lib/generated-session";
 import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
+import { isPastKolkataDay, kolkataDayKey, PAST_DATE_MESSAGE } from "@/lib/queue/day";
 import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
+import { BRIDAL_TRIAL_SENT } from "@/lib/whatsapp";
 
 function EyeIcon() {
   return (
@@ -417,8 +420,27 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   }
 
+  async function replaceShot(kind: "face" | "hand", blob: Blob) {
+    const shot = await shotFromBlob(blob);
+    const drop = (current: Shot | null) => {
+      if (current?.url.startsWith("blob:")) URL.revokeObjectURL(current.url);
+      return shot;
+    };
+    if (kind === "face") {
+      setFace(drop);
+      setResult((current) => (current?.kind === "look" ? null : current));
+      return;
+    }
+    setHand(drop);
+    setResult((current) => (current?.kind === "mehendi" ? null : current));
+  }
+
   async function book() {
     setBookNote("");
+    if (isPastKolkataDay(eventDate)) {
+      setBookNote(PAST_DATE_MESSAGE);
+      return;
+    }
     const picked = saved.filter((item) => item.kind === "look");
     const lookIds = picked.length ? [...new Set(picked.map((item) => item.lookId))] : result?.kind === "look" ? [result.lookId] : chosen ? [chosen.id] : [];
     const lookUrls = picked.map((item) => item.share).filter(Boolean);
@@ -443,7 +465,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
       return;
     }
     window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
-    setBookNote("Sent to the salon on WhatsApp.");
+    setBookNote(BRIDAL_TRIAL_SENT);
   }
 
   const compared = compare.map((id) => saved.find((item) => item.id === id)).filter((item) => item !== undefined);
@@ -756,6 +778,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
                 <button className="btn secondary" type="button" data-photo-action="upload" onClick={() => consent.gate(() => bridalFile.current?.click())}>Upload</button>
                 <button className="btn secondary" type="button" data-photo-action="live" onClick={() => beginLive("face", true)}>Live capture</button>
                 <p className="text-center text-xs text-muted">Front camera with live lip colour while you frame the photo.</p>
+                {face ? <CropPhotoButton src={face.url} disabled={busy} onApply={(blob) => replaceShot("face", blob)} /> : null}
                 <input ref={bridalFile} className="sr-only" type="file" accept="image/*" data-photo="bridal" onChange={(event) => {
                   const file = event.target.files?.[0];
                   event.target.value = "";
@@ -826,6 +849,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               <PhotoActions settled={result?.kind === "mehendi"} className="grid w-full max-w-[28rem] gap-2">
                 <button className="btn sheen" type="button" onClick={() => beginLive("hand")}>Take photo</button>
                 <button className="btn secondary" type="button" onClick={() => consent.gate(() => mehendiFile.current?.click())}>Upload</button>
+                {hand ? <CropPhotoButton src={hand.url} disabled={busy} onApply={(blob) => replaceShot("hand", blob)} /> : null}
                 <input ref={mehendiFile} className="sr-only" type="file" accept="image/*" data-photo="mehendi" onChange={(event) => {
                   const file = event.target.files?.[0];
                   event.target.value = "";
@@ -913,7 +937,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required minLength={2} autoComplete="name" />
             </label>
             <label className="text-sm">Event date
-              <input className="field mt-1" type="date" value={eventDate} onChange={(event) => setEventDate(event.target.value)} required />
+              <input className="field mt-1" type="date" min={kolkataDayKey()} value={eventDate} onChange={(event) => setEventDate(event.target.value)} required />
             </label>
             <button className="btn sheen" type="submit">Book bridal trial</button>
             {bookNote && <p className="text-sm" role="status">{bookNote}</p>}

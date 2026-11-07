@@ -1,3 +1,4 @@
+import "@/lib/zod-jitless";
 import { z } from "zod";
 import { styleById, type FaceShape, type HairDensity, type HairTexture } from "@/data/styles";
 

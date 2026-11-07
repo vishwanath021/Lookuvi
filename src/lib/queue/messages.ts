@@ -1,5 +1,6 @@
 import { appBaseUrl } from "@/lib/env";
 import type { NotifyMessage } from "@/lib/notify";
+import { whatsAppDate, whatsAppTime } from "@/lib/whatsapp-format";
 
 export function statusPath(slug: string, ref: string) {
   return `/s/${slug}/q/${ref}`;
@@ -47,11 +48,13 @@ export function almostMessage(input: { salon: string; token: number; waitMin: nu
 }
 
 export function confirmedMessage(input: { salon: string; date: string; slot: string; link: string; home: string; tryOn: string }): NotifyMessage {
+  const date = whatsAppDate(input.date);
+  const slot = whatsAppTime(input.slot);
   return {
     to: "",
     kind: "confirmed",
-    body: withLinks(`${input.salon}: your visit is confirmed for ${input.date} at ${input.slot}. ${input.link}`, input.home, input.tryOn),
-    parameters: [input.salon, input.date, input.slot, input.link, input.home, input.tryOn],
+    body: withLinks(`${input.salon}: your visit is confirmed for ${date} at ${slot}. ${input.link}`, input.home, input.tryOn),
+    parameters: [input.salon, date, slot, input.link, input.home, input.tryOn],
   };
 }
 
