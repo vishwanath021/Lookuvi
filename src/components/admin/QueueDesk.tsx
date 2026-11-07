@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { t } from "@/data/i18n";
+import { DESK_STALE_MESSAGE, deskFailure, type DeskPayload } from "@/lib/queue/desk-client";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
 
 type Card = {
@@ -64,7 +65,11 @@ function minutesInChair(iso?: string | null) {
 export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: string; monthTries?: number }) {
   const [desk, setDesk] = useState(initial);
   const [notice, setNotice] = useState("");
+  const [stale, setStale] = useState(false);
   const [busy, setBusy] = useState(false);
+  const ticket = useRef(0);
+  const refreshRef = useRef<() => void>(() => {});
+  const staleFromPoll = useRef(false);
   const [ready, setReady] = useState(false);
   const [walkName, setWalkName] = useState("");
   const [walkPhone, setWalkPhone] = useState("");
@@ -91,21 +96,75 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
   const summary = `${desk.waiting.length} waiting · ~${lineWait} min`;
   const hoursLabel = desk.state.hoursLabel || (desk.state.isOpen ? "Open" : "Closed");
 
+  function claim() {
+    ticket.current += 1;
+    return ticket.current;
+  }
+
+  function current(id: number) {
+    return id === ticket.current;
+  }
+
+  function applySnapshot(data: Desk) {
+    if (staleFromPoll.current) setNotice("");
+    staleFromPoll.current = false;
+    setStale(false);
+    setDesk(data);
+    setSheet((open) => {
+      if (!open) return open;
+      const seated = (data.serving || []).map((seat) => seat.entry).filter(Boolean) as Card[];
+      return [...data.waiting, ...seated, ...data.requests, ...data.confirmed].find((item) => item.id === open.id) || open;
+    });
+    setUnits(String(data.state.units));
+    setAvg(String(data.state.avgMinutes));
+    setAlertMin(String(data.state.alertLeadMin));
+    setMode(data.state.mode);
+    setUnitLabel(data.state.unitLabel);
+  }
+
+  function keepList(message: string, fromPoll: boolean) {
+    staleFromPoll.current = fromPoll;
+    setStale(true);
+    setNotice(message);
+  }
+
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1024px)");
     const apply = () => setWide(media.matches);
     apply();
     setReady(true);
     media.addEventListener("change", apply);
+    let alive = true;
+    async function refresh() {
+      const id = claim();
+      try {
+        const res = await fetch("/api/v1/admin/queue", { cache: "no-store", credentials: "same-origin" });
+        const data = (await res.json().catch(() => ({}))) as DeskPayload;
+        if (!alive || !current(id)) return;
+        const failure = deskFailure(res.status, data);
+        if (failure?.type === "login") {
+          window.location.assign("/login");
+          return;
+        }
+        if (failure) {
+          keepList(failure.message, true);
+          return;
+        }
+        applySnapshot(data as Desk);
+      } catch {
+        if (!alive || !current(id)) return;
+        keepList(DESK_STALE_MESSAGE, true);
+      }
+    }
+    refreshRef.current = () => {
+      void refresh();
+    };
+    void refresh();
     const timer = setInterval(() => {
-      void fetch("/api/v1/admin/queue")
-        .then((res) => res.json())
-        .then((data) => {
-          if (data?.state) setDesk(data);
-        })
-        .catch(() => undefined);
+      void refresh();
     }, QUEUE_POLL_MS);
     return () => {
+      alive = false;
       media.removeEventListener("change", apply);
       clearInterval(timer);
     };
@@ -114,29 +173,42 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
   async function act(body: Record<string, unknown>) {
     setBusy(true);
     setNotice("");
-    const res = await fetch("/api/v1/admin/queue", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok) {
-      setNotice(data.message || "That did not work.");
-      return;
-    }
-    if (data?.state) {
-      setDesk(data);
-      setSheet((current) => {
-        if (!current) return current;
-        const seated = (data.serving || []).map((seat: { entry: Card | null }) => seat.entry).filter(Boolean) as Card[];
-        return [...(data.waiting || []), ...seated, ...(data.requests || []), ...(data.confirmed || [])].find((item) => item.id === current.id) || current;
+    const id = claim();
+    try {
+      const res = await fetch("/api/v1/admin/queue", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        credentials: "same-origin",
+        body: JSON.stringify(body),
       });
-      setUnits(String(data.state.units));
-      setAvg(String(data.state.avgMinutes));
-      setAlertMin(String(data.state.alertLeadMin));
-      setMode(data.state.mode);
-      setUnitLabel(data.state.unitLabel);
+      const data = (await res.json().catch(() => ({}))) as DeskPayload & Desk;
+      if (!current(id)) return;
+      if (res.status === 401 || data?.error === "UNAUTHENTICATED") {
+        window.location.assign("/login");
+        return;
+      }
+      if (res.status === 403 || data?.error === "CSRF") {
+        const failure = deskFailure(res.status, data);
+        keepList(failure && failure.type !== "login" ? failure.message : DESK_STALE_MESSAGE, false);
+        return;
+      }
+      if (!res.ok) {
+        staleFromPoll.current = false;
+        setStale(false);
+        setNotice(data.message || "That did not work.");
+        return;
+      }
+      if (!data?.state) {
+        keepList(DESK_STALE_MESSAGE, false);
+        return;
+      }
+      applySnapshot(data);
+    } catch {
+      if (!current(id)) return;
+      keepList(DESK_STALE_MESSAGE, false);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -180,7 +252,17 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
       </header>
       {typeof monthTries === "number" ? <p className="mt-1 text-xs text-muted">{monthTries.toLocaleString("en-IN")} try-ons this month</p> : null}
       {!desk.state.isOpen && !desk.state.scheduled && !desk.state.closedToday ? <p className="mt-2 text-sm text-muted">{t(lang, "queuePausedNote")}</p> : null}
-      {notice ? <p className="mt-3 text-sm" role="status">{notice}</p> : null}
+      {notice ? (
+        <p className="mt-3 text-sm" role="status" data-queue-stale={stale ? "yes" : "no"}>
+          {notice}
+          {stale ? (
+            <>
+              {" "}
+              <button className="underline" type="button" onClick={() => refreshRef.current()}>Retry</button>
+            </>
+          ) : null}
+        </p>
+      ) : null}
 
       {live ? (
         <div className={wide ? "mt-4 grid grid-cols-[260px_minmax(0,1fr)] items-start gap-6" : "mt-4"}>
@@ -231,7 +313,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
 
           <section className={wide ? "" : "mt-4"} aria-label="Waiting">
             <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted">{t(lang, "queueWaiting")}</h2>
-            {desk.waiting.length === 0 ? <p className="mt-2 text-sm text-muted">{t(lang, "queueNobody")}</p> : null}
+            {desk.waiting.length === 0 ? <p className="mt-2 text-sm text-muted">{stale ? "Waiting list could not be loaded." : t(lang, "queueNobody")}</p> : null}
             {wide ? (
               <div className="mt-2 overflow-x-hidden">
                 <table className="w-full text-left text-sm">
@@ -308,7 +390,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
       {!live ? (
         <section className="mt-4">
           <h2 className="font-serif text-2xl">{t(lang, "queueRequests")}</h2>
-          {desk.requests.length === 0 ? <p className="mt-2 text-sm text-muted">{t(lang, "queueNobody")}</p> : null}
+          {desk.requests.length === 0 ? <p className="mt-2 text-sm text-muted">{stale ? "Waiting list could not be loaded." : t(lang, "queueNobody")}</p> : null}
           <div className="mt-3 grid gap-2">
             {desk.requests.map((card) => (
               <article key={card.id} className="card flex flex-wrap items-center gap-2 p-3">

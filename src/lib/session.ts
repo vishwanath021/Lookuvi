@@ -40,11 +40,11 @@ async function membershipFor(userId: string, sessionTenantId?: string) {
 export async function requireMembership() {
   const session = await auth();
   if (!session?.user?.id) {
-    return { error: NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 }) };
+    return { error: NextResponse.json({ error: "UNAUTHENTICATED", message: "Your session has ended. Sign in again." }, { status: 401 }) };
   }
   const membership = await membershipFor(session.user.id, session.user.tenantId);
   if (!membership) {
-    return { error: NextResponse.json({ error: "NO_TENANT" }, { status: 403 }) };
+    return { error: NextResponse.json({ error: "NO_TENANT", message: "This account is not a member of a salon." }, { status: 403 }) };
   }
   return { session, membership, tenant: membership.tenant };
 }
@@ -53,7 +53,7 @@ export async function requireOwner() {
   const result = await requireMembership();
   if ("error" in result && result.error) return result;
   if (!("membership" in result) || result.membership.role !== "OWNER") {
-    return { error: NextResponse.json({ error: "OWNER_ONLY" }, { status: 403 }) };
+    return { error: NextResponse.json({ error: "OWNER_ONLY", message: "Only the owner can do that." }, { status: 403 }) };
   }
   return result;
 }

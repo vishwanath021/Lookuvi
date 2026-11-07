@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { contentSecurityPolicy } from "@/lib/csp";
-import { csrfBlocked } from "@/lib/http/csrf";
+import { CSRF_MESSAGE, csrfBlocked } from "@/lib/http/csrf";
 import { isSharedPath, parseHost } from "@/lib/host";
 
 function hasSessionCookie(req: NextRequest) {
@@ -34,7 +34,9 @@ function nextWithCsp(req: NextRequest, nonce: string, rewrite?: URL) {
 export function middleware(req: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const { pathname } = req.nextUrl;
-  if (csrfBlocked(req)) return applyCsp(req, NextResponse.json({ error: "CSRF" }, { status: 403 }), nonce);
+  if (csrfBlocked(req)) {
+    return applyCsp(req, NextResponse.json({ error: "CSRF", message: CSRF_MESSAGE }, { status: 403 }), nonce);
+  }
   if ((pathname.startsWith("/admin") || pathname.startsWith("/super")) && !hasSessionCookie(req)) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
