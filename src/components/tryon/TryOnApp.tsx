@@ -12,6 +12,7 @@ import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { LegalFooter } from "@/components/legal/LegalFooter";
 import { AiGeneratedBadge } from "@/components/legal/AiGeneratedBadge";
 import { GeneratingLook } from "@/components/tryon/GeneratingLook";
+import { LookPicker } from "@/components/tryon/LookPicker";
 import { LiveStudio, StudioRail } from "@/components/tryon/LiveStudio";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import { BrowCard } from "@/components/tryon/BrowCard";
@@ -21,6 +22,7 @@ import { StyleCard } from "@/components/tryon/StyleCard";
 import { BROW_COLOURS, BROW_THICKNESS, browsForAudience, type BrowColour, type BrowThickness } from "@/data/brows";
 import { t } from "@/data/i18n";
 import { styleHasPhoto } from "@/data/style-photos";
+import { lookTagsForStyle } from "@/lib/look-picker";
 import { orderStylesForPicker, suggestStyles, type HairReading } from "@/lib/hair-suitability";
 import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
 import { alignGeneratedPhoto } from "@/lib/face/align-client";
@@ -57,15 +59,6 @@ function PoseReadout({ debug }: { debug: PlacementDebug }) {
       {poseLine("Check", debug.failed ? `${debug.failed} ${debug.value ?? ""}`.trim() : "ok")}
     </dl>
   );
-}
-
-function pickClass(selected: boolean) {
-  return `relative overflow-hidden rounded-[14px] border bg-white text-left shadow-sm ${selected ? "border-[var(--brand)] ring-2 ring-[var(--brand)]" : "border-line"}`;
-}
-
-function PickMark({ on }: { on: boolean }) {
-  if (!on) return null;
-  return <span className="check" aria-hidden="true">✓</span>;
 }
 
 type Look = {
@@ -243,6 +236,8 @@ export function TryOnApp({
   const captureRef = useRef<HTMLInputElement>(null);
   const frameRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLElement>(null);
+  const previewDockRef = useRef<HTMLDivElement>(null);
+  const [miniPreview, setMiniPreview] = useState(false);
   const consent = usePhotoConsent(config.slug, lang);
   const [zoom, setZoom] = useState(1);
   const [compareOn, setCompareOn] = useState(true);
@@ -745,7 +740,7 @@ export function TryOnApp({
     void preview(chosen);
   }
 
-  function selectLook(chosen: Chosen) {
+  function selectLook(chosen: Chosen, generate = false) {
     setStyleId(chosen.id);
     setPicked((current) => ({ ...current, [chosen.tool]: chosen.id }));
     setTool(chosen.tool);
@@ -757,7 +752,8 @@ export function TryOnApp({
       frameRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
-    void preview(chosen);
+    pendingLook.current = chosen;
+    if (generate) void preview(chosen);
   }
 
   async function preview(chosen: Chosen) {
@@ -943,7 +939,18 @@ export function TryOnApp({
   const showActionStrip = showQueue && actionItems.length > 0;
 
   const platformLogo = isPlatformLogo(config.logoUrl);
-  const lockedBrowse = showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon) && !cameraOn && !activeShot && !showResult;
+  const salonLocked = showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon);
+  const lockedBrowse = salonLocked && !cameraOn && !activeShot && !showResult;
+  useEffect(() => {
+    const node = previewDockRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      const narrow = window.matchMedia("(max-width: 1023px)").matches;
+      setMiniPreview(narrow && !entry.isIntersecting);
+    }, { threshold: 0.25 });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [section, tool, lockedBrowse]);
 
   function saveCurrentStyle() {
     const chosen = chosenNow();
@@ -1025,37 +1032,20 @@ export function TryOnApp({
       <h2 className="page-title">{t(lang, "pageTitle")}</h2>
       <AtSalonNote lang={lang} />
 
-      {visibleTools.length > 1 && (
-      <div className="seg-fade mt-4">
-      <div className="seg" role="tablist" aria-label={t(lang, "toolsLabel")}>
-        {visibleTools.map((item) => (
-          <button
-            key={item.id}
-            className="seg-btn"
-            type="button"
-            role="tab"
-            aria-selected={tool === item.id}
-            aria-label={item.name}
-            onClick={() => {
-              setTool(item.id);
-              setError("");
-              setCameraError("");
-              setStyleId(picked[item.id] || looks[item.id]?.styleId || "");
-            }}
-          >
-            <ToolGlyph name={item.icon} />
-            {item.label}
-          </button>
-        ))}
-      </div>
-      </div>
-      )}
-
-      <div className={`mt-6 grid items-start gap-8 ${lockedBrowse ? "" : "lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]"}`}>
-      {lockedBrowse ? null : <div>
+      <div className="try-desk mt-4">
+      <div className="try-preview" ref={previewDockRef}>
+      {lockedBrowse ? (
+        <section ref={frameRef} className="card p-4" aria-label="Photo" data-browse-locked="yes">
+          <p className="text-sm">{t(lang, "atSalonLocked")}</p>
+          <button className="btn secondary mt-3 min-h-11" type="button" disabled={!chosenNow()} onClick={saveCurrentStyle}>{t(lang, "saveLook")}</button>
+          {savedFlash ? <p className="mt-2 text-sm" role="status">{t(lang, "atSalonSaved")}</p> : null}
+          {savedPicks.length > 0 ? <p className="mt-2 text-sm">Saved: {savedPicks.map((item) => item.name).join(", ")}</p> : null}
+        </section>
+      ) : (
+      <>
       <section
         ref={frameRef}
-        className={generatingHere || showResult ? `ai-photo ${showResult ? "is-ready" : "is-working"}${freshGlow ? " is-fresh" : ""}` : "overflow-hidden rounded-[14px] border border-line bg-white shadow-lift"}
+        className={`try-shot ${generatingHere || showResult ? `ai-photo ${showResult ? "is-ready" : "is-working"}${freshGlow ? " is-fresh" : ""}` : "overflow-hidden rounded-[14px] border border-line bg-white shadow-lift"}`}
         aria-label="Photo"
       >
         {(generatingHere || showResult) && <div className="ai-photo-spin" aria-hidden="true" />}
@@ -1246,16 +1236,42 @@ export function TryOnApp({
           <button className="btn secondary" type="button" onClick={() => resetForAnotherPhoto()}>{t(lang, "tryAnotherShort")}</button>
         </div>
       )}
-      </div>}
-
-      <section ref={gridRef} data-style-grid="yes" aria-label={tool === "style" ? t(lang, "styles") : tool === "colour" ? t(lang, "shades") : tool === "brows" ? t(lang, "brows") : tool === "beard" ? t(lang, "beards") : t(lang, "nails")}>
-        {lockedBrowse ? (
-          <div className="mb-4 grid gap-2" data-browse-locked="yes">
-            <button className="btn secondary w-fit" type="button" disabled={!chosenNow()} onClick={saveCurrentStyle}>{t(lang, "saveLook")}</button>
-            {savedFlash ? <p className="text-sm" role="status">{t(lang, "atSalonSaved")}</p> : null}
-            {savedPicks.length > 0 ? <p className="text-sm">Saved: {savedPicks.map((item) => item.name).join(", ")}</p> : null}
-          </div>
-        ) : null}
+      </>
+      )}
+      </div>
+      {miniPreview ? (
+        <div className="try-mini" data-mini-preview="yes">
+          {(showResult && active) || activeShot ? <img src={showResult && active ? active.after : activeShot?.url} alt="" /> : null}
+          <p className="min-w-0 flex-1 truncate text-sm">{showResult && active ? active.styleName : activeShot ? "Your photo" : salonLocked ? t(lang, "atSalonLocked") : "Your preview"}</p>
+        </div>
+      ) : null}
+      <div className="try-picks">
+      {visibleTools.length > 1 && (
+      <div className="seg-fade">
+      <div className="seg" role="tablist" aria-label={t(lang, "toolsLabel")}>
+        {visibleTools.map((item) => (
+          <button
+            key={item.id}
+            className="seg-btn"
+            type="button"
+            role="tab"
+            aria-selected={tool === item.id}
+            aria-label={item.name}
+            onClick={() => {
+              setTool(item.id);
+              setError("");
+              setCameraError("");
+              setStyleId(picked[item.id] || looks[item.id]?.styleId || "");
+            }}
+          >
+            <ToolGlyph name={item.icon} />
+            {item.label}
+          </button>
+        ))}
+      </div>
+      </div>
+      )}
+      <section ref={gridRef} className="mt-3" data-style-grid="yes" aria-label={tool === "style" ? t(lang, "styles") : tool === "colour" ? t(lang, "shades") : tool === "brows" ? t(lang, "brows") : tool === "beard" ? t(lang, "beards") : t(lang, "nails")}>
         {tool === "style" && (
           <>
             <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Style audience">
@@ -1263,9 +1279,9 @@ export function TryOnApp({
               {config.showMen && <button className="chip" type="button" aria-pressed={gender === "men"} onClick={() => chooseGender("men")}>{t(lang, "men")}</button>}
               {config.showKids && <button className="chip" type="button" aria-pressed={gender === "kids"} onClick={() => chooseGender("kids")}>{t(lang, "kids")}</button>}
             </div>
-            {!lockedBrowse ? <HairTypePicker
+            <HairTypePicker
               pickerOn={config.hairPickerOn}
-              suggestOn={config.hairSuggestOn}
+              suggestOn={!lockedBrowse && config.hairSuggestOn}
               usesCredits={config.hairSuggestUsesCredits}
               density={pickedDensity}
               texture={pickedTexture}
@@ -1280,106 +1296,114 @@ export function TryOnApp({
               onShowAll={setShowAllStyles}
               onSuggest={() => void suggestHair()}
               onPick={(card) => selectLook({ id: card.id, name: card.name, serviceKeys: card.serviceKeys, tool: "style" })}
-            /> : null}
+            />
             {config.hairPickerOn && (pickedDensity || pickedTexture) && visibleStyles.length === 0 && (
               <p className="mb-2 text-sm">No style photos for that hair type. Turn on Show all.</p>
             )}
-            <div className="grid grid-cols-3 gap-3 max-[340px]:grid-cols-2">
-              {shownStyles.map((style) => (
-                <button
-                  key={style.id}
-                  type="button"
-                  aria-pressed={style.id === styleId}
-                  className={pickClass(style.id === styleId)}
-                  disabled={busy} onClick={() => selectLook({ id: style.id, name: style.name, serviceKeys: style.serviceKeys, tool: "style" })}
-                >
-                  <PickMark on={style.id === styleId} />
-                  <StyleCard id={style.id} name={style.name} />
-                  <span className="block px-2 py-2 text-center text-sm font-medium">{style.name}</span>
-                </button>
-              ))}
-            </div>
-            {lockedBrowse ? (
-              <div className="mt-4">
-                <HairTypePicker
-                  pickerOn={config.hairPickerOn}
-                  suggestOn={false}
-                  usesCredits={false}
-                  density={pickedDensity}
-                  texture={pickedTexture}
-                  showAll={showAllStyles}
-                  suggestions={hairSuggestions}
-                  selectedId={styleId}
-                  busy={busy}
-                  note=""
-                  costLine=""
-                  onDensity={setPickedDensity}
-                  onTexture={setPickedTexture}
-                  onShowAll={setShowAllStyles}
-                  onSuggest={() => undefined}
-                  onPick={(card) => selectLook({ id: card.id, name: card.name, serviceKeys: card.serviceKeys, tool: "style" })}
-                />
-              </div>
-            ) : null}
+            <LookPicker
+              key={`style-${gender}`}
+              label="styles"
+              selectedId={styleId}
+              disabled={busy}
+              tryDisabled={salonLocked}
+              items={shownStyles.map((style) => ({
+                id: style.id,
+                name: style.name,
+                tags: lookTagsForStyle(style, savedPicks.some((item) => item.tool === "style" && item.id === style.id)),
+                preview: <StyleCard id={style.id} name={style.name} />,
+              }))}
+              onSelect={(id) => {
+                const style = shownStyles.find((item) => item.id === id);
+                if (style) selectLook({ id: style.id, name: style.name, serviceKeys: style.serviceKeys, tool: "style" });
+              }}
+              onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+            />
           </>
         )}
 
         {tool === "colour" && (
-          <div className="grid grid-cols-3 gap-2 max-[340px]:grid-cols-2">
-            {config.shades.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                aria-pressed={item.id === shadeId}
-                className={`${pickClass(item.id === shadeId)} p-2 text-center text-sm`}
-                disabled={busy}
-                onClick={() => pickShade(item.id)}
-              >
-                <PickMark on={item.id === shadeId} />
-                <span className="mx-auto mb-2 block h-16 w-full rounded-xl" style={{ background: item.hex }} />
-                {item.name}
-              </button>
-            ))}
-          </div>
+          <LookPicker
+            key="colour"
+            label="shades"
+            selectedId={shadeId}
+            disabled={busy}
+            tryDisabled={salonLocked}
+            items={config.shades.map((item) => ({
+              id: item.id,
+              name: item.name,
+              tags: savedPicks.some((pick) => pick.tool === "colour" && pick.id === item.id) ? ["saved"] : [],
+              preview: <span className="block h-16 w-full" style={{ background: item.hex }} />,
+            }))}
+            onSelect={(id) => pickShade(id)}
+            onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+          />
         )}
 
         {tool === "brows" && (
-          <div className="grid grid-cols-3 gap-2 max-[340px]:grid-cols-2">
-            {browList.map((brow) => (
-              <button key={brow.id} type="button" aria-pressed={brow.id === styleId} className={`${pickClass(brow.id === styleId)} min-h-11`} disabled={busy} onClick={() => selectLook({ id: brow.id, name: brow.name, serviceKeys: brow.serviceKeys, tool: "brows" })}>
-                <PickMark on={brow.id === styleId} />
-                <BrowCard id={brow.id} name={brow.name} />
-                <span className="block px-2 pt-2 text-center text-sm font-medium leading-tight">{brow.name}</span>
-                <span className="block px-2 pb-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted">{brow.audience === "men" ? "Men" : brow.audience === "women" ? "Women" : "Unisex"}</span>
-              </button>
-            ))}
-          </div>
+          <LookPicker
+            key="brows"
+            label="brows"
+            selectedId={styleId}
+            disabled={busy}
+            tryDisabled={salonLocked}
+            items={browList.map((brow) => ({
+              id: brow.id,
+              name: brow.name,
+              meta: brow.audience === "men" ? "Men" : brow.audience === "women" ? "Women" : "Unisex",
+              tags: savedPicks.some((pick) => pick.tool === "brows" && pick.id === brow.id) ? ["saved"] : [],
+              preview: <BrowCard id={brow.id} name={brow.name} />,
+            }))}
+            onSelect={(id) => {
+              const brow = browList.find((item) => item.id === id);
+              if (brow) selectLook({ id: brow.id, name: brow.name, serviceKeys: brow.serviceKeys, tool: "brows" });
+            }}
+            onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+          />
         )}
 
         {tool === "beard" && (
-          <div className="grid grid-cols-3 gap-2 max-[340px]:grid-cols-2">
-            {config.beards.map((beard) => (
-              <button key={beard.id} type="button" aria-pressed={beard.id === styleId} className={pickClass(beard.id === styleId)} disabled={busy} onClick={() => selectLook({ id: beard.id, name: beard.name, serviceKeys: beard.serviceKeys, tool: "beard" })}>
-                <PickMark on={beard.id === styleId} />
-                <StyleCard id={beard.id} name={beard.name} folder="beards" />
-                <span className="block px-2 py-2 text-center text-sm font-medium">{beard.name}</span>
-              </button>
-            ))}
-          </div>
+          <LookPicker
+            key="beard"
+            label="beards"
+            selectedId={styleId}
+            disabled={busy}
+            tryDisabled={salonLocked}
+            items={config.beards.map((beard) => ({
+              id: beard.id,
+              name: beard.name,
+              tags: savedPicks.some((pick) => pick.tool === "beard" && pick.id === beard.id) ? ["saved"] : [],
+              preview: <StyleCard id={beard.id} name={beard.name} folder="beards" />,
+            }))}
+            onSelect={(id) => {
+              const beard = config.beards.find((item) => item.id === id);
+              if (beard) selectLook({ id: beard.id, name: beard.name, serviceKeys: beard.serviceKeys, tool: "beard" });
+            }}
+            onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+          />
         )}
 
         {tool === "nails" && (
-          <div className="grid grid-cols-3 gap-2 max-[340px]:grid-cols-2">
-            {config.nails.map((nail) => (
-              <button key={nail.id} type="button" aria-pressed={nail.id === styleId} className={pickClass(nail.id === styleId)} disabled={busy} onClick={() => selectLook({ id: nail.id, name: nail.name, serviceKeys: nail.serviceKeys, tool: "nails" })}>
-                <PickMark on={nail.id === styleId} />
-                <StyleCard id={nail.id} name={nail.name} folder="nails" />
-                <span className="block px-2 py-2 text-center text-sm font-medium">{nail.name}</span>
-              </button>
-            ))}
-          </div>
+          <LookPicker
+            key="nails"
+            label="nails"
+            selectedId={styleId}
+            disabled={busy}
+            tryDisabled={salonLocked}
+            items={config.nails.map((nail) => ({
+              id: nail.id,
+              name: nail.name,
+              tags: savedPicks.some((pick) => pick.tool === "nails" && pick.id === nail.id) ? ["saved"] : [],
+              preview: <StyleCard id={nail.id} name={nail.name} folder="nails" />,
+            }))}
+            onSelect={(id) => {
+              const nail = config.nails.find((item) => item.id === id);
+              if (nail) selectLook({ id: nail.id, name: nail.name, serviceKeys: nail.serviceKeys, tool: "nails" });
+            }}
+            onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+          />
         )}
       </section>
+      </div>
       </div>
       </>}
       {demoHint && <p className="mt-8 text-center text-xs text-muted">Demo preview</p>}

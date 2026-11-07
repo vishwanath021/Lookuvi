@@ -338,7 +338,8 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
         <button className="seg-btn" type="button" role="tab" aria-selected={panel === "own"} onClick={() => setPanel("own")}>Your own look</button>
       </div>
 
-      <div className={panel === "looks" ? "grid gap-4" : "hidden"} data-panel="looks">
+      <div className={panel === "looks" ? "try-desk" : "hidden"} data-panel="looks">
+          <div className="try-picks grid gap-4">
           <StepRail
             id="groom-steps"
             label="Groom steps"
@@ -353,7 +354,8 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
           {chipRow("groom-hair", "Hair", "Optional. Tap again to keep his hair.", "Hair", GROOM_HAIR, hairId, setHairId)}
           {chipRow("groom-beard", "Beard", "Optional. Tap again to keep his beard.", "Beard", GROOM_BEARDS, beardId, setBeardId)}
           {chipRow("groom-grooming", "Grooming", "Facial glow, or leave the skin natural.", "Grooming", GROOM_GROOMING, groomingId, setGroomingId)}
-          <section id="groom-photo" className="step-card grid gap-3" data-step="photo">
+          </div>
+          <section id="groom-photo" className="try-preview step-card grid gap-3" data-step="photo">
             <h3 className="text-base font-semibold leading-tight">Photo</h3>
             <SelectionSummary rows={[
               { id: "groom-hair", label: "Hair", value: GROOM_HAIR.find((item) => item.id === hairId)?.name || "Keep his hair" },

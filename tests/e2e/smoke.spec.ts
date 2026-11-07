@@ -17,6 +17,14 @@ async function buttonContrast(locator: import("@playwright/test").Locator) {
   return contrastRatio(rgbToHex(colors.color), rgbToHex(colors.background));
 }
 
+async function showEveryStyle(gallery: import("@playwright/test").Locator) {
+  for (let step = 0; step < 8; step += 1) {
+    const more = gallery.getByRole("button", { name: "Show more" });
+    if (await more.count() === 0) return;
+    await more.click();
+  }
+}
+
 function salonModeToken(tenantId: string, nonce: string) {
   const exp = Date.now() + 30 * 24 * 60 * 60 * 1000;
   const body = `${tenantId}.${nonce}.${exp}`;
@@ -89,6 +97,7 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   await expect(photo.getByText("Your photo is used only for this preview.")).toBeVisible();
   const gallery = page.getByRole("region", { name: "Styles" });
   await expect(gallery.getByRole("button", { name: "Women", exact: true })).toBeVisible();
+  await showEveryStyle(gallery);
   await expect(gallery.locator("img")).toHaveCount(25);
   await expect(gallery.getByRole("button", { name: "Soft Bob" })).toBeVisible();
   await page.screenshot({ path: "docs/screenshots/01-home.png", fullPage: true });
@@ -96,6 +105,7 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   await page.screenshot({ path: "docs/screenshots/13-gallery-women.png", fullPage: true });
 
   await gallery.getByRole("button", { name: "Men", exact: true }).click();
+  await showEveryStyle(gallery);
   await expect(gallery.locator("img")).toHaveCount(29);
   await expect(gallery.getByRole("button", { name: "Mid Fade" })).toBeVisible();
   await page.screenshot({ path: "docs/screenshots/14-gallery-men.png", fullPage: true });
@@ -157,6 +167,7 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   await waitForCapture(page);
   await gallery.getByRole("button", { name: "Women", exact: true }).click();
   await gallery.getByRole("button", { name: "Wolf Cut" }).click();
+  await page.getByRole("button", { name: "Try this look" }).click();
   await expect(page.getByRole("heading", { name: "Wolf Cut" })).toBeVisible({ timeout: 45_000 });
   const popupPromise = page.waitForEvent("popup");
   await page.getByRole("button", { name: "Book this look" }).click();
@@ -416,6 +427,7 @@ test("booking asks for a phone code only when the salon requires it", async ({ p
 test("style gallery uses portraits and the demo result is not a flat placeholder", async ({ page }) => {
   await page.goto("/s/demo");
   const gallery = page.getByRole("region", { name: "Styles" });
+  await showEveryStyle(gallery);
   await expect(gallery.locator("img")).toHaveCount(25);
   const womenPhoto = gallery.locator("img").first();
   await expect(womenPhoto).toHaveAttribute("src", /\/styles\/.+\.jpg/);
@@ -424,6 +436,7 @@ test("style gallery uses portraits and the demo result is not a flat placeholder
   await expect(page.getByRole("button", { name: "Retake" })).toBeVisible();
   await page.screenshot({ path: "docs/screenshots/17-after-photo.png", fullPage: true });
   await gallery.getByRole("button", { name: "Soft Bob" }).click();
+  await page.getByRole("button", { name: "Try this look" }).click();
   await expect(page.getByText("Reading your face shape")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Soft Bob" })).toBeVisible({ timeout: 45_000 });
   const slider = page.getByRole("slider", { name: /BEFORE \/ AFTER/i });

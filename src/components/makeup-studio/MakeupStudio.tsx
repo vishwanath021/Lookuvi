@@ -307,7 +307,7 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
             {looks}
           </div>
         </div>
-        <div className="md:col-start-2 md:row-start-1 max-md:mb-[54dvh]">
+        <div className="md:sticky md:top-4 md:col-start-2 md:row-start-1 md:self-start max-md:mb-[54dvh]">
           {!photo ? (
             <div className="card grid min-h-64 place-items-center gap-3 p-6 text-center">
               <p className="font-serif text-2xl">Makeup</p>

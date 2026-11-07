@@ -14,21 +14,21 @@ export function GeneratingLook({ tool, expectedMs = GENERATION_EXPECTED_MS, blur
   return (
     <div className="gen-veil" data-generating="yes" data-stage={frame.label} data-blur={blur ? "yes" : "no"} role="status">
       {blur ? <div className="gen-blur" /> : null}
-      <div className="gen-shimmer" aria-hidden="true" />
-      <div className="gen-glow" aria-hidden="true" />
-      <div className="gen-corner">
+      <div className="gen-mesh" aria-hidden="true" />
+      <div className="gen-caption">
+        <p className="gen-stage">{frame.label}</p>
         <div
-          className="gen-ring"
-          style={{ ["--p" as string]: frame.pct }}
+          className="gen-bar"
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={frame.pct}
           aria-valuetext={frame.label}
           aria-label={frame.label}
-        />
+        >
+          <span style={{ width: `${frame.pct}%` }} />
+        </div>
       </div>
-      <p className="gen-stage">{frame.label}</p>
     </div>
   );
 }

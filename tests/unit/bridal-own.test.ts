@@ -359,15 +359,15 @@ describe("your own look cost and privacy", () => {
 
 describe("your own look screen", () => {
   it("walks status lines on her photo without a blur veil", () => {
-    expect(generationFrame("bridal-own", 0).label).toBe("Reading your photo");
-    expect(generationFrame("bridal-own", 5_000).label).toBe("Placing your items");
-    expect(generationFrame("bridal-own", 10_000).label).toBe("Applying the makeup");
-    expect(generationFrame("bridal-own", 14_000).label).toBe("Finishing the portrait");
+    expect(generationFrame("bridal-own", 0).label).toBe("Reading your photo…");
+    expect(generationFrame("bridal-own", 5_000).label).toBe("Placing your items…");
+    expect(generationFrame("bridal-own", 10_000).label).toBe("Applying the makeup…");
+    expect(generationFrame("bridal-own", 14_000).label).toBe("Adding final touches…");
     expect(generationFrame("bridal-own", 120_000).pct).toBe(92);
     const own = renderToStaticMarkup(createElement(GeneratingLook, { tool: "bridal-own", blur: false }));
-    expect(own).toContain("gen-shimmer");
+    expect(own).toContain("gen-mesh");
     expect(own).toContain("gen-stage");
-    expect(own).toContain("Reading your photo");
+    expect(own).toContain("Reading your photo…");
     expect(own).toContain("data-blur=\"no\"");
     expect(own).not.toContain("gen-blur");
     const bridal = renderToStaticMarkup(createElement(GeneratingLook, { tool: "bridal" }));

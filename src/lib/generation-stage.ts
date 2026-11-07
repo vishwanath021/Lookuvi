@@ -3,30 +3,28 @@ export const GENERATION_EXPECTED_MS = 18_000;
 
 export function generationStages(tool: string) {
   if (tool === "bridal-own") {
-    return ["Reading your photo", "Placing your items", "Applying the makeup", "Finishing the portrait"];
+    return ["Reading your photo…", "Placing your items…", "Applying the makeup…", "Adding final touches…"];
   }
   if (tool === "groom-own") {
-    return ["Reading your photo", "Placing your clothes", "Fitting the look", "Finishing the portrait"];
+    return ["Reading your photo…", "Placing your clothes…", "Fitting the look…", "Adding final touches…"];
   }
   if (tool === "groom") {
-    return ["Reading your photo", "Shaping the hair", "Setting the beard", "Finishing the portrait"];
+    return ["Reading your photo…", "Shaping the hair…", "Setting the beard…", "Adding final touches…"];
   }
-  const read = tool === "mehendi" || tool === "nails" ? "Reading your hand" : "Reading your face shape";
+  const read = tool === "mehendi" || tool === "nails" ? "Reading your hand…" : "Reading your face shape…";
   const apply =
     tool === "mehendi"
-      ? "Applying mehendi"
+      ? "Applying mehendi…"
       : tool === "colour"
-        ? "Colouring your hair"
+        ? "Colouring your hair…"
         : tool === "brows"
-          ? "Shaping your brows"
+          ? "Shaping your brows…"
           : tool === "nails"
-            ? "Painting your nails"
+            ? "Painting your nails…"
             : tool === "beard"
-              ? "Shaping your beard"
-              : tool === "style"
-                ? "Cutting the style"
-                : "Applying the look";
-  return [read, "Matching your skin tone", apply, "Adding final details"];
+              ? "Shaping your beard…"
+              : "Styling your hair…";
+  return [read, apply, "Adding final touches…"];
 }
 
 export function generationFrame(tool: string, elapsedMs: number, expectedMs = GENERATION_EXPECTED_MS) {

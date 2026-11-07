@@ -600,7 +600,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
       <div className="mt-4" hidden={panel !== "own"} data-own-panel={panel === "own" ? "open" : "closed"}><BridalOwnLook config={config} /></div>
 
       {panel === "looks" && (
-        <div className="mt-4 grid gap-4">
+        <div className="try-desk mt-4">
+          <div className="try-picks grid gap-4">
           <StepRail
             id="bridal-steps"
             label="Bridal steps"
@@ -644,7 +645,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
             </div>
           </StepCard>
           </fieldset>
-          <section id="bridal-selfie" ref={resultRef} className="step-card grid gap-3" data-step="selfie" data-photo-cluster="yes">
+          </div>
+          <section id="bridal-selfie" ref={resultRef} className="try-preview step-card grid gap-3" data-step="selfie" data-photo-cluster="yes">
             <h3 className="text-base font-semibold leading-tight">Photo</h3>
             <SelectionSummary rows={[
               { id: "bridal-event", label: "Event", value: event?.label || "Wedding" },
@@ -871,28 +873,37 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
 }
 
 function PhotoGrid({ step, label, hint, group, styles, style, onStyle, items, value, onChange }: { step: string; label: string; hint?: string; group: string; styles: { id: BridalStyleId; label: string }[]; style: BridalStyleId; onStyle: (id: BridalStyleId) => void; items: { id: string; name: string; image: boolean }[]; value: string; onChange: (id: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [shown, setShown] = useState(12);
   const pills = visibleStylePills(styles);
+  const needle = query.trim().toLowerCase();
+  const filtered = needle ? items.filter((item) => item.name.toLowerCase().includes(needle)) : items;
+  const visible = filtered.slice(0, shown);
   return (
     <section id={`bridal-${step}`} className="card step-card grid gap-3 p-3" data-step={step}>
       <h3 className="text-base font-semibold leading-tight">{label}</h3>
       {hint ? <p className="text-sm text-muted">{hint}</p> : null}
+      <input className="field" type="search" aria-label={`Search ${group}`} placeholder={`Search ${group.toLowerCase()}`} value={query} onChange={(event) => { setQuery(event.target.value); setShown(12); }} />
       {pills.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-2" role="group" aria-label={`${group} style`}>
+        <div className="chip-scroll" role="group" aria-label={`${group} style`}>
           {pills.map((item) => (
-            <button key={item.id} className="chip" type="button" aria-pressed={style === item.id} onClick={() => onStyle(item.id)}>{item.label}</button>
+            <button key={item.id} className="chip shrink-0" type="button" aria-pressed={style === item.id} onClick={() => { onStyle(item.id); setShown(12); }}>{item.label}</button>
           ))}
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3" role="list" aria-label={group}>
-        {items.map((item, index) => (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" role="list" aria-label={group}>
+        {visible.map((item, index) => (
           <div key={item.id} role="listitem">
-            <button type="button" aria-pressed={item.id === value} className={`w-full overflow-hidden rounded-[14px] border bg-[#F3E6D8] text-left shadow-sm ${item.id === value ? "border-[var(--brand)] ring-2 ring-[var(--brand)]" : "border-line"}`} onClick={() => onChange(item.id)}>
+            <button type="button" aria-pressed={item.id === value} className={`relative w-full overflow-hidden rounded-[14px] border bg-[#F3E6D8] text-left shadow-sm ${item.id === value ? "border-[var(--brand)] ring-2 ring-[var(--brand)]" : "border-line"}`} onClick={() => onChange(item.id)}>
+              {item.id === value ? <span className="check" aria-hidden="true">✓</span> : null}
               <BridalLookCard id={item.id} name={item.name} image={item.image} priority={index < 2} />
               <span className="block bg-white px-2 py-2 text-sm font-medium leading-snug">{item.name}</span>
             </button>
           </div>
         ))}
       </div>
+      {filtered.length === 0 ? <p className="text-sm text-muted">No matches.</p> : null}
+      {filtered.length > shown ? <button className="btn secondary min-h-11 w-fit" type="button" onClick={() => setShown((count) => count + 12)}>Show more</button> : null}
     </section>
   );
 }
