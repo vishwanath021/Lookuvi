@@ -24,6 +24,8 @@ test("brow cards are distinct diagrams and chips do not generate", async ({ page
   await page.goto("/s/demo");
   await page.getByRole("tab", { name: "Brows" }).click();
   const region = page.getByRole("region", { name: "Brows" });
+  const more = region.getByRole("button", { name: "Show more" });
+  if (await more.count()) await more.click();
   const photos = await region.locator("[data-brow-card='photo']").count();
   expect(photos === 0 || photos === NAMES.length).toBe(true);
   const paths = new Set<string>();
@@ -64,6 +66,8 @@ test("brow cards are distinct diagrams and chips do not generate", async ({ page
     await chip.click();
   }
   expect(posts).toEqual([]);
-  await expect(page.getByRole("button", { name: "Try this look" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Try this look" })).toBeVisible();
+  await page.getByRole("button", { name: "Try this look" }).click();
+  expect(posts).toEqual([]);
   await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0);
 });

@@ -41,29 +41,24 @@ test("the bridal photo shows the loading sweep, then a crossfade", async ({ page
   await expect(page.getByText("Almost ready...")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Live capture" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Use photo" })).toHaveCount(0);
-  await expect(veil).toHaveAttribute("data-stage", "Reading your face shape");
+  await expect(veil).toHaveAttribute("data-stage", "Reading your face shape…");
   const photo = await box.boundingBox();
-  const ring = await box.locator(".gen-corner").boundingBox();
+  const bar = await box.locator(".gen-bar").boundingBox();
   const stage = box.locator(".gen-stage");
   const stageBox = await stage.boundingBox();
-  expect(photo && ring && stageBox).toBeTruthy();
-  expect(ring!.y + ring!.height / 2).toBeGreaterThan(photo!.y + photo!.height * 0.72);
-  expect(ring!.x).toBeGreaterThan(photo!.x + photo!.width * 0.7);
-  expect(stageBox!.x + stageBox!.width).toBeLessThanOrEqual(ring!.x + 4);
-  const ink = await stage.evaluate((el) => {
-    const style = getComputedStyle(el);
-    return { color: style.color, background: style.backgroundColor };
-  });
-  expect(ink.color).toBe("rgb(255, 255, 255)");
-  expect(ink.background).toBe("rgba(41, 35, 48, 0.82)");
+  expect(photo && bar && stageBox).toBeTruthy();
+  expect(bar!.y).toBeGreaterThan(photo!.y + photo!.height * 0.7);
+  expect(bar!.width).toBeGreaterThan(80);
+  const ink = await stage.evaluate((el) => getComputedStyle(el).color);
+  expect(ink).toBe("rgb(41, 35, 48)");
   await box.screenshot({ path: `${OUT}/loading-1.png` });
 
-  await page.clock.fastForward(20_000);
-  await expect(veil).toHaveAttribute("data-stage", "Matching your skin tone");
+  await page.clock.fastForward(7_000);
+  await expect(veil).toHaveAttribute("data-stage", "Styling your hair…");
   await box.screenshot({ path: `${OUT}/loading-2.png` });
 
-  await page.clock.fastForward(16_000);
-  await expect(veil).toHaveAttribute("data-stage", "Applying the look");
+  await page.clock.fastForward(8_000);
+  await expect(veil).toHaveAttribute("data-stage", "Adding final touches…");
   await box.screenshot({ path: `${OUT}/loading-3.png` });
 
   release?.();

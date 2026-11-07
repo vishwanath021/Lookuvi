@@ -44,6 +44,7 @@ test("bridal is its own section and the hair styles stay in the gallery", async 
   }
   await expect(gallery.getByRole("button", { name: "Curtain Wolf" })).toHaveCount(0);
   await expect(gallery.getByRole("button", { name: "Wolf Cut" })).toBeVisible();
+  await gallery.getByRole("searchbox", { name: "Search styles" }).fill("Voluminous");
   await expect(gallery.getByRole("button", { name: "Voluminous Blowout" }).locator("img")).toHaveAttribute("src", /voluminous-blowout\.jpg/);
 });
 

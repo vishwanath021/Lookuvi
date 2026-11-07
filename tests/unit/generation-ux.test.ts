@@ -7,12 +7,12 @@ import { generationFrame } from "@/lib/generation-stage";
 
 describe("generation stages", () => {
   it("walks the bridal lines across the expected wait", () => {
-    expect(generationFrame("bridal", 0).label).toBe("Reading your face shape");
-    expect(generationFrame("bridal", 5_000).label).toBe("Matching your skin tone");
-    expect(generationFrame("bridal", 10_000).label).toBe("Applying the look");
-    expect(generationFrame("mehendi", 10_000).label).toBe("Applying mehendi");
-    expect(generationFrame("colour", 10_000).label).toBe("Colouring your hair");
-    expect(generationFrame("brows", 10_000).label).toBe("Shaping your brows");
+    expect(generationFrame("bridal", 0).label).toBe("Reading your face shape…");
+    expect(generationFrame("bridal", 10_000).label).toBe("Styling your hair…");
+    expect(generationFrame("bridal", 16_000).label).toBe("Adding final touches…");
+    expect(generationFrame("mehendi", 10_000).label).toBe("Applying mehendi…");
+    expect(generationFrame("colour", 10_000).label).toBe("Colouring your hair…");
+    expect(generationFrame("brows", 10_000).label).toBe("Shaping your brows…");
     expect(generationFrame("bridal", 17_000).pct).toBeLessThanOrEqual(92);
     expect(generationFrame("bridal", 30_000).pct).toBe(92);
   });
