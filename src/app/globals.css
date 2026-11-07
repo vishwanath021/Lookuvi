@@ -750,6 +750,8 @@ textarea { min-height: 48px; }
   .seg { overflow: hidden; scroll-snap-type: none; }
   .seg-btn { flex: 1 1 0; scroll-snap-align: none; }
 }
+.tool-row .seg { overflow-x: auto; scroll-snap-type: x mandatory; }
+.tool-row .seg-btn { flex: 0 0 auto; min-height: 44px; padding: 6px 12px; letter-spacing: 0.04em; }
 .seg-btn[aria-selected="true"] {
   background-color: var(--metal-base);
   background-image: var(--metal-purple);

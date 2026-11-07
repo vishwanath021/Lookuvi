@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import { VisitUnlock } from "@/components/admin/VisitUnlock";
 import { t } from "@/data/i18n";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
 
@@ -55,7 +54,7 @@ function minutesInChair(iso?: string | null) {
   return mins;
 }
 
-export function QueueDesk({ initial, lang, showVisits = false, monthTries }: { initial: Desk; lang: string; showVisits?: boolean; monthTries?: number }) {
+export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: string; monthTries?: number }) {
   const [desk, setDesk] = useState(initial);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -158,7 +157,7 @@ export function QueueDesk({ initial, lang, showVisits = false, monthTries }: { i
         {live && wide ? (
           <div className="ml-auto">
             <button className="btn min-h-11" type="button" data-call-next="yes" disabled={busy || !canCall} onClick={() => void act({ action: "next" })}>
-              {canCall ? "Call next" : callReason}
+              {canCall && nextGuest ? `Call ${tokenLabel(nextGuest.token)} ${nextGuest.name}` : callReason}
             </button>
           </div>
         ) : null}
@@ -199,12 +198,12 @@ export function QueueDesk({ initial, lang, showVisits = false, monthTries }: { i
                   ) : null}
                   {seat.entry?.status === "CALLED" ? (
                     <>
-                      <button className="btn min-h-11 px-3" type="button" disabled={busy} onClick={() => void act({ action: "start", id: seat.entry?.id })}>{t(lang, "queueStart")}</button>
+                      <button className="btn min-h-11 px-3" type="button" disabled={busy} onClick={() => void act({ action: "start", id: seat.entry?.id })}>Seated</button>
                       <button className="btn ghost min-h-11 px-3" type="button" disabled={busy} onClick={() => setAway(seat.entry)}>Not here</button>
                     </>
                   ) : null}
                   {seat.entry?.status === "IN_SERVICE" ? (
-                    <button className="btn min-h-11 px-3" type="button" disabled={busy} onClick={() => void act({ action: "done", id: seat.entry?.id })}>{t(lang, "queueDone")}</button>
+                    <button className="btn min-h-11 px-3" type="button" disabled={busy} onClick={() => void act({ action: "done", id: seat.entry?.id })}>Finish</button>
                   ) : null}
                 </article>
               ))}
@@ -358,7 +357,6 @@ export function QueueDesk({ initial, lang, showVisits = false, monthTries }: { i
           <button className="btn min-h-11 w-fit" type="submit" disabled={busy}>{t(lang, "queueSave")}</button>
         </form>
       </details>
-      <VisitUnlock show={showVisits} />
 
       {confirmClose ? (
         <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-4 sm:place-items-center" role="dialog" aria-label="Close the queue">

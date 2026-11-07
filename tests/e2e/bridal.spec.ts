@@ -204,7 +204,9 @@ test("a new catalogue style generates before the salon has a menu row", async ({
   await page.goto("/s/demo");
   await page.locator("input[data-photo='gallery']").setInputFiles("public/samples/portrait.jpg");
   const gallery = page.getByRole("region", { name: "Styles" });
-  await gallery.getByRole("button", { name: "Women", exact: true }).click();
+  await page.getByRole("button", { name: "Filters" }).click();
+  await page.getByRole("button", { name: "Women", exact: true }).click();
+  await page.getByRole("button", { name: "Close" }).click();
   await gallery.getByRole("button", { name: "Wolf Cut" }).click();
   await page.getByRole("button", { name: "Try this look" }).click();
   await expect(page.getByText("That style is not on this salon's menu.")).toHaveCount(0);

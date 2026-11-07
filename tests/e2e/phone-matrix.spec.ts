@@ -42,7 +42,9 @@ async function previewLook(page: Page, styleName: string) {
   await page.locator("input[data-photo='gallery']").setInputFiles("public/samples/portrait.jpg");
   await expect(page.getByRole("button", { name: "Retake" })).toBeVisible();
   const gallery = page.getByRole("region", { name: "Styles" });
-  await gallery.getByRole("button", { name: "Women", exact: true }).click();
+  await page.getByRole("button", { name: "Filters" }).click();
+  await page.getByRole("button", { name: "Women", exact: true }).click();
+  await page.getByRole("button", { name: "Close" }).click();
   await gallery.getByRole("button", { name: styleName }).click();
   await page.getByRole("button", { name: "Try this look" }).click();
   await expect(page.getByText("Reading your face shape")).toBeVisible();
@@ -97,7 +99,9 @@ test("guest: upload, every tab including bridal, generate, before/after, save, a
   const gallery = page.getByRole("region", { name: "Styles" });
   await expect(gallery.getByRole("button", { name: "Bridal", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Bridal", exact: true })).toBeVisible();
-  await gallery.getByRole("button", { name: "Women", exact: true }).click();
+  await page.getByRole("button", { name: "Filters" }).click();
+  await page.getByRole("button", { name: "Women", exact: true }).click();
+  await page.getByRole("button", { name: "Close" }).click();
   for (const look of ["Bridal Bun", "Braided Updo", "Side-Swept Curls", "Half-Up with Flowers", "South-Indian Bridal Braid"]) {
     await expect(gallery.getByRole("button", { name: look })).toHaveCount(0);
   }
@@ -193,11 +197,11 @@ test("owner: open and pause the queue, add walk-ins, then Next, Done, and No-sho
   await page.locator("[data-call-next='yes']:visible").click();
   await expect(page.getByRole("heading", { name: "Chairs" })).toBeVisible();
   const called = page.locator("article").filter({ hasText: "Matrix Phone" });
-  await expect(called.getByRole("button", { name: "Start", exact: true })).toBeVisible();
+  await expect(called.getByRole("button", { name: "Seated", exact: true })).toBeVisible();
   await expect(called.getByRole("button", { name: "Not here" })).toBeVisible();
-  await expect(called.getByRole("button", { name: "Done" })).toHaveCount(0);
-  await called.getByRole("button", { name: "Start", exact: true }).click();
-  await called.getByRole("button", { name: "Done" }).click();
+  await expect(called.getByRole("button", { name: "Finish" })).toHaveCount(0);
+  await called.getByRole("button", { name: "Seated", exact: true }).click();
+  await called.getByRole("button", { name: "Finish" }).click();
   await expect(page.getByText("Matrix Phone")).toHaveCount(0);
 
   await page.getByLabel("Walk-in name").fill("Matrix Desk");

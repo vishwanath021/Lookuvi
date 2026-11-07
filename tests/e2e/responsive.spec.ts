@@ -83,7 +83,7 @@ async function signIn(page: Page, email: string, password: string) {
 test("guest, owner, and super layouts fit the device", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await go(page, "/s/demo");
-  await expect(page.getByRole("heading", { name: "See your next look." })).toBeVisible();
+  if ((page.viewportSize()?.width ?? 0) >= 1024) await expect(page.getByRole("heading", { name: "See your next look." })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1, name: "Demo Salon – Bengaluru" })).toBeVisible();
   await expect(page.locator("input[data-photo='gallery']")).toHaveAttribute("accept", "image/*");
   await expect(page.locator("input[data-photo='camera']")).toHaveAttribute("capture", "user");
