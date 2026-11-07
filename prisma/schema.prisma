@@ -83,9 +83,16 @@ model Tenant {
   /** Empty inherits the platform guest hairstyle engine (fal or openai). */
   hairstyleEngine     String    @default("")
   onboardingDone      Boolean   @default(false)
-  /** REQUEST window in Asia/Kolkata, HH:MM. Both empty uses 06:00–22:00. Live open/pause is separate. */
+  /** REQUEST window in Asia/Kolkata, HH:MM. Kept in step with a one-session week. Both empty, with an empty week, uses 06:00–22:00. */
   openTime            String    @default("")
   closeTime           String    @default("")
+  /** JSON week, Asia/Kolkata. Each day is [] or up to two {open, close} sessions. Empty keeps openTime/closeTime or the fallback. */
+  weeklyHours         String    @default("")
+  /** "open" or "closed" until hoursOverrideUntil. Empty follows the week. */
+  hoursOverride       String    @default("")
+  hoursOverrideUntil  DateTime?
+  /** Asia/Kolkata YYYY-MM-DD when the salon is closed all day. Empty means not a holiday. */
+  closedDayKey        String    @default("")
   /** Soft delete. Null keeps the salon. Suspend uses status and can be resumed; this cannot. */
   deletedAt           DateTime?
   createdAt           DateTime  @default(now())

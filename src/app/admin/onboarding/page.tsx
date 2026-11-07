@@ -21,6 +21,9 @@ export default async function OnboardingPage() {
           address: tenant.address,
           languages: parseJson<string[]>(tenant.languages, ["en"]),
           services: services.map((service) => ({ key: service.key, name: service.name, priceInr: service.priceInr })),
+          openTime: tenant.openTime,
+          closeTime: tenant.closeTime,
+          weeklyHours: tenant.weeklyHours,
         }}
       />
     </main>

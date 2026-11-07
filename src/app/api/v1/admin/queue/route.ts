@@ -10,6 +10,7 @@ import {
   deskSnapshot,
   finishEntry,
   saveQueueSettings,
+  setClosedToday,
   setQueueOpen,
   returnToLine,
   startEntry,
@@ -19,6 +20,8 @@ import { requireMembership } from "@/lib/session";
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("open") }),
   z.object({ action: z.literal("pause") }),
+  z.object({ action: z.literal("close-today") }),
+  z.object({ action: z.literal("open-today") }),
   z.object({ action: z.literal("next") }),
   z.object({ action: z.literal("start"), id: z.string().min(1) }),
   z.object({ action: z.literal("return"), id: z.string().min(1) }),
@@ -78,6 +81,8 @@ export async function POST(req: Request) {
   try {
     if (body.action === "open") return NextResponse.json(await setQueueOpen(tenant.id, true));
     if (body.action === "pause") return NextResponse.json(await setQueueOpen(tenant.id, false));
+    if (body.action === "close-today") return NextResponse.json(await setClosedToday(tenant.id, true));
+    if (body.action === "open-today") return NextResponse.json(await setClosedToday(tenant.id, false));
     if (body.action === "next") return NextResponse.json(await callNext(tenant.id));
     if (body.action === "start") return NextResponse.json(await startEntry(tenant.id, body.id));
     if (body.action === "return") return NextResponse.json(await returnToLine(tenant.id, body.id));

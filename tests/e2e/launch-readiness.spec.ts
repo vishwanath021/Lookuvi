@@ -250,10 +250,10 @@ test("Sunday rush across three salons", async ({ page, browser, request }, testI
   await page.context().clearCookies();
   await signIn(page, "rao@lookuvi.test");
   await page.goto("/admin/onboarding");
-  await expect(page.getByText("Step 1 of 5")).toBeVisible();
+  await expect(page.getByText("Step 1 of 6")).toBeVisible();
   await shot(page, "onboarding_desktop");
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(page.getByText("Step 2 of 5")).toBeVisible();
+  await expect(page.getByText("Step 2 of 6")).toBeVisible();
   await page.goto("/admin/queue");
   await page.locator("[data-queue-mode][data-ready='yes']").waitFor();
   await expect(page.getByText("Meera Beauty")).toHaveCount(0);

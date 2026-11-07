@@ -1,0 +1,224 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  DAY_LABELS,
+  WEEK_HOURS_INVALID,
+  compileSessions,
+  effectiveWeek,
+  emptyWeek,
+  isUniform,
+  serializeWeek,
+  pairFromWeek,
+  type Session,
+  type Weekday,
+  type WeekSchedule,
+} from "@/lib/queue/schedule";
+
+export function WeekHoursEditor({
+  openTime,
+  closeTime,
+  weeklyHours,
+  onChange,
+}: {
+  openTime: string;
+  closeTime: string;
+  weeklyHours: string;
+  onChange: (next: { openTime: string; closeTime: string; weeklyHours: string }) => void;
+}) {
+  const week = loadWeek(weeklyHours, openTime, closeTime);
+  const saved = (weeklyHours || "").trim().length > 0;
+  const [sameOpen, setSameOpen] = useState(openTime);
+  const [sameClose, setSameClose] = useState(closeTime);
+  const [sameOpen2, setSameOpen2] = useState("");
+  const [sameClose2, setSameClose2] = useState("");
+  const [error, setError] = useState("");
+
+  function pushWeek(next: WeekSchedule) {
+    const pair = pairFromWeek(next);
+    onChange({
+      openTime: pair?.open ?? "",
+      closeTime: pair?.close ?? "",
+      weeklyHours: serializeWeek(next),
+    });
+  }
+
+  function applySame(open: string, close: string, open2: string, close2: string, force: boolean) {
+    const compiled = compileSessions(open, close, open2, close2);
+    if (!compiled.ok) {
+      if (force) setError(compiled.message || WEEK_HOURS_INVALID);
+      return;
+    }
+    if (!compiled.sessions.length) {
+      setError("");
+      onChange({ openTime: "", closeTime: "", weeklyHours: "" });
+      return;
+    }
+    if (!force && saved && !isUniform(week)) return;
+    setError("");
+    const next = emptyWeek();
+    for (const day of DAY_LABELS) next[day.id] = compiled.sessions.map((session) => ({ ...session }));
+    const pair = compiled.sessions.length === 1 ? compiled.sessions[0] : null;
+    onChange({
+      openTime: pair?.open ?? "",
+      closeTime: pair?.close ?? "",
+      weeklyHours: serializeWeek(next),
+    });
+  }
+
+  function onSame(patch: { open?: string; close?: string; open2?: string; close2?: string }) {
+    const open = patch.open ?? sameOpen;
+    const close = patch.close ?? sameClose;
+    const open2 = patch.open2 ?? sameOpen2;
+    const close2 = patch.close2 ?? sameClose2;
+    if (patch.open !== undefined) setSameOpen(patch.open);
+    if (patch.close !== undefined) setSameClose(patch.close);
+    if (patch.open2 !== undefined) setSameOpen2(patch.open2);
+    if (patch.close2 !== undefined) setSameClose2(patch.close2);
+    applySame(open, close, open2, close2, false);
+  }
+
+  return (
+    <fieldset className="grid gap-3 text-sm" data-hours-editor="yes">
+      <legend className="font-medium">Opening hours (India time)</legend>
+      <p className="text-xs text-muted">
+        Each day is closed, or has up to two sessions, for example 09:00–13:00 and 16:00–21:00.
+        Same every day copies the times below onto Monday–Sunday. Clear hours for 06:00–22:00 time requests and the desk switch.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <label>Opens
+          <input className="field mt-1" type="time" aria-label="Opens" value={sameOpen} onChange={(event) => onSame({ open: event.target.value })} />
+        </label>
+        <label>Closes
+          <input className="field mt-1" type="time" aria-label="Closes" value={sameClose} onChange={(event) => onSame({ close: event.target.value })} />
+        </label>
+        <label>Second opens
+          <input className="field mt-1" type="time" aria-label="Second opens" value={sameOpen2} onChange={(event) => onSame({ open2: event.target.value })} />
+        </label>
+        <label>Second closes
+          <input className="field mt-1" type="time" aria-label="Second closes" value={sameClose2} onChange={(event) => onSame({ close2: event.target.value })} />
+        </label>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button className="btn secondary min-h-11 w-fit" type="button" onClick={() => applySame(sameOpen, sameClose, sameOpen2, sameClose2, true)}>Same every day</button>
+        <button
+          className="btn secondary min-h-11 w-fit"
+          type="button"
+          onClick={() => {
+            setSameOpen("");
+            setSameClose("");
+            setSameOpen2("");
+            setSameClose2("");
+            setError("");
+            onChange({ openTime: "", closeTime: "", weeklyHours: "" });
+          }}
+        >
+          Clear hours
+        </button>
+      </div>
+      {!saved ? <p className="text-xs text-muted">No weekly hours saved yet. The live queue still follows the desk switch.</p> : null}
+      <div className="grid gap-3">
+        {DAY_LABELS.map((day) => (
+          <DayRow key={day.id} name={day.name} day={day.id} sessions={week[day.id]} onCommit={pushWeek} week={week} />
+        ))}
+      </div>
+      {error ? <p className="text-sm text-red-700" role="status">{error}</p> : null}
+    </fieldset>
+  );
+}
+
+function loadWeek(weeklyHours: string, openTime: string, closeTime: string): WeekSchedule {
+  const resolved = effectiveWeek({ weeklyHours, openTime, closeTime });
+  return resolved.kind === "week" ? resolved.week : emptyWeek();
+}
+
+function DayRow({
+  name,
+  day,
+  sessions,
+  week,
+  onCommit,
+}: {
+  name: string;
+  day: Weekday;
+  sessions: Session[];
+  week: WeekSchedule;
+  onCommit: (next: WeekSchedule) => void;
+}) {
+  const open0 = sessions[0]?.open ?? "";
+  const close0 = sessions[0]?.close ?? "";
+  const open1 = sessions[1]?.open ?? "";
+  const close1 = sessions[1]?.close ?? "";
+  const [open, setOpen] = useState(open0);
+  const [close, setClose] = useState(close0);
+  const [open2, setOpen2] = useState(open1);
+  const [close2, setClose2] = useState(close1);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setOpen(open0);
+    setClose(close0);
+    setOpen2(open1);
+    setClose2(close1);
+  }, [open0, close0, open1, close1]);
+
+  function commit(nextOpen: string, nextClose: string, nextOpen2: string, nextClose2: string) {
+    const compiled = compileSessions(nextOpen, nextClose, nextOpen2, nextClose2);
+    if (!compiled.ok) {
+      setError(compiled.message || WEEK_HOURS_INVALID);
+      return;
+    }
+    setError("");
+    onCommit({ ...week, [day]: compiled.sessions });
+  }
+
+  const closed = open === "" && close === "" && open2 === "" && close2 === "";
+
+  return (
+    <div className="grid gap-2 border-b border-line pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-medium">{name}</p>
+        <label className="flex min-h-11 items-center gap-2">
+          <input
+            type="checkbox"
+            aria-label={`${name} closed`}
+            checked={closed}
+            onChange={(event) => {
+              if (event.target.checked) {
+                setOpen("");
+                setClose("");
+                setOpen2("");
+                setClose2("");
+                setError("");
+                onCommit({ ...week, [day]: [] });
+                return;
+              }
+              setOpen("09:00");
+              setClose("18:00");
+              setOpen2("");
+              setClose2("");
+              setError("");
+              onCommit({ ...week, [day]: [{ open: "09:00", close: "18:00" }] });
+            }}
+          />
+          Closed
+        </label>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs">Opens
+          <input className="field mt-1" type="time" aria-label={`${name} opens`} value={open} onChange={(event) => { setOpen(event.target.value); commit(event.target.value, close, open2, close2); }} />
+        </label>
+        <label className="text-xs">Closes
+          <input className="field mt-1" type="time" aria-label={`${name} closes`} value={close} onChange={(event) => { setClose(event.target.value); commit(open, event.target.value, open2, close2); }} />
+        </label>
+        <label className="text-xs">Second opens
+          <input className="field mt-1" type="time" aria-label={`${name} second opens`} value={open2} onChange={(event) => { setOpen2(event.target.value); commit(open, close, event.target.value, close2); }} />
+        </label>
+        <label className="text-xs">Second closes
+          <input className="field mt-1" type="time" aria-label={`${name} second closes`} value={close2} onChange={(event) => { setClose2(event.target.value); commit(open, close, open2, event.target.value); }} />
+        </label>
+      </div>
+      {error ? <p className="text-xs text-red-700">{error}</p> : null}
+    </div>
+  );
+}

@@ -272,6 +272,8 @@ const en: Record<string, string> = {
   queueClosed: "The queue is paused. Please ask at the desk.",
   queueOpenNow: "Open",
   queueClosedNow: "Closed",
+  queueTodayLine: "Today · {hours}",
+  queueOpensAt: "Opens {when}",
   queueName: "Name",
   queuePhone: "Mobile number",
   queueService: "Service",

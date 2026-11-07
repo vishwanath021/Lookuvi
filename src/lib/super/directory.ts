@@ -27,6 +27,7 @@ export type SalonRecord = {
   queueToday: number;
   openTime: string;
   closeTime: string;
+  weeklyHours: string;
 };
 
 /** Succeeded try-ons only. Demo samples and failed attempts are not previews. */
@@ -95,6 +96,7 @@ export async function loadSalons(): Promise<SalonRecord[]> {
       queueToday: today.get(tenant.id) || 0,
       openTime: tenant.openTime,
       closeTime: tenant.closeTime,
+      weeklyHours: tenant.weeklyHours,
     };
   });
 }
