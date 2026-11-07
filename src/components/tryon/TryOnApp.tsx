@@ -20,7 +20,7 @@ import { ColourStage } from "@/components/tryon/ColourStage";
 import { HairTypePicker } from "@/components/tryon/HairTypePicker";
 import { StyleCard } from "@/components/tryon/StyleCard";
 import { BROW_COLOURS, BROW_THICKNESS, browsForAudience, type BrowColour, type BrowThickness } from "@/data/brows";
-import { t } from "@/data/i18n";
+import { guestPageLocale, t } from "@/data/i18n";
 import { styleHasPhoto } from "@/data/style-photos";
 import { lookTagsForStyle } from "@/lib/look-picker";
 import { orderStylesForPicker, suggestStyles, type HairReading } from "@/lib/hair-suitability";
@@ -180,7 +180,7 @@ export function TryOnApp({
   showGroom?: boolean;
   showMakeup?: boolean;
 }) {
-  const lang = config.defaultLang || "en";
+  const lang = guestPageLocale(config.defaultLang, config.languages);
   const atSalon = useAtSalon();
   const [savedPicks, setSavedPicks] = useState<SavedPick[]>([]);
   const [savedFlash, setSavedFlash] = useState(false);

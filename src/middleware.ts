@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { contentSecurityPolicy } from "@/lib/csp";
 import { csrfBlocked } from "@/lib/http/csrf";
-import { parseHost } from "@/lib/host";
+import { isSharedPath, parseHost } from "@/lib/host";
 
 function hasSessionCookie(req: NextRequest) {
   return Boolean(req.cookies.get("authjs.session-token") || req.cookies.get("__Secure-authjs.session-token"));
@@ -41,21 +41,7 @@ export function middleware(req: NextRequest) {
     url.search = "";
     return applyCsp(req, NextResponse.redirect(url), nonce);
   }
-  if (
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/admin") ||
-    pathname.startsWith("/super") ||
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/privacy") ||
-    pathname.startsWith("/terms") ||
-    pathname.startsWith("/embed") ||
-    pathname.startsWith("/mediapipe") ||
-    pathname.startsWith("/brand") ||
-    pathname.startsWith("/samples") ||
-    pathname === "/manifest.webmanifest" ||
-    /\.(?:webp|png|jpe?g|gif|svg|avif|ico|json|txt|wasm|js|css|webmanifest)$/i.test(pathname)
-  ) {
+  if (isSharedPath(pathname)) {
     return nextWithCsp(req, nonce);
   }
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
