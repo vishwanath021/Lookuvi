@@ -7,6 +7,7 @@ type Customer = {
   name: string;
   phone: string;
   phoneLabel: string;
+  points: number;
   visitCount: number;
   lastVisitAt: string;
   lastVisitLabel: string;
@@ -32,6 +33,7 @@ type LapsedCustomer = {
   name: string;
   phone: string;
   phoneLabel: string;
+  points: number;
   visitCount: number;
   lastVisitLabel: string;
   optedOut: boolean;
@@ -202,6 +204,24 @@ export function CustomersBoard({
             <p className="text-lg">{row.name || "No name"}</p>
             <p className="text-sm">{row.phoneLabel}</p>
             <p className="text-sm text-muted">{row.visitCount} {row.visitCount === 1 ? "visit" : "visits"} · {row.lastVisitLabel}</p>
+            <p className="text-sm" data-customer-points={row.points}>{row.points} {row.points === 1 ? "point" : "points"}</p>
+            <form
+              className="mt-2 flex flex-wrap items-end gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const data = new FormData(event.currentTarget);
+                void act({ action: "adjust", id: row.id, delta: Number(data.get("delta")), reason: String(data.get("reason") || "") });
+                event.currentTarget.reset();
+              }}
+            >
+              <label className="text-sm">Change
+                <input className="field narrow mt-1" name="delta" type="number" step={1} required aria-label={`Points change for ${row.phoneLabel}`} placeholder="+1" />
+              </label>
+              <label className="text-sm">Reason
+                <input className="field mt-1" name="reason" required maxLength={120} aria-label={`Reason for ${row.phoneLabel}`} placeholder="Reason" />
+              </label>
+              <button className="btn secondary min-h-11" type="submit" disabled={busy}>Adjust points</button>
+            </form>
             {row.stop ? <p className="text-sm">Replied STOP</p> : null}
             {!row.stop && row.canResume && owner ? (
               <button className="btn secondary mt-2 w-fit" type="button" disabled={busy} onClick={() => void act({ action: "resume", id: row.id })}>Turn reminders on</button>
@@ -266,7 +286,7 @@ function NotBackYet({
             <article key={`${band.id}-${row.id}`} className="rounded-xl border border-line px-3 py-2" data-lapsed-phone={row.phone}>
               <p>{row.name || "No name"}</p>
               <p className="text-sm">{row.phoneLabel}</p>
-              <p className="text-sm text-muted">{row.visitCount} {row.visitCount === 1 ? "visit" : "visits"} · {row.lastVisitLabel}</p>
+              <p className="text-sm text-muted">{row.visitCount} {row.visitCount === 1 ? "visit" : "visits"} · {row.lastVisitLabel} · {row.points} {row.points === 1 ? "point" : "points"}</p>
               {row.optedOut ? <p className="text-sm">Reminders off</p> : null}
               <button className="btn secondary mt-2 disabled:opacity-40" type="button" disabled={busy || !ready || row.optedOut} onClick={() => onSend([row.id])}>
                 Send come-back message

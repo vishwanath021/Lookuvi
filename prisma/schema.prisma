@@ -93,6 +93,10 @@ model Tenant {
   hoursOverrideUntil  DateTime?
   /** Asia/Kolkata YYYY-MM-DD when the salon is closed all day. Empty means not a holiday. */
   closedDayKey        String    @default("")
+  /** Points for a finished visit. Off stops new points. Existing balances stay. */
+  loyaltyOn           Boolean   @default(true)
+  /** Points added when staff tap Finish. Not tied to a bill. */
+  loyaltyPointsPerVisit Int     @default(1)
   /** Soft delete. Null keeps the salon. Suspend uses status and can be resumed; this cannot. */
   deletedAt           DateTime?
   createdAt           DateTime  @default(now())
@@ -121,6 +125,41 @@ model Tenant {
   customerReturns     CustomerReturn[]
   broadcasts          SalonBroadcast[]
   paymentRequests     PaymentRequest[]
+  loyaltyRewards      LoyaltyReward[]
+  loyaltyEntries      LoyaltyLedger[]
+}
+
+model LoyaltyReward {
+  id       String @id @default(cuid())
+  tenantId String
+  name     String
+  cost     Int
+  sort     Int    @default(0)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sort])
+}
+
+model LoyaltyLedger {
+  id           String   @id @default(cuid())
+  tenantId     String
+  /** 91XXXXXXXXXX, the same phone the customer list uses. */
+  phone        String
+  /** Positive earns. Negative redeems or adjustments. */
+  delta        Int
+  /** earn, redeem, or adjust. */
+  kind         String
+  reason       String   @default("")
+  staffId      String   @default("")
+  /** Queue entry when the points came from Finish or a redeem on that token. */
+  visitId      String   @default("")
+  rewardId     String   @default("")
+  balanceAfter Int
+  createdAt    DateTime @default(now())
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, phone])
+  @@index([tenantId, visitId])
 }
 
 model VisitGrant {

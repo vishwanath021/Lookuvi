@@ -23,7 +23,10 @@ type Card = {
   wantsTries?: boolean;
   used?: number;
   remaining?: number;
+  points?: number | null;
 };
+
+type Reward = { id: string; name: string; cost: number };
 
 type Desk = {
   salon: string;
@@ -43,6 +46,7 @@ type Desk = {
   waiting: Card[];
   requests: Card[];
   confirmed: Card[];
+  rewards?: Reward[];
 };
 
 const LABELS: Record<string, string> = { chair: "queueChair", station: "queueStation", room: "queueRoom" };
@@ -123,6 +127,11 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
     }
     if (data?.state) {
       setDesk(data);
+      setSheet((current) => {
+        if (!current) return current;
+        const seated = (data.serving || []).map((seat: { entry: Card | null }) => seat.entry).filter(Boolean) as Card[];
+        return [...(data.waiting || []), ...seated, ...(data.requests || []), ...(data.confirmed || [])].find((item) => item.id === current.id) || current;
+      });
       setUnits(String(data.state.units));
       setAvg(String(data.state.avgMinutes));
       setAlertMin(String(data.state.alertLeadMin));
@@ -211,6 +220,9 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
                   ) : null}
                   {seat.entry?.status === "IN_SERVICE" ? (
                     <button className="btn min-h-11 px-3" type="button" disabled={busy} onClick={() => void act({ action: "done", id: seat.entry?.id })}>Finish</button>
+                  ) : null}
+                  {seat.entry ? (
+                    <button className="btn secondary min-h-11 min-w-11 px-2" type="button" aria-label="More actions" onClick={() => setSheet(seat.entry)}>⋯</button>
                   ) : null}
                 </article>
               ))}
@@ -405,9 +417,11 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
       {sheet ? (
         <ActionSheet
           card={sheet}
+          rewards={desk.rewards || []}
           busy={busy}
           onClose={() => setSheet(null)}
           onAdd={(extra) => addTries(sheet.id, extra)}
+          onRedeem={(rewardId) => void act({ action: "redeem", id: sheet.id, rewardId })}
           onNoShow={() => setConfirmNoShow(sheet)}
         />
       ) : null}
@@ -490,20 +504,39 @@ function TryChips({ busy, onAdd, onDismiss, compact = false }: { busy: boolean; 
   );
 }
 
-function ActionSheet({ card, busy, onClose, onAdd, onNoShow }: {
+function ActionSheet({ card, rewards, busy, onClose, onAdd, onRedeem, onNoShow }: {
   card: Card;
+  rewards: Reward[];
   busy: boolean;
   onClose: () => void;
   onAdd: (extra: number) => void;
+  onRedeem: (rewardId: string) => void;
   onNoShow: () => void;
 }) {
   const [custom, setCustom] = useState("");
   const [note, setNote] = useState("");
+  const [pick, setPick] = useState<Reward | null>(null);
+  const points = typeof card.points === "number" ? card.points : null;
   return (
     <div className="fixed inset-0 z-40 bg-black/40" role="presentation" onClick={onClose}>
       <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-white p-4" role="dialog" aria-label="More actions" onClick={(event) => event.stopPropagation()}>
         <p className="text-base font-semibold">{tokenLabel(card.token)} {card.name}</p>
+        {points !== null ? <p className="mt-1 text-sm" data-points={points}>Points: {points}</p> : null}
         <div className="mt-3 grid gap-2">
+          {points !== null && rewards.length ? (
+            pick ? (
+              <div className="grid gap-2 rounded-xl border border-line p-3">
+                <p>Redeem {pick.name} for {pick.cost} points?</p>
+                <button className="btn min-h-11" type="button" disabled={busy || pick.cost > points} onClick={() => onRedeem(pick.id)}>Confirm redeem</button>
+                <button className="btn secondary min-h-11" type="button" onClick={() => setPick(null)}>Back</button>
+              </div>
+            ) : (
+              <button className="btn secondary min-h-11" type="button" onClick={() => setPick(rewards[0] || null)}>Redeem</button>
+            )
+          ) : null}
+          {pick ? rewards.map((reward) => (
+            <button key={reward.id} className="btn secondary min-h-11" type="button" disabled={reward.cost > points!} aria-pressed={pick.id === reward.id} onClick={() => setPick(reward)}>{reward.name} · {reward.cost}</button>
+          )) : null}
           {card.whatsappUrl ? <a className="btn secondary min-h-11" href={card.whatsappUrl} target="_blank" rel="noreferrer">WhatsApp</a> : null}
           {card.callUrl ? <a className="btn secondary min-h-11" href={card.callUrl}>Call</a> : null}
           <div className="flex flex-wrap gap-2">

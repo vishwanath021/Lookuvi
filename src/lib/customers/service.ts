@@ -3,6 +3,7 @@ import { kolkataDayKey, kolkataMonthKey } from "@/lib/queue/day";
 import { kolkataMonthStart } from "@/lib/ai/spend";
 import { indianMobile } from "@/lib/queue/phone";
 import { customerFilter, displayPhone, istNoon, nextCustomerName, parseCustomerImport } from "@/lib/customers/parse";
+import { changePoints, pointsBalances } from "@/lib/loyalty";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -106,6 +107,18 @@ async function applyImportedVisit(tenantId: string, phone: string, name: string,
   });
 }
 
+export async function adjustCustomerPoints(tenantId: string, customerId: string, delta: number, reason: string, staffId = "") {
+  const row = await prisma.customer.findFirst({ where: { id: customerId, tenantId } });
+  if (!row) return { ok: false as const, message: "That customer was not found." };
+  try {
+    const result = await changePoints({ tenantId, phone: row.phone, delta, kind: "adjust", reason, staffId });
+    return { ok: true as const, message: `Balance is ${result.balance}.`, balance: result.balance };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "That did not work.";
+    return { ok: false as const, message };
+  }
+}
+
 export async function addCustomer(tenantId: string, phoneInput: string, name: string) {
   const phone = indianMobile(phoneInput);
   if (!phone) return { ok: false as const, message: "Enter a 10-digit Indian mobile number." };
@@ -133,7 +146,7 @@ export async function listCustomers(tenantId: string, q: string) {
     take: 100,
   });
   const phones = rows.map((row) => row.phone);
-  const blocked = await blockedPhoneSet(tenantId, phones);
+  const [blocked, balances] = await Promise.all([blockedPhoneSet(tenantId, phones), pointsBalances(tenantId, phones)]);
   return rows.map((row) => {
     const stopped = blocked.has(row.phone) || row.optOutSource === "STOP";
     return {
@@ -141,6 +154,7 @@ export async function listCustomers(tenantId: string, q: string) {
       name: row.name,
       phone: row.phone,
       phoneLabel: displayPhone(row.phone),
+      points: balances.get(row.phone) ?? 0,
       visitCount: row.visitCount,
       lastVisitAt: row.lastVisitAt ? row.lastVisitAt.toISOString() : "",
       lastVisitLabel: row.lastVisitAt

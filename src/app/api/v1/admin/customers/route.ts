@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
   addCustomer,
+  adjustCustomerPoints,
   deskOptOut,
   importCustomers,
   listCustomers,
@@ -26,6 +27,12 @@ const schema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("broadcast"), text: z.string().max(200) }),
   z.object({ action: z.literal("comeback"), ids: z.array(z.string().min(1).max(40)).min(1).max(100) }),
+  z.object({
+    action: z.literal("adjust"),
+    id: z.string().min(1).max(40),
+    delta: z.number().int().min(-100).max(100),
+    reason: z.string().trim().min(1).max(120),
+  }),
 ]);
 
 async function member() {
@@ -73,6 +80,10 @@ export async function POST(req: Request) {
   }
   if (body.action === "import") {
     const result = await importCustomers(tenantId, body.text);
+    return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+  }
+  if (body.action === "adjust") {
+    const result = await adjustCustomerPoints(tenantId, body.id, body.delta, body.reason, access.session.user.id);
     return NextResponse.json(result, { status: result.ok ? 200 : 400 });
   }
   if (body.action === "stop") return NextResponse.json(await deskOptOut(tenantId, body.id));

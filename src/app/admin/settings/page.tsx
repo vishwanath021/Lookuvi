@@ -20,6 +20,7 @@ export default async function SettingsPage() {
     include: { user: { select: { id: true, name: true, email: true } } },
     orderBy: [{ role: "asc" }, { id: "asc" }],
   });
+  const rewards = await prisma.loyaltyReward.findMany({ where: { tenantId: tenant.id }, orderBy: [{ sort: "asc" }, { name: "asc" }] });
   const origin = await salonGuestOrigin(tenant.id, tenant.slug);
   const salonModeUrl = tenant.salonNonce ? `${origin}/?salon=${signSalonToken(tenant.id, tenant.salonNonce)}` : "";
   return (
@@ -67,6 +68,9 @@ export default async function SettingsPage() {
           openTime: tenant.openTime,
           closeTime: tenant.closeTime,
           weeklyHours: tenant.weeklyHours,
+          loyaltyOn: tenant.loyaltyOn,
+          loyaltyPointsPerVisit: tenant.loyaltyPointsPerVisit,
+          rewards: rewards.map((reward) => ({ name: reward.name, cost: reward.cost })),
         }}
       />
     </main>

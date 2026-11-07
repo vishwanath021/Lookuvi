@@ -24,6 +24,9 @@ type Ticket = {
   tryOn: boolean;
   lang: string;
   serviceName: string;
+  points?: number | null;
+  pointsLine?: string;
+  pointsNext?: string;
 };
 
 export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }) {
@@ -104,6 +107,8 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
         </>
       )}
       {ticket.serviceName ? <p className="mt-1 text-sm text-muted">{ticket.serviceName}</p> : null}
+      {ticket.pointsLine ? <p className="mt-3 text-sm" data-loyalty-points={ticket.points ?? 0}>{ticket.pointsLine}</p> : null}
+      {ticket.pointsNext ? <p className="text-sm text-muted" data-loyalty-next="yes">{ticket.pointsNext}</p> : null}
       {showComing ? <p className="mt-3 text-sm" data-queue-coming="yes">{t(lang, "queueComing")}</p> : null}
       {canCancel ? (
         <div className="mt-6 grid gap-2">
