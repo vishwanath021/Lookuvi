@@ -70,12 +70,12 @@ test("the desk calls the next guest, finishes the visit, and adds a walk-in", as
   await page.goto("/admin/queue");
   await page.locator("[data-queue-mode][data-ready='yes']").waitFor();
   await expect(page.getByRole("heading", { name: "Queue" })).toBeVisible();
-  await expect(page.getByText("Queue Guest")).toBeVisible();
+  await expect(page.getByText("Queue Guest", { exact: true })).toBeVisible();
   await expect(page.getByText("On the way")).toBeVisible();
   await expect(page.getByRole("button", { name: "Start", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "NEXT" }).click();
-  await expect(page.getByRole("heading", { name: "Now serving" })).toBeVisible();
-  await expect(page.getByText("Token")).toBeVisible();
+  await page.locator("[data-call-next='yes']:visible").click();
+  await expect(page.getByRole("heading", { name: "Chairs" })).toBeVisible();
+  await expect(page.locator("[data-chair] [data-queue-token]")).toBeVisible();
   await expect(page.getByRole("button", { name: "Start", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await expect(page.getByRole("button", { name: "Start", exact: true })).toHaveCount(0);
@@ -85,9 +85,9 @@ test("the desk calls the next guest, finishes the visit, and adds a walk-in", as
   await expect(page.getByLabel("Mobile number (optional)")).toBeVisible();
   await page.getByLabel("Walk-in name").fill("Desk Guest");
   await page.getByRole("button", { name: "Add walk-in" }).click();
-  await expect(page.getByText("Desk Guest")).toBeVisible();
+  await expect(page.getByText("Desk Guest", { exact: true })).toBeVisible();
   await expect(page.locator("[data-queue-token]")).toBeVisible();
-  await expect(page.locator("[data-queue-token]")).toHaveClass(/text-7xl/);
+  await expect(page.locator("[data-queue-token]")).toHaveClass(/text-base/);
 });
 
 test("request mode asks for a time and the desk confirms it", async ({ page }) => {
@@ -124,15 +124,16 @@ test("a paused queue tells the guest to ask at the desk", async ({ page }) => {
   await page.getByText("Queue settings").click();
   await page.getByLabel("How customers join").selectOption("LIVE");
   await page.getByRole("button", { name: "Save settings" }).click();
-  await page.getByRole("button", { name: "Queue is OPEN, tap to change" }).click();
-  await expect(page.getByRole("button", { name: "Queue is PAUSED, tap to change" })).toBeVisible();
+  await page.getByRole("switch", { name: "Queue is open" }).click();
+  await page.getByRole("button", { name: "Close queue" }).click();
+  await expect(page.getByRole("switch", { name: "Queue is closed" })).toBeVisible();
   await expect(page.locator("[data-queue-open='no']")).toBeVisible();
   await page.goto("/s/demo/queue");
   await expect(page.getByText(/queue is paused/i)).toBeVisible();
   await expect(page.getByRole("button", { name: "Join the queue" })).toBeDisabled();
   await page.goto("/admin/queue");
   await page.locator("[data-queue-mode][data-ready='yes']").waitFor();
-  await page.getByRole("button", { name: "Queue is PAUSED, tap to change" }).click();
+  await page.getByRole("switch", { name: "Queue is closed" }).click();
   await expect(page.locator("[data-queue-open='yes']")).toBeVisible();
   await page.goto("/s/demo/queue");
   await expect(page.getByText(/queue is paused/i)).toHaveCount(0);
@@ -143,7 +144,7 @@ test("try-on links to the queue when both products are on", async ({ page }) => 
   await signIn(page);
   await page.goto("/admin/queue");
   await page.locator("[data-queue-mode][data-ready='yes']").waitFor();
-  const pausedToggle = page.getByRole("button", { name: "Queue is PAUSED, tap to change" });
+  const pausedToggle = page.getByRole("switch", { name: "Queue is closed" });
   if (await pausedToggle.isVisible()) await pausedToggle.click();
   await expect(page.locator("[data-queue-open='yes']")).toBeVisible();
   await page.goto("/s/demo");

@@ -427,6 +427,7 @@ async function deskCard(tenantName: string, slug: string, row: EntryRow, avgMinu
     requestedSlot: row.requestedSlot,
     whatsappUrl: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : "",
     callUrl: phone ? `tel:+${phone}` : "",
+    startedAt: row.startedAt ? row.startedAt.toISOString() : null,
     ...(await tryLineForEntry(row, tenant)),
   };
 }

@@ -123,6 +123,13 @@ textarea { min-height: 48px; }
   background: var(--selected);
   color: var(--aubergine);
 }
+.btn.danger {
+  background-color: #8f2d2d;
+  background-image: none;
+  color: #ffffff;
+  border-color: #6d2222;
+}
+.btn.danger:hover:not(:disabled) { filter: brightness(1.08); }
 .salon-bar,
 .header-metal {
   color: #fff;
