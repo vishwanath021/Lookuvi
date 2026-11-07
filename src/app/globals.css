@@ -750,6 +750,8 @@ textarea { min-height: 48px; }
   .seg { overflow: hidden; scroll-snap-type: none; }
   .seg-btn { flex: 1 1 0; scroll-snap-align: none; }
 }
+.tool-row .seg { overflow-x: auto; scroll-snap-type: x mandatory; }
+.tool-row .seg-btn { flex: 0 0 auto; min-height: 44px; padding: 6px 12px; letter-spacing: 0.04em; }
 .seg-btn[aria-selected="true"] {
   background-color: var(--metal-base);
   background-image: var(--metal-purple);
@@ -890,6 +892,15 @@ textarea { min-height: 48px; }
   padding-bottom: 0.25rem;
   scrollbar-width: none;
 }
+@media (max-width: 1023px) {
+  .chip-scroll {
+    padding-right: 0.25rem;
+    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 2.5rem), transparent);
+    mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 2.5rem), transparent);
+  }
+  .look-grid { padding-bottom: 13rem; }
+  .look-grid button { scroll-margin-bottom: 13rem; }
+}
 .chip-scroll::-webkit-scrollbar { display: none; }
 .try-cta {
   position: sticky;
@@ -940,7 +951,7 @@ textarea { min-height: 48px; }
     border-top: 1px solid var(--line);
     background: var(--bg);
   }
-  .try-picks { padding-bottom: 8.5rem; }
+  .try-picks { padding-bottom: 13rem; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

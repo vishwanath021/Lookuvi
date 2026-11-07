@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import { VisitUnlock } from "@/components/admin/VisitUnlock";
 import { t } from "@/data/i18n";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
 
@@ -55,7 +54,7 @@ function minutesInChair(iso?: string | null) {
   return mins;
 }
 
-export function QueueDesk({ initial, lang, showVisits = false, monthTries }: { initial: Desk; lang: string; showVisits?: boolean; monthTries?: number }) {
+export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: string; monthTries?: number }) {
   const [desk, setDesk] = useState(initial);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -70,6 +69,7 @@ export function QueueDesk({ initial, lang, showVisits = false, monthTries }: { i
   const [confirmClose, setConfirmClose] = useState(false);
   const [sheet, setSheet] = useState<Card | null>(null);
   const [confirmNoShow, setConfirmNoShow] = useState<Card | null>(null);
+  const [away, setAway] = useState<Card | null>(null);
   const [wide, setWide] = useState(false);
   const live = desk.state.mode === "LIVE";
   const place = t(lang, LABELS[desk.state.unitLabel] || "queueChair");
@@ -157,7 +157,7 @@ export function QueueDesk({ initial, lang, showVisits = false, monthTries }: { i
         {live && wide ? (
           <div className="ml-auto">
             <button className="btn min-h-11" type="button" data-call-next="yes" disabled={busy || !canCall} onClick={() => void act({ action: "next" })}>
-              {canCall ? "Call next" : callReason}
+              {canCall && nextGuest ? `Call ${tokenLabel(nextGuest.token)} ${nextGuest.name}` : callReason}
             </button>
           </div>
         ) : null}
@@ -175,7 +175,14 @@ export function QueueDesk({ initial, lang, showVisits = false, monthTries }: { i
                 <article key={seat.unit} className={wide ? "card flex w-full flex-col items-start gap-2 p-3" : "card inline-flex w-fit max-w-full flex-wrap items-center gap-2 px-3 py-2"} data-chair={seat.unit}>
                   <p className="min-w-0 text-sm">
                     <span className="font-medium">{place} {seat.unit}</span>
-                    {seat.entry ? (
+                    {seat.entry?.status === "CALLED" ? (
+                      <>
+                        {" · Waiting for "}
+                        <span className="text-base font-semibold" data-queue-token={seat.entry.token}>{tokenLabel(seat.entry.token)}</span>
+                        {" "}
+                        {seat.entry.name}
+                      </>
+                    ) : seat.entry ? (
                       <>
                         {" · "}
                         <span className="text-base font-semibold" data-queue-token={seat.entry.token}>{tokenLabel(seat.entry.token)}</span>
@@ -186,18 +193,17 @@ export function QueueDesk({ initial, lang, showVisits = false, monthTries }: { i
                       <> · Free</>
                     )}
                   </p>
-                  {seat.entry && wide ? (
-                    <p className="text-xs text-muted">
-                      {seat.entry.status === "IN_SERVICE"
-                        ? `${minutesInChair(seat.entry.startedAt) ?? 0} min in chair`
-                        : "Called"}
-                    </p>
+                  {seat.entry?.status === "IN_SERVICE" && wide ? (
+                    <p className="text-xs text-muted">{minutesInChair(seat.entry.startedAt) ?? 0} min in chair</p>
                   ) : null}
                   {seat.entry?.status === "CALLED" ? (
-                    <button className="btn min-h-11 px-3" type="button" disabled={busy} onClick={() => void act({ action: "start", id: seat.entry?.id })}>{t(lang, "queueStart")}</button>
+                    <>
+                      <button className="btn min-h-11 px-3" type="button" disabled={busy} onClick={() => void act({ action: "start", id: seat.entry?.id })}>Seated</button>
+                      <button className="btn ghost min-h-11 px-3" type="button" disabled={busy} onClick={() => setAway(seat.entry)}>Not here</button>
+                    </>
                   ) : null}
-                  {seat.entry ? (
-                    <button className="btn min-h-11 px-3" type="button" disabled={busy} onClick={() => void act({ action: "done", id: seat.entry?.id })}>{t(lang, "queueDone")}</button>
+                  {seat.entry?.status === "IN_SERVICE" ? (
+                    <button className="btn min-h-11 px-3" type="button" disabled={busy} onClick={() => void act({ action: "done", id: seat.entry?.id })}>Finish</button>
                   ) : null}
                 </article>
               ))}
@@ -228,16 +234,12 @@ export function QueueDesk({ initial, lang, showVisits = false, monthTries }: { i
                           <td className="whitespace-nowrap py-2 pr-2">{t(lang, "queueMinShort", { min: card.waitMin })}</td>
                           <td className="py-2 pr-2"><StatusPills card={card} lang={lang} /></td>
                           <td className="py-2">
-                            <RowActions card={card} busy={busy} lang={lang} onArrive={() => void act({ action: "arrived", id: card.id })} onMore={() => setSheet(card)} />
+                            <div className="flex flex-wrap items-center gap-1">
+                              <RowActions card={card} busy={busy} lang={lang} onArrive={() => void act({ action: "arrived", id: card.id })} onMore={() => setSheet(card)} />
+                              {card.wantsTries && card.arrived ? <TryChips compact busy={busy} onAdd={(extra) => addTries(card.id, extra)} onDismiss={() => void act({ action: "dismiss", id: card.id })} /> : null}
+                            </div>
                           </td>
                         </tr>
-                        {card.wantsTries ? (
-                          <tr>
-                            <td className="pb-2" colSpan={5}>
-                              <TryChips busy={busy} onAdd={(extra) => addTries(card.id, extra)} onDismiss={() => void act({ action: "dismiss", id: card.id })} />
-                            </td>
-                          </tr>
-                        ) : null}
                       </Fragment>
                     ))}
                   </tbody>
@@ -355,7 +357,6 @@ export function QueueDesk({ initial, lang, showVisits = false, monthTries }: { i
           <button className="btn min-h-11 w-fit" type="submit" disabled={busy}>{t(lang, "queueSave")}</button>
         </form>
       </details>
-      <VisitUnlock show={showVisits} />
 
       {confirmClose ? (
         <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-4 sm:place-items-center" role="dialog" aria-label="Close the queue">
@@ -364,6 +365,19 @@ export function QueueDesk({ initial, lang, showVisits = false, monthTries }: { i
             <div className="mt-4 flex flex-wrap gap-2">
               <button className="btn min-h-11" type="button" onClick={() => { setConfirmClose(false); void act({ action: "pause" }); }}>Close queue</button>
               <button className="btn secondary min-h-11" type="button" onClick={() => setConfirmClose(false)}>Keep open</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {away ? (
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-4 sm:place-items-center" role="dialog" aria-label="Not here">
+          <div className="card w-full max-w-sm p-4">
+            <p className="text-base">{away.name} is not at the chair.</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button className="btn secondary min-h-11" type="button" onClick={() => { const id = away.id; setAway(null); void act({ action: "return", id }); }}>Back in line</button>
+              <button className="btn danger min-h-11" type="button" onClick={() => { const id = away.id; setAway(null); void act({ action: "noshow", id }); }}>Mark no-show</button>
+              <button className="btn ghost min-h-11" type="button" onClick={() => setAway(null)}>Cancel</button>
             </div>
           </div>
         </div>
@@ -399,7 +413,7 @@ function StatusPills({ card, lang }: { card: Card; lang: string }) {
     <span className="flex flex-wrap gap-1">
       {card.wantsTries ? <span className="rounded-full bg-[#f8efdc] px-2 py-1 text-xs" data-wants-tries="yes">{t(lang, "queueWantsTries")}</span> : null}
       {card.onTheWay ? <span className="rounded-full bg-sand px-2 py-1 text-xs">{t(lang, "queueOnTheWayBadge")}</span> : null}
-      <span className="rounded-full bg-sand px-2 py-1 text-xs" data-try-line="yes">{t(lang, "queueTriesLine", { used: card.used ?? 0, left: card.remaining ?? 0 })}</span>
+      <span className="whitespace-nowrap rounded-full bg-sand px-3 py-1.5 text-xs" data-try-line="yes">{t(lang, "queueTriesLine", { used: card.used ?? 0, left: card.remaining ?? 0 })}</span>
     </span>
   );
 }
@@ -430,7 +444,7 @@ function WaitingRow({ card, busy, lang, onArrive, onAdd, onDismiss, onMore }: {
       </div>
       <p className="mt-1 text-xs text-muted">{t(lang, "queueMinShort", { min: card.waitMin })}{card.serviceName ? ` · ${card.serviceName}` : ""}</p>
       <div className="mt-1"><StatusPills card={card} lang={lang} /></div>
-      {card.wantsTries ? <TryChips busy={busy} onAdd={onAdd} onDismiss={onDismiss} /> : null}
+      {card.wantsTries && card.arrived ? <TryChips busy={busy} onAdd={onAdd} onDismiss={onDismiss} /> : null}
     </article>
   );
 }
@@ -456,15 +470,15 @@ function RowActions({ card, busy, lang, onArrive, onMore }: {
   );
 }
 
-function TryChips({ busy, onAdd, onDismiss }: { busy: boolean; onAdd: (extra: number) => void; onDismiss: () => void }) {
+function TryChips({ busy, onAdd, onDismiss, compact = false }: { busy: boolean; onAdd: (extra: number) => void; onDismiss: () => void; compact?: boolean }) {
   return (
-    <div className="mt-2 flex flex-wrap gap-1" data-try-box="yes">
+    <div className={compact ? "flex flex-wrap items-center gap-1" : "mt-2 flex flex-wrap gap-1"} data-try-box="yes">
       {[1, 2, 3].map((extra) => (
-        <button key={extra} className="btn min-h-11 px-3" type="button" disabled={busy} onClick={() => onAdd(extra)}>
+        <button key={extra} className={`btn min-h-11 ${compact ? "px-2" : "px-3"}`} type="button" disabled={busy} onClick={() => onAdd(extra)}>
           {extra === 1 ? "+1 try" : `+${extra} tries`}
         </button>
       ))}
-      <button className="btn secondary min-h-11 px-3" type="button" disabled={busy} onClick={onDismiss}>Dismiss</button>
+      <button className={`btn secondary min-h-11 ${compact ? "px-2" : "px-3"}`} type="button" disabled={busy} onClick={onDismiss}>Dismiss</button>
     </div>
   );
 }

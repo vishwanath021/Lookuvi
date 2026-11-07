@@ -211,7 +211,7 @@ export function TryOnApp({
   const [busyTool, setBusyTool] = useState<TryTool | null>(null);
   const [pickedDensity, setPickedDensity] = useState("");
   const [pickedTexture, setPickedTexture] = useState("");
-  const [showAllStyles, setShowAllStyles] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [hairReading, setHairReading] = useState<HairReading | null>(null);
   const [suggestNote, setSuggestNote] = useState("");
   const [suggestCost, setSuggestCost] = useState("");
@@ -274,6 +274,26 @@ export function TryOnApp({
   }, [config.slug]);
 
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem("lookuvi-hair-filters");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { density?: string; texture?: string };
+      if (typeof parsed.density === "string") setPickedDensity(parsed.density);
+      if (typeof parsed.texture === "string") setPickedTexture(parsed.texture);
+    } catch {
+      /* A bad saved filter just starts blank. */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("lookuvi-hair-filters", JSON.stringify({ density: pickedDensity, texture: pickedTexture }));
+    } catch {
+      /* The choice still applies for this visit. */
+    }
+  }, [pickedDensity, pickedTexture]);
+
+  useEffect(() => {
     setSid(sessionId());
     if (initialStyleId) return;
     const saved = localStorage.getItem("helix_audience");
@@ -311,7 +331,7 @@ export function TryOnApp({
   const styles = config.styles.filter((style) => style.gender === gender);
   const browList = browsForAudience(config.brows, gender);
   const visibleStyles = config.hairPickerOn
-    ? orderStylesForPicker(styles, { density: pickedDensity, texture: pickedTexture }, showAllStyles)
+    ? orderStylesForPicker(styles, { density: pickedDensity, texture: pickedTexture }, false)
     : styles;
   const shownStyles = visibleStyles.filter((style) => styleHasPhoto(style.id));
   const hairSuggestions = hairReading
@@ -679,7 +699,6 @@ export function TryOnApp({
     setHairReading(null);
     setPickedDensity("");
     setPickedTexture("");
-    setShowAllStyles(false);
     setSuggestNote("");
     setSuggestCost("");
     setNotice("");
@@ -720,7 +739,6 @@ export function TryOnApp({
       });
       setPickedDensity(String(data.density || ""));
       setPickedTexture(String(data.texture || ""));
-      setShowAllStyles(false);
       const low = Number(data.confidence) < 0.4;
       setSuggestNote(low ? "Check the hair type." : "");
       setSuggestCost("");
@@ -1029,7 +1047,7 @@ export function TryOnApp({
       {makeupOn && !MakeupPane ? <p className="mt-2 text-sm text-muted">Opening makeup…</p> : null}
       {makeupOn && MakeupPane ? <MakeupPane config={config} /> : null}
       {bridalOn || groomOn || makeupOn ? null : <>
-      <h2 className="page-title">{t(lang, "pageTitle")}</h2>
+      <h2 className="mb-2 hidden font-serif text-2xl leading-tight lg:block">{t(lang, "pageTitle")}</h2>
       <AtSalonNote lang={lang} />
 
       <div className="try-desk mt-4">
@@ -1247,7 +1265,7 @@ export function TryOnApp({
       ) : null}
       <div className="try-picks">
       {visibleTools.length > 1 && (
-      <div className="seg-fade">
+      <div className="tool-row seg-fade">
       <div className="seg" role="tablist" aria-label={t(lang, "toolsLabel")}>
         {visibleTools.map((item) => (
           <button
@@ -1274,31 +1292,8 @@ export function TryOnApp({
       <section ref={gridRef} className="mt-3" data-style-grid="yes" aria-label={tool === "style" ? t(lang, "styles") : tool === "colour" ? t(lang, "shades") : tool === "brows" ? t(lang, "brows") : tool === "beard" ? t(lang, "beards") : t(lang, "nails")}>
         {tool === "style" && (
           <>
-            <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Style audience">
-              {config.showWomen && <button className="chip" type="button" aria-pressed={gender === "women"} onClick={() => chooseGender("women")}>{t(lang, "women")}</button>}
-              {config.showMen && <button className="chip" type="button" aria-pressed={gender === "men"} onClick={() => chooseGender("men")}>{t(lang, "men")}</button>}
-              {config.showKids && <button className="chip" type="button" aria-pressed={gender === "kids"} onClick={() => chooseGender("kids")}>{t(lang, "kids")}</button>}
-            </div>
-            <HairTypePicker
-              pickerOn={config.hairPickerOn}
-              suggestOn={!lockedBrowse && config.hairSuggestOn}
-              usesCredits={config.hairSuggestUsesCredits}
-              density={pickedDensity}
-              texture={pickedTexture}
-              showAll={showAllStyles}
-              suggestions={hairSuggestions}
-              selectedId={styleId}
-              busy={busy || suggestBusy}
-              note={suggestNote}
-              costLine={suggestCost}
-              onDensity={setPickedDensity}
-              onTexture={setPickedTexture}
-              onShowAll={setShowAllStyles}
-              onSuggest={() => void suggestHair()}
-              onPick={(card) => selectLook({ id: card.id, name: card.name, serviceKeys: card.serviceKeys, tool: "style" })}
-            />
             {config.hairPickerOn && (pickedDensity || pickedTexture) && visibleStyles.length === 0 && (
-              <p className="mb-2 text-sm">No style photos for that hair type. Turn on Show all.</p>
+              <p className="mb-2 text-sm">No style photos for that hair type. Clear filters to see every style.</p>
             )}
             <LookPicker
               key={`style-${gender}`}
@@ -1306,6 +1301,7 @@ export function TryOnApp({
               selectedId={styleId}
               disabled={busy}
               tryDisabled={salonLocked}
+              onFilters={() => setFiltersOpen(true)}
               items={shownStyles.map((style) => ({
                 id: style.id,
                 name: style.name,
@@ -1318,6 +1314,40 @@ export function TryOnApp({
               }}
               onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
             />
+            {filtersOpen ? (
+              <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-4 sm:place-items-center" role="dialog" aria-label="Filters">
+                <div className="card max-h-[85dvh] w-full max-w-md overflow-y-auto p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-serif text-xl">Filters</h3>
+                    <button className="btn ghost min-h-11" type="button" onClick={() => setFiltersOpen(false)}>Close</button>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Style audience">
+                    {config.showWomen && <button className="chip" type="button" aria-pressed={gender === "women"} onClick={() => chooseGender("women")}>{t(lang, "women")}</button>}
+                    {config.showMen && <button className="chip" type="button" aria-pressed={gender === "men"} onClick={() => chooseGender("men")}>{t(lang, "men")}</button>}
+                    {config.showKids && <button className="chip" type="button" aria-pressed={gender === "kids"} onClick={() => chooseGender("kids")}>{t(lang, "kids")}</button>}
+                  </div>
+                  <div className="mt-3">
+                    <HairTypePicker
+                      pickerOn={config.hairPickerOn}
+                      suggestOn={!lockedBrowse && config.hairSuggestOn}
+                      usesCredits={config.hairSuggestUsesCredits}
+                      density={pickedDensity}
+                      texture={pickedTexture}
+                      suggestions={hairSuggestions}
+                      selectedId={styleId}
+                      busy={busy || suggestBusy}
+                      note={suggestNote}
+                      costLine={suggestCost}
+                      onDensity={setPickedDensity}
+                      onTexture={setPickedTexture}
+                      onSuggest={() => void suggestHair()}
+                      onPick={(card) => selectLook({ id: card.id, name: card.name, serviceKeys: card.serviceKeys, tool: "style" })}
+                    />
+                  </div>
+                  <button className="btn secondary mt-4 min-h-11" type="button" onClick={() => { setPickedDensity(""); setPickedTexture(""); }}>Clear filters</button>
+                </div>
+              </div>
+            ) : null}
           </>
         )}
 

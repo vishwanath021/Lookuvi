@@ -19,6 +19,7 @@ export function LookPicker({
   tryDisabled,
   onSelect,
   onTry,
+  onFilters,
 }: {
   label: string;
   items: LookPick[];
@@ -27,6 +28,7 @@ export function LookPicker({
   tryDisabled?: boolean;
   onSelect: (id: string) => void;
   onTry: () => void;
+  onFilters?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
@@ -40,25 +42,36 @@ export function LookPicker({
   const selected = items.find((item) => item.id === selectedId);
   return (
     <div data-picker="yes">
-      <label className="sr-only" htmlFor={`look-search-${label}`}>Search {label}</label>
-      <input
-        id={`look-search-${label}`}
-        className="field"
-        type="search"
-        placeholder={`Search ${label.toLowerCase()}`}
-        aria-label={`Search ${label}`}
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-      />
-      <div className="chip-scroll mt-2" role="group" aria-label={`${label} categories`}>
-        {chips.map((item) => (
-          <button key={item.id} className="chip shrink-0" type="button" aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>
-            {item.label}
-          </button>
-        ))}
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+        <div className="flex min-w-0 items-center gap-2 lg:w-72 lg:shrink-0">
+          <label className="sr-only" htmlFor={`look-search-${label}`}>Search {label}</label>
+          <input
+            id={`look-search-${label}`}
+            className="field min-w-0 flex-1"
+            type="search"
+            placeholder={`Search ${label.toLowerCase()}`}
+            aria-label={`Search ${label}`}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          {onFilters ? (
+            <button className="btn secondary grid h-11 w-11 shrink-0 place-items-center px-0" type="button" aria-label="Filters" onClick={onFilters}>
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                <path d="M2 4h14M4 9h10M7 14h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
+        <div className="chip-scroll min-w-0 lg:flex-1" role="group" aria-label={`${label} categories`}>
+          {chips.map((item) => (
+            <button key={item.id} className="chip shrink-0" type="button" aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>
+              {item.label}
+            </button>
+          ))}
+        </div>
       </div>
       {visible.length === 0 ? <p className="mt-3 text-sm text-muted">{category === "saved" && !query ? "No saved styles yet." : "No matches."}</p> : null}
-      <div className="mt-3 grid grid-cols-3 gap-2 lg:grid-cols-4">
+      <div className="look-grid mt-3 grid grid-cols-3 gap-2 lg:grid-cols-4">
         {visible.map((item) => {
           const on = item.id === selectedId;
           return (

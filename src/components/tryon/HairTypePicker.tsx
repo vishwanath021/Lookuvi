@@ -29,7 +29,6 @@ export function HairTypePicker({
   usesCredits,
   density,
   texture,
-  showAll,
   suggestions,
   selectedId,
   busy,
@@ -37,7 +36,6 @@ export function HairTypePicker({
   costLine,
   onDensity,
   onTexture,
-  onShowAll,
   onSuggest,
   onPick,
 }: {
@@ -46,7 +44,6 @@ export function HairTypePicker({
   usesCredits: boolean;
   density: string;
   texture: string;
-  showAll: boolean;
   suggestions: HairSuggestionCard[];
   selectedId: string;
   busy: boolean;
@@ -54,7 +51,6 @@ export function HairTypePicker({
   costLine: string;
   onDensity: (value: string) => void;
   onTexture: (value: string) => void;
-  onShowAll: (value: boolean) => void;
   onSuggest: () => void;
   onPick: (card: HairSuggestionCard) => void;
 }) {
@@ -74,10 +70,6 @@ export function HairTypePicker({
               <Chip key={item} pressed={texture === item} label={item} onClick={() => onTexture(texture === item ? "" : item)} />
             ))}
           </div>
-          <label className="mt-2 flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={showAll} onChange={(event) => onShowAll(event.target.checked)} />
-            Show all
-          </label>
         </div>
       )}
       {suggestOn && (

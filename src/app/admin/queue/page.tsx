@@ -23,7 +23,7 @@ export default async function QueuePage() {
   ]);
   return (
     <main>
-      <QueueDesk initial={desk} lang={tenant.defaultLang} monthTries={tryOns} showVisits={tenant.productBridal || tenant.productGroom || tenant.productMakeupStudio} />
+      <QueueDesk initial={desk} lang={tenant.defaultLang} monthTries={tryOns} />
     </main>
   );
 }

@@ -286,7 +286,6 @@ describe("hair picker markup", () => {
       usesCredits: false,
       density: "thick",
       texture: "",
-      showAll: false,
       suggestions: [card],
       selectedId: "",
       busy: false,
@@ -294,12 +293,11 @@ describe("hair picker markup", () => {
       costLine: "",
       onDensity: () => undefined,
       onTexture: () => undefined,
-      onShowAll: () => undefined,
       onSuggest: () => undefined,
       onPick: () => undefined,
     }));
     expect(free).toContain("Hair type");
-    expect(free).toContain("Show all");
+    expect(free).not.toContain("Show all");
     expect(free).toContain("Suggested for you");
     expect(free).toContain("Suits thick wavy hair");
     expect(free).toContain("/styles/thumbs/pixie.webp");

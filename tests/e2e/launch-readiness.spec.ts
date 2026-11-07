@@ -194,19 +194,19 @@ test("Sunday rush across three salons", async ({ page, browser, request }, testI
   await expect(page.getByText("North Star")).toHaveCount(0);
   await shot(page, "owner_desk_desktop");
   await page.locator("[data-call-next='yes']:visible").click();
-  await expect(page.getByRole("button", { name: "Start", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Seated", exact: true })).toBeVisible();
   await shot(page, "owner_called_desktop");
   await expect(guest.getByText("Your turn")).toBeVisible({ timeout: 20_000 });
   await shot(guest, "customer_turn_phone");
-  await page.getByRole("button", { name: "Start", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Start", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Seated", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Seated", exact: true })).toHaveCount(0);
   await shot(page, "owner_in_service_desktop");
   await expect(guest.getByText("You are being served.")).toBeVisible({ timeout: 20_000 });
 
   await page.getByRole("region", { name: "Waiting" }).getByRole("button", { name: "More actions" }).first().click();
   await page.getByRole("button", { name: "No-show" }).click();
   await page.getByRole("button", { name: "Mark no-show" }).click();
-  await page.getByRole("region", { name: "Chairs" }).getByRole("button", { name: "Done" }).click();
+  await page.getByRole("region", { name: "Chairs" }).getByRole("button", { name: "Finish" }).click();
 
   for (let step = 0; step < 40; step += 1) {
     const deskRes = await page.request.get("/api/v1/admin/queue");

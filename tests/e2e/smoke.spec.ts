@@ -65,7 +65,7 @@ test.afterAll(async () => {
 test("customer can consent, use the camera, preview a cut, and an owner can open the dashboard", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto("/s/demo");
-  await expect(page.getByRole("heading", { name: "See your next look." })).toBeVisible();
+  if ((page.viewportSize()?.width ?? 0) >= 1024) await expect(page.getByRole("heading", { name: "See your next look." })).toBeVisible();
   const salonName = page.getByRole("heading", { level: 1, name: "Demo Salon – Bengaluru" });
   await expect(salonName).toBeVisible();
   await expect(salonName).toHaveText("Demo Salon – Bengaluru");
@@ -96,7 +96,8 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   await expect(photo.getByRole("link", { name: "Details" })).toHaveAttribute("href", "/privacy");
   await expect(photo.getByText("Your photo is used only for this preview.")).toBeVisible();
   const gallery = page.getByRole("region", { name: "Styles" });
-  await expect(gallery.getByRole("button", { name: "Women", exact: true })).toBeVisible();
+  await gallery.getByRole("button", { name: "Filters" }).click();
+  await expect(page.getByRole("button", { name: "Women", exact: true })).toBeVisible();
   await showEveryStyle(gallery);
   await expect(gallery.locator("img")).toHaveCount(25);
   await expect(gallery.getByRole("button", { name: "Soft Bob" })).toBeVisible();
@@ -109,7 +110,8 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   await expect(gallery.locator("img")).toHaveCount(29);
   await expect(gallery.getByRole("button", { name: "Mid Fade" })).toBeVisible();
   await page.screenshot({ path: "docs/screenshots/14-gallery-men.png", fullPage: true });
-  await gallery.getByRole("button", { name: "Women", exact: true }).click();
+  await page.getByRole("button", { name: "Women", exact: true }).click();
+  await page.getByRole("button", { name: "Close" }).click();
 
   await gallery.getByRole("button", { name: "Soft Bob" }).click();
   await expect(page.getByText("Add your photo first")).toBeVisible();
@@ -160,12 +162,16 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   await expect(page.getByRole("button", { name: "Take photo" })).toBeEnabled();
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect(gallery.getByRole("button", { name: "Kids Soft Bob" })).toHaveCount(0);
-  await gallery.getByRole("button", { name: "Kids", exact: true }).click();
+  await gallery.getByRole("button", { name: "Filters" }).click();
+  await page.getByRole("button", { name: "Kids", exact: true }).click();
+  await page.getByRole("button", { name: "Close" }).click();
   await expect(gallery.locator("img")).toHaveCount(8);
 
   await page.locator('input[data-photo="gallery"]').setInputFiles("public/samples/portrait.jpg");
   await waitForCapture(page);
-  await gallery.getByRole("button", { name: "Women", exact: true }).click();
+  await gallery.getByRole("button", { name: "Filters" }).click();
+  await page.getByRole("button", { name: "Women", exact: true }).click();
+  await page.getByRole("button", { name: "Close" }).click();
   await gallery.getByRole("button", { name: "Wolf Cut" }).click();
   await page.getByRole("button", { name: "Try this look" }).click();
   await expect(page.getByRole("heading", { name: "Wolf Cut" })).toBeVisible({ timeout: 45_000 });

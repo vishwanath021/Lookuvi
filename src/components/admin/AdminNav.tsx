@@ -49,9 +49,20 @@ export function AdminNav({
   const more = links.filter((link) => link.section === "more");
   return (
     <div className="print:hidden">
-      <button className="btn secondary mb-3 w-full md:hidden" type="button" data-ready={ready ? "yes" : "no"} aria-expanded={open} aria-controls="salon-nav" onClick={() => setOpen((value) => !value)}>
-        {open ? "Close menu" : "Menu"}
-      </button>
+      <div className="mb-3 flex items-center justify-between gap-3 md:hidden">
+        <p className="min-w-0 truncate font-serif text-lg leading-tight">{name}</p>
+        <button className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-line bg-white text-[#3e304b]" type="button" data-ready={ready ? "yes" : "no"} aria-expanded={open} aria-controls="salon-nav" aria-label={open ? "Close menu" : "Menu"} onClick={() => setOpen((value) => !value)}>
+          {open ? (
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+              <path d="M4 4l10 10M14 4L4 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+              <path d="M3 5h12M3 9h12M3 13h12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          )}
+        </button>
+      </div>
       <aside id="salon-nav" data-ready={ready ? "yes" : "no"} className={`${open ? "block" : "hidden"} nav-side h-fit rounded-[14px] p-4 md:block`}>
         <p className="text-sm uppercase tracking-[0.14em] text-[#d8cbe4]">{role}</p>
         <p className="font-serif text-2xl leading-tight">{name}</p>

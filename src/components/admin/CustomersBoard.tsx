@@ -239,6 +239,7 @@ function NotBackYet({
       <div>
         <h2 className="text-base font-semibold">Not back yet</h2>
         <p className="mt-1 text-sm" data-lapsed-summary="yes">{lapsed.summary}</p>
+        <p className="text-sm text-muted">Two come-back messages per visit: one around 6 weeks, one at 2 months. Then it stops until the next visit.</p>
       </div>
       {!ready ? (
         <p className="rounded-xl bg-[#f8efdc] px-3 py-2 text-sm" role="status">

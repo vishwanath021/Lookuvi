@@ -38,7 +38,9 @@ test("bridal is its own section and the hair styles stay in the gallery", async 
   await expect(page.getByRole("heading", { name: "Bridal", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Telugu Muhurtham Classic" })).toBeVisible();
   await page.getByRole("button", { name: "Everyday", exact: true }).click();
-  await gallery.getByRole("button", { name: "Women", exact: true }).click();
+  await page.getByRole("button", { name: "Filters" }).click();
+  await page.getByRole("button", { name: "Women", exact: true }).click();
+  await page.getByRole("button", { name: "Close" }).click();
   for (const look of ["Bridal Bun", "Braided Updo", "Side-Swept Curls", "Half-Up with Flowers", "South-Indian Bridal Braid"]) {
     await expect(gallery.getByRole("button", { name: look })).toHaveCount(0);
   }

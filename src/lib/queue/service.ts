@@ -179,8 +179,8 @@ export async function sweepAlerts(tenantId: string, send: Sender = notifyGuest) 
   const dayKey = kolkataDayKey();
   const { state, entries } = await loadDay(tenantId, dayKey);
   if (!state.isOpen || state.mode !== "LIVE") return { sent: 0 };
-  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, slug: true, productQueue: true } });
-  if (!tenant?.productQueue) return { sent: 0 };
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, slug: true, productQueue: true, whatsappAlmostOn: true } });
+  if (!tenant?.productQueue || !tenant.whatsappAlmostOn) return { sent: 0 };
   let sent = 0;
   for (const entry of entries) {
     if (entry.source !== "ONLINE" || entry.status !== "WAITING" || entry.alertSentAt || !entry.phone) continue;
@@ -525,6 +525,14 @@ export async function startEntry(tenantId: string, id: string) {
   return deskSnapshot(tenantId);
 }
 
+export async function returnToLine(tenantId: string, id: string) {
+  await requireDesk(tenantId);
+  const row = await prisma.queueEntry.findFirst({ where: { id, tenantId } });
+  if (!row || row.status !== "CALLED") throw new QueueError("STATE", "That guest is not waiting at the chair.", 409);
+  await prisma.queueEntry.update({ where: { id }, data: { status: "WAITING", unitSlot: null, calledAt: null } });
+  return deskSnapshot(tenantId);
+}
+
 export async function finishEntry(tenantId: string, id: string, status: "DONE" | "NO_SHOW", send: Sender = notifyGuest) {
   await requireDesk(tenantId);
   const row = await prisma.queueEntry.findFirst({ where: { id, tenantId } });
@@ -557,18 +565,20 @@ export async function addWalkIn(tenantId: string, input: { name?: string; phone?
   });
   if (phone) {
     await rememberCustomer({ tenantId, phone, name: (input.name || "").trim() });
-    const loaded = await loadDay(tenantId, dayKey);
-    const row = loaded.entries.find((entry) => entry.id === created.id);
-    const wait = timing(loaded.entries, created.id, loaded.state.avgMinutes, loaded.state.units);
-    await safeSend(send, {
-      ...joinedMessage({
-        salon: tenant.name,
-        token: created.token,
-        waitMin: row ? wait.waitMin : 0,
-        ...visitLinks(tenant.slug, created.cancelToken),
-      }),
-      to: phone,
-    });
+    if (tenant.whatsappWalkInJoined) {
+      const loaded = await loadDay(tenantId, dayKey);
+      const row = loaded.entries.find((entry) => entry.id === created.id);
+      const wait = timing(loaded.entries, created.id, loaded.state.avgMinutes, loaded.state.units);
+      await safeSend(send, {
+        ...joinedMessage({
+          salon: tenant.name,
+          token: created.token,
+          waitMin: row ? wait.waitMin : 0,
+          ...visitLinks(tenant.slug, created.cancelToken),
+        }),
+        to: phone,
+      });
+    }
   }
   await sweepAlerts(tenantId, send);
   return deskSnapshot(tenantId);
