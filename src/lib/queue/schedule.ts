@@ -84,6 +84,14 @@ export function formatSessions(sessions: Session[]) {
   return sessions.map((session) => `${formatClock(session.open)}–${formatClock(session.close)}`).join(", ");
 }
 
+export const SUGGESTED_OPEN = "10:00";
+export const SUGGESTED_CLOSE = "20:00";
+
+/** Shown before the owner saves hours. It is not stored and does not open or close the queue. */
+export function suggestedWeek(): WeekSchedule {
+  return weekFromPair(SUGGESTED_OPEN, SUGGESTED_CLOSE);
+}
+
 export function weekFromPair(open: string, close: string): WeekSchedule {
   const week = emptyWeek();
   for (const day of WEEKDAYS) week[day] = [{ open, close }];

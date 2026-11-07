@@ -4,6 +4,9 @@ import { useState } from "react";
 import { WeekHoursEditor } from "@/components/admin/WeekHoursEditor";
 import { LOCALES, LOCALE_LABELS, type Locale } from "@/data/i18n";
 
+export const ONBOARDING_STEPS = ["Brand", "Services", "WhatsApp", "Languages", "Hours", "Done"] as const;
+export const ONBOARDING_SAVED = "Saved ✓";
+
 export function OnboardingWizard({
   initial,
   hairstyleOnly = true,
@@ -31,7 +34,7 @@ export function OnboardingWizard({
   const [closeTime, setCloseTime] = useState(initial.closeTime ?? "");
   const [weeklyHours, setWeeklyHours] = useState(initial.weeklyHours ?? "");
   const [message, setMessage] = useState("");
-  const steps = ["Brand", "Services", "WhatsApp", "Languages", "Hours", "Done"];
+  const steps = ONBOARDING_STEPS;
 
   async function save(done = false) {
     const res = await fetch("/api/v1/admin/settings", {
@@ -41,7 +44,7 @@ export function OnboardingWizard({
     });
     const data = await res.json();
     if (!res.ok) setMessage(data.message || "Could not save");
-    else setMessage(done ? "Salon page is ready." : "Saved");
+    else setMessage(done ? "Salon page is ready." : ONBOARDING_SAVED);
   }
 
   return (
@@ -94,12 +97,12 @@ export function OnboardingWizard({
         </div>
       )}
       {step === 5 && <p className="mt-3 text-sm">Open the try-on, print the QR, and paste the embed if your plan includes it. {hairstyleOnly ? "The try-on is hairstyle for now." : "Colour, style, brows, beard, and nails start on. Turn a tool off in Settings."} Booking stays on WhatsApp unless you require a phone login.</p>}
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {step > 0 && <button className="btn secondary" type="button" onClick={() => setStep((value) => value - 1)}>Back</button>}
         {step < 5 && <button className="btn" type="button" onClick={() => { void save(false); setStep((value) => value + 1); }}>Next</button>}
         {step === 5 && <button className="btn" type="button" onClick={() => void save(true)}>Finish</button>}
+        {message ? <p className="text-sm" role="status" data-onboarding-status="yes">{message}</p> : null}
       </div>
-      {message && <p className="mt-3 text-sm" role="status">{message}</p>}
     </div>
   );
 }
