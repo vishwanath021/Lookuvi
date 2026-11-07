@@ -9,6 +9,9 @@ import {
   emptyWeek,
   isUniform,
   serializeWeek,
+  suggestedWeek,
+  SUGGESTED_CLOSE,
+  SUGGESTED_OPEN,
   pairFromWeek,
   type Session,
   type Weekday,
@@ -26,10 +29,11 @@ export function WeekHoursEditor({
   weeklyHours: string;
   onChange: (next: { openTime: string; closeTime: string; weeklyHours: string }) => void;
 }) {
-  const week = loadWeek(weeklyHours, openTime, closeTime);
-  const saved = (weeklyHours || "").trim().length > 0;
-  const [sameOpen, setSameOpen] = useState(openTime);
-  const [sameClose, setSameClose] = useState(closeTime);
+  const stored = loadWeek(weeklyHours, openTime, closeTime);
+  const unsaved = stored.kind === "fallback";
+  const week = unsaved ? suggestedWeek() : stored.week;
+  const [sameOpen, setSameOpen] = useState(unsaved ? SUGGESTED_OPEN : openTime);
+  const [sameClose, setSameClose] = useState(unsaved ? SUGGESTED_CLOSE : closeTime);
   const [sameOpen2, setSameOpen2] = useState("");
   const [sameClose2, setSameClose2] = useState("");
   const [error, setError] = useState("");
@@ -54,7 +58,7 @@ export function WeekHoursEditor({
       onChange({ openTime: "", closeTime: "", weeklyHours: "" });
       return;
     }
-    if (!force && saved && !isUniform(week)) return;
+    if (!force && !unsaved && !isUniform(week)) return;
     setError("");
     const next = emptyWeek();
     for (const day of DAY_LABELS) next[day.id] = compiled.sessions.map((session) => ({ ...session }));
@@ -105,8 +109,8 @@ export function WeekHoursEditor({
           className="btn secondary min-h-11 w-fit"
           type="button"
           onClick={() => {
-            setSameOpen("");
-            setSameClose("");
+            setSameOpen(SUGGESTED_OPEN);
+            setSameClose(SUGGESTED_CLOSE);
             setSameOpen2("");
             setSameClose2("");
             setError("");
@@ -116,7 +120,7 @@ export function WeekHoursEditor({
           Clear hours
         </button>
       </div>
-      {!saved ? <p className="text-xs text-muted">No weekly hours saved yet. The live queue still follows the desk switch.</p> : null}
+      {unsaved ? <p className="text-sm font-medium" data-hours-suggested="yes">Suggested — not saved yet. Every day {SUGGESTED_OPEN}–{SUGGESTED_CLOSE}. The live queue still uses the desk switch until you save.</p> : null}
       <div className="grid gap-3">
         {DAY_LABELS.map((day) => (
           <DayRow key={day.id} name={day.name} day={day.id} sessions={week[day.id]} onCommit={pushWeek} week={week} />
@@ -127,9 +131,8 @@ export function WeekHoursEditor({
   );
 }
 
-function loadWeek(weeklyHours: string, openTime: string, closeTime: string): WeekSchedule {
-  const resolved = effectiveWeek({ weeklyHours, openTime, closeTime });
-  return resolved.kind === "week" ? resolved.week : emptyWeek();
+function loadWeek(weeklyHours: string, openTime: string, closeTime: string) {
+  return effectiveWeek({ weeklyHours, openTime, closeTime });
 }
 
 function DayRow({
@@ -193,12 +196,12 @@ function DayRow({
                 onCommit({ ...week, [day]: [] });
                 return;
               }
-              setOpen("09:00");
-              setClose("18:00");
+              setOpen(SUGGESTED_OPEN);
+              setClose(SUGGESTED_CLOSE);
               setOpen2("");
               setClose2("");
               setError("");
-              onCommit({ ...week, [day]: [{ open: "09:00", close: "18:00" }] });
+              onCommit({ ...week, [day]: [{ open: SUGGESTED_OPEN, close: SUGGESTED_CLOSE }] });
             }}
           />
           Closed
