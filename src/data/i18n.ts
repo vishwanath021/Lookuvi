@@ -1199,6 +1199,18 @@ export function isLocale(value: string): value is Locale {
   return (LOCALES as readonly string[]).includes(value);
 }
 
+/**
+ * Language for the guest try-on. English is the page language when the salon
+ * still offers English, so a partial translation cannot label three chips in
+ * another language while the rest of the page stays English.
+ */
+export function guestPageLocale(defaultLang: string | null | undefined, languages?: string[] | null) {
+  const enabled = (languages ?? []).filter(isLocale);
+  if (enabled.includes("en") || !enabled.length) return "en" as const;
+  if (defaultLang && isLocale(defaultLang) && enabled.includes(defaultLang)) return defaultLang;
+  return enabled[0];
+}
+
 export function t(locale: string, key: string, vars?: Record<string, string | number>) {
   const lang = isLocale(locale) ? locale : "en";
   let text = MESSAGES[lang][key] ?? MESSAGES.en[key] ?? key;

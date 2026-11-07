@@ -1,5 +1,30 @@
 const RESERVED = new Set(["by-host", "admin", "api", "embed", "login", "privacy", "terms", "super", "www", "app", "s"]);
 
+/** Paths that stay on this host instead of being rewritten to /s/{salon}/... */
+const SHARED_PREFIXES = [
+  "/api",
+  "/_next",
+  "/admin",
+  "/super",
+  "/login",
+  "/privacy",
+  "/terms",
+  "/grievance",
+  "/refund",
+  "/ai-disclosure",
+  "/copyright",
+  "/embed",
+  "/mediapipe",
+  "/brand",
+  "/samples",
+];
+
+export function isSharedPath(pathname: string) {
+  if (SHARED_PREFIXES.some((path) => pathname === path || pathname.startsWith(`${path}/`))) return true;
+  if (pathname === "/manifest.webmanifest") return true;
+  return /\.(?:webp|png|jpe?g|gif|svg|avif|ico|json|txt|wasm|js|css|webmanifest)$/i.test(pathname);
+}
+
 export type HostParse =
   | { kind: "platform"; host: string }
   | { kind: "subdomain"; host: string; slug: string }
