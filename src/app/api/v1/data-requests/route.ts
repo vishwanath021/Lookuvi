@@ -1,6 +1,9 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { possessesWithdrawSession } from "@/lib/data-request";
 import { tooMany } from "@/lib/http/guard";
+import { readGuestToken } from "@/lib/preview-access";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
@@ -8,6 +11,7 @@ const bodySchema = z.object({
   kind: z.enum(["withdraw", "delete", "access", "correct", "grievance"]),
   contact: z.string().min(3).max(120),
   sessionId: z.string().max(80).optional().nullable(),
+  ref: z.string().max(80).optional().nullable(),
 });
 
 export async function POST(req: Request) {
@@ -19,9 +23,18 @@ export async function POST(req: Request) {
   if (!tenant) return NextResponse.json({ error: "TENANT" }, { status: 404 });
   let withdrew = false;
   if (parsed.data.kind === "withdraw" && parsed.data.sessionId) {
-    const consent = await prisma.consentLog.findFirst({
-      where: { tenantId: tenant.id, sessionId: parsed.data.sessionId, accepted: true },
+    const guest = readGuestToken((await cookies()).get("helix_guest")?.value);
+    const allowed = await possessesWithdrawSession({
+      tenantId: tenant.id,
+      sessionId: parsed.data.sessionId,
+      guest,
+      ref: parsed.data.ref,
     });
+    const consent = allowed
+      ? await prisma.consentLog.findFirst({
+        where: { tenantId: tenant.id, sessionId: parsed.data.sessionId, accepted: true },
+      })
+      : null;
     if (consent) {
       await prisma.lead.deleteMany({ where: { tenantId: tenant.id, sessionId: parsed.data.sessionId } });
       withdrew = true;

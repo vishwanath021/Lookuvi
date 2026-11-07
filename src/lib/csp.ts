@@ -19,9 +19,11 @@
  *
  * `style-src` keeps `unsafe-inline` because React style attributes are not covered
  * by a style-element nonce.
+ *
+ * Embed pages use the same script policy. Only `frame-ancestors` is relaxed so a
+ * salon site can frame the try-on.
  */
 export function contentSecurityPolicy(nonce: string, opts: { dev: boolean; embed: boolean }) {
-  if (opts.embed) return "frame-ancestors *";
   const script = opts.dev
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:"
     : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval' blob:`;
@@ -34,7 +36,7 @@ export function contentSecurityPolicy(nonce: string, opts: { dev: boolean; embed
     "media-src 'self' blob:",
     "connect-src 'self' blob:",
     "worker-src 'self' blob:",
-    "frame-ancestors 'self'",
+    opts.embed ? "frame-ancestors *" : "frame-ancestors 'self'",
     "base-uri 'self'",
     "form-action 'self'",
     "object-src 'none'",

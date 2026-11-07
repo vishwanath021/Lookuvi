@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { CREDIT_PACKS, planById, TRIAL_DAYS } from "@/data/plans";
 import { allocateReceiptNumber } from "@/lib/billing/receipt-number";
 import { dailyCapAfterPlanChange } from "@/lib/billing/plan-assign";
@@ -79,26 +80,71 @@ export async function activatePlan(input: {
   return { plan: plan.id, credits: plan.credits, invoiceNumber: invoice.number, totalInr: invoice.totalInr };
 }
 
+function uniqueConflict(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+/** A repeated provider payment id returns the first grant and does not add credits again. */
 export async function addCreditPack(tenantId: string, packId: string, provider: string, externalId?: string) {
   const pack = CREDIT_PACKS.find((item) => item.id === packId);
   if (!pack) throw new Error("UNKNOWN_PACK");
-  await grantCredits(tenantId, pack.credits, "PACK", externalId || pack.id);
+  const paymentId = (externalId || "").trim();
   const money = withGst(pack.priceExGst);
-  const tax = gstEnabled();
-  const invoice = await prisma.invoice.create({
-    data: {
-      tenantId,
-      number: await nextInvoiceNumber(),
-      amountExGst: pack.priceExGst,
-      gstInr: money.gstInr,
-      totalInr: money.totalInr,
-      description: `${pack.credits} try-ons via ${provider}`,
-      status: "PAID",
-      upiRef: externalId || "",
-      documentKind: tax ? "TAX_INVOICE" : "RECEIPT",
-    },
-  });
-  return { credits: pack.credits, invoiceNumber: invoice.number, totalInr: invoice.totalInr };
+  const replay = async () => {
+    if (!paymentId) return null;
+    const prior = await prisma.creditPackGrant.findUnique({ where: { externalId: paymentId } });
+    if (!prior) return null;
+    return { credits: pack.credits, invoiceNumber: prior.invoiceNumber, totalInr: money.totalInr, alreadyApplied: true as const };
+  };
+  const existing = await replay();
+  if (existing) return existing;
+  try {
+    return await prisma.$transaction(async (tx) => {
+      if (paymentId) {
+        await tx.creditPackGrant.create({
+          data: { externalId: paymentId, tenantId, packId, provider },
+        });
+      }
+      const tenant = await tx.tenant.update({
+        where: { id: tenantId },
+        data: { creditBalance: { increment: pack.credits } },
+      });
+      await tx.creditLedger.create({
+        data: {
+          tenantId,
+          delta: pack.credits,
+          reason: "PACK",
+          refId: paymentId || pack.id,
+          balanceAfter: tenant.creditBalance,
+        },
+      });
+      const tax = gstEnabled();
+      const invoice = await tx.invoice.create({
+        data: {
+          tenantId,
+          number: await allocateReceiptNumber(tx),
+          amountExGst: pack.priceExGst,
+          gstInr: money.gstInr,
+          totalInr: money.totalInr,
+          description: `${pack.credits} try-ons via ${provider}`,
+          status: "PAID",
+          upiRef: paymentId,
+          documentKind: tax ? "TAX_INVOICE" : "RECEIPT",
+        },
+      });
+      if (paymentId) {
+        await tx.creditPackGrant.update({
+          where: { externalId: paymentId },
+          data: { invoiceNumber: invoice.number },
+        });
+      }
+      return { credits: pack.credits, invoiceNumber: invoice.number, totalInr: invoice.totalInr, alreadyApplied: false as const };
+    });
+  } catch (error) {
+    const prior = await replay();
+    if (prior && uniqueConflict(error)) return prior;
+    throw error;
+  }
 }
 
 export function trialEndFromNow() {

@@ -34,6 +34,7 @@ COPY --from=proddeps /app/node_modules ./node_modules
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x docker-entrypoint.sh \
   && mkdir -p /app/var/objects /app/var/benchmarks \
+  && chmod 0750 /app/var/objects /app/var/benchmarks \
   && chown -R nextjs:nodejs /app
 USER nextjs
 EXPOSE 3000

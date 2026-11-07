@@ -16,7 +16,8 @@ import {
   returnToLine,
   startEntry,
 } from "@/lib/queue/service";
-import { requireMembership } from "@/lib/session";
+import { queueActionNeedsOwner } from "@/lib/desk-role";
+import { requireMembership, requireOwner } from "@/lib/session";
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("open") }),
@@ -83,6 +84,10 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "INVALID", message: "That update was not understood." }, { status: 400 });
   const body = parsed.data;
   try {
+    if (queueActionNeedsOwner(body.action)) {
+      const owner = await requireOwner();
+      if ("error" in owner && owner.error) return owner.error;
+    }
     if (body.action === "open") return NextResponse.json(await setQueueOpen(tenant.id, true));
     if (body.action === "pause") return NextResponse.json(await setQueueOpen(tenant.id, false));
     if (body.action === "close-today") return NextResponse.json(await setClosedToday(tenant.id, true));

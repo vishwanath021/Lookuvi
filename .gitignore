@@ -3,8 +3,9 @@ node_modules
 out
 dist
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.production.example
 ai-samples/
 ai-smoke/
 *.db

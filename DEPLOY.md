@@ -149,26 +149,50 @@ Retention of preview files runs in two places:
 
 A DigitalOcean scheduled job can call the same URL if you prefer that to the sidecar.
 
-Backups:
+Backups land on the droplet, not in the app bucket:
 
 ```bash
-# daily at 00:30 IST, installed on the droplet
+# daily at 00:30 IST, installed on the droplet as root
 crontab /opt/lookuvi/deploy/backup.cron
 # or once, by hand
 cd /opt/lookuvi && ./scripts/backup-postgres.sh
 ```
 
-That runs `pg_dump` in the Postgres container and uploads `backups/lookuvi-<timestamp>.dump` to the same R2 bucket.
+`scripts/backup-postgres.sh` runs `docker compose --env-file .env.production -f docker-compose.prod.yml`. It does not shell-source `.env.production`. `pg_dump` runs in the Postgres container and the custom-format file is written to `/opt/lookuvi/backups/lookuvi-<timestamp>.dump` (mode 0640). Files older than 14 days are deleted. The directory is mode 0750.
 
-Restore (stop the app first so nothing writes during the restore):
+These copies sit on the same machine as the database volume. Copy `/opt/lookuvi/backups` off the droplet as well if a lost disk should still be recoverable.
+
+Restore drill (does not replace the live database):
 
 ```bash
-docker compose -f docker-compose.prod.yml stop app
-./scripts/restore-postgres.sh backups/lookuvi-YYYYMMDDTHHMMSSZ.dump
-docker compose -f docker-compose.prod.yml start app
+cd /opt/lookuvi
+./scripts/verify-pg-restore.sh /opt/lookuvi/backups/lookuvi-YYYYMMDDTHHMMSSZ.dump
+```
+
+That restores the file into a database named `lookuvi_restore` inside the Postgres container, checks the public table count matches production, and drops `lookuvi_restore`.
+
+Restore onto the live database (stop the app first so nothing writes during the restore):
+
+```bash
+cd /opt/lookuvi
+docker compose --env-file .env.production -f docker-compose.prod.yml stop app
+./scripts/restore-postgres.sh /opt/lookuvi/backups/lookuvi-YYYYMMDDTHHMMSSZ.dump
+docker compose --env-file .env.production -f docker-compose.prod.yml start app
 ```
 
 `pg_restore --clean` drops objects that are in the dump. Take a fresh dump before you try a restore.
+
+Private files already on disk stay world-readable until you run this once:
+
+```bash
+cd /opt/lookuvi && ./scripts/chmod-objects.sh
+# or, when var/objects is inside the app container:
+docker compose --env-file .env.production -f docker-compose.prod.yml exec app ./scripts/chmod-objects.sh
+```
+
+New uploads are written mode 0640, and their directories mode 0750.
+
+`TRUST_CF_HEADER` stays unset behind Caddy. Set it to `true` only when Cloudflare is the proxy and overwrites `cf-connecting-ip`.
 
 Also turn on the host’s disk snapshots or Postgres point-in-time recovery if the database is not the Docker volume (a managed database is better once you have more than a trial).
 
@@ -204,7 +228,7 @@ Production script policy is a per-request nonce plus `strict-dynamic` and `wasm-
 
 `style-src` keeps `'unsafe-inline'` because React style attributes are not covered by a style nonce.
 
-`/embed` only sets `frame-ancestors *` so a salon site can frame the try-on.
+`/embed` uses the same script policy as the rest of the app. Only `frame-ancestors` is `*` so a salon site can frame the try-on.
 
 ## 13. Roll back
 
