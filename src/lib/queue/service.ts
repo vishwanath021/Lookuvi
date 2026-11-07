@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { sharedRateLimit } from "@/lib/ratelimit";
 import { notifyGuest, type NotifyMessage, type NotifyResult } from "@/lib/notify";
 import { kolkataDayKey } from "@/lib/queue/day";
-import { liveJoinWindow, requestWindow } from "@/lib/queue/hours";
+import { effectiveWeek, hoursView, nextBoundary, slotProblem, type HoursTenant } from "@/lib/queue/schedule";
 import { peopleAhead, serviceMinutes, waitMinutes, type WaitRow } from "@/lib/queue/estimate";
 import { attributeReturn, recordVisit, rememberCustomer } from "@/lib/customers/service";
 import { bindTicket, linkSessionToEntry, tryLineForEntry } from "@/lib/at-salon";
@@ -224,22 +224,23 @@ export async function publicBoard(slug: string) {
   });
   const live = state.mode === "LIVE";
   const wait = live ? timing(entries, null, state.avgMinutes, state.units) : { ahead: 0, waitMin: 0 };
-  const hours = requestWindow(tenant.openTime, tenant.closeTime);
-  const liveHours = state.mode === "LIVE" ? liveJoinWindow(tenant.openTime, tenant.closeTime) : { closed: false, message: "" };
+  const view = hoursView(tenant, state.isOpen);
   return {
     name: tenant.name,
     slug: tenant.slug,
-    open: state.isOpen,
+    open: live ? view.accepting : state.isOpen,
     mode: state.mode,
-    hoursClosed: liveHours.closed,
-    hoursMessage: liveHours.message,
+    hoursClosed: live && !view.accepting,
+    hoursMessage: live && !view.accepting ? view.hoursMessage : "",
+    todayHours: view.todayHours,
+    nextOpen: live && !view.accepting ? view.nextOpen : "",
     unitLabel: state.unitLabel,
     waitMin: wait.waitMin,
     ahead: wait.ahead,
     tryOn: tenant.productTryOn,
     lang: tenant.defaultLang,
-    hoursOpen: hours.open,
-    hoursClose: hours.close,
+    hoursOpen: view.hoursOpen,
+    hoursClose: view.hoursClose,
     services: services.map((service) => ({ id: service.id, name: service.name, minutes: serviceMinutes(service.durationMin, state.avgMinutes) })),
   };
 }
@@ -251,13 +252,12 @@ async function findService(tenantId: string, serviceId: string | undefined) {
   return service;
 }
 
-function checkSlot(date: string, slot: string, window: { open: string; close: string }) {
+function checkSlot(date: string, slot: string, source: HoursTenant) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new QueueError("INVALID", "Choose a date.", 400);
   if (!/^\d{2}:\d{2}$/.test(slot)) throw new QueueError("INVALID", "Choose a time.", 400);
   if (date < kolkataDayKey()) throw new QueueError("INVALID", "Choose today or a later date.", 400);
-  if (slot < window.open || slot > window.close) {
-    throw new QueueError("INVALID", `Choose a time between ${window.open} and ${window.close}.`, 400);
-  }
+  const problem = slotProblem(source, date, slot);
+  if (problem) throw new QueueError("INVALID", problem, 400);
 }
 
 export async function joinQueue(input: {
@@ -286,14 +286,14 @@ export async function joinQueue(input: {
   const state = await ensureQueueState(tenant.id);
   const requestedDate = (input.requestedDate || "").trim();
   const requestedSlot = (input.requestedSlot || "").trim();
-  if (state.mode === "REQUEST") checkSlot(requestedDate, requestedSlot, requestWindow(tenant.openTime, tenant.closeTime));
-  else {
-    const hours = liveJoinWindow(tenant.openTime, tenant.closeTime, input.now);
-    if (hours.closed) throw new QueueError("CLOSED", hours.message, 403);
-    if (!state.isOpen) throw new QueueError("CLOSED", "The queue is paused. Please ask at the desk.", 403);
+  if (state.mode === "REQUEST") {
+    if (requestedDate && requestedDate === kolkataDayKey(input.now) && tenant.closedDayKey === requestedDate) {
+      throw new QueueError("CLOSED", "This salon is closed today.", 403);
+    }
+    checkSlot(requestedDate, requestedSlot, tenant);
   }
 
-  const dayKey = state.mode === "REQUEST" ? requestedDate : kolkataDayKey();
+  const dayKey = state.mode === "REQUEST" ? requestedDate : kolkataDayKey(input.now);
   const active = state.mode === "REQUEST" ? REQUEST_ACTIVE : LIVE_ACTIVE;
   const sessionId = (input.sessionId || "").trim().slice(0, 80);
   const device = deviceKey(input.deviceId);
@@ -312,6 +312,11 @@ export async function joinQueue(input: {
     if (sessionId.length >= 8) await linkSessionToEntry(existing.id, sessionId, device);
     if (input.returnToken) await attributeReturn({ tenantId: tenant.id, phone, linkToken: input.returnToken });
     return ticket(tenant.slug, existing as EntryRow, state.mode, wait.waitMin, wait.ahead, false);
+  }
+
+  if (state.mode !== "REQUEST") {
+    const view = hoursView(tenant, state.isOpen, input.now);
+    if (!view.accepting) throw new QueueError("CLOSED", view.hoursMessage || "The queue is paused. Please ask at the desk.", 403);
   }
 
   const ipLimit = await sharedRateLimit(`queue:ip:${input.ip}`, QUEUE_IP_JOINS_PER_HOUR, HOUR_MS);
@@ -432,11 +437,12 @@ async function deskCard(tenantName: string, slug: string, row: EntryRow, avgMinu
   };
 }
 
-export async function deskSnapshot(tenantId: string) {
+export async function deskSnapshot(tenantId: string, now = new Date()) {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant?.productQueue) throw new QueueError("PRODUCT", "The queue is not available for this salon.", 404);
-  const dayKey = kolkataDayKey();
+  const dayKey = kolkataDayKey(now);
   const { state, entries } = await loadDay(tenantId, dayKey);
+  const view = hoursView(tenant, state.isOpen, now);
   const requests = state.mode === "REQUEST"
     ? await prisma.queueEntry.findMany({
       where: { tenantId, status: { in: ["REQUESTED", "CONFIRMED"] }, requestedDate: { gte: dayKey } },
@@ -464,7 +470,12 @@ export async function deskSnapshot(tenantId: string) {
   return {
     salon: tenant.name,
     state: {
-      isOpen: state.isOpen,
+      isOpen: view.accepting,
+      scheduled: view.scheduled,
+      hoursLabel: view.label,
+      closedToday: view.closedToday,
+      todayHours: view.todayHours,
+      nextOpen: view.nextOpen,
       units: state.units,
       unitLabel: state.unitLabel,
       avgMinutes: state.avgMinutes,
@@ -584,12 +595,31 @@ export async function addWalkIn(tenantId: string, input: { name?: string; phone?
   return deskSnapshot(tenantId);
 }
 
-export async function setQueueOpen(tenantId: string, isOpen: boolean) {
-  await requireDesk(tenantId);
+export async function setQueueOpen(tenantId: string, isOpen: boolean, now = new Date()) {
+  const tenant = await requireDesk(tenantId);
   await ensureQueueState(tenantId);
+  const week = effectiveWeek(tenant);
+  if (week.kind === "fallback") {
+    await prisma.tenant.update({ where: { id: tenantId }, data: { hoursOverride: "", hoursOverrideUntil: null } });
+  } else {
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { hoursOverride: isOpen ? "open" : "closed", hoursOverrideUntil: nextBoundary(week.week, now) },
+    });
+  }
   await prisma.queueState.update({ where: { tenantId }, data: { isOpen } });
   if (isOpen) await sweepAlerts(tenantId);
-  return deskSnapshot(tenantId);
+  return deskSnapshot(tenantId, now);
+}
+
+export async function setClosedToday(tenantId: string, closed: boolean, now = new Date()) {
+  await requireDesk(tenantId);
+  await ensureQueueState(tenantId);
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: { closedDayKey: closed ? kolkataDayKey(now) : "" },
+  });
+  return deskSnapshot(tenantId, now);
 }
 
 export async function saveQueueSettings(tenantId: string, input: {
@@ -620,7 +650,7 @@ export async function confirmRequest(tenantId: string, id: string, input: { date
   if (!row || row.status !== "REQUESTED") throw new QueueError("STATE", "That request is not waiting.", 409);
   const date = (input.date || row.requestedDate).trim();
   const slot = (input.slot || row.requestedSlot).trim();
-  checkSlot(date, slot, requestWindow(tenant.openTime, tenant.closeTime));
+  checkSlot(date, slot, tenant);
   await prisma.queueEntry.update({
     where: { id },
     data: { status: "CONFIRMED", requestedDate: date, requestedSlot: slot },

@@ -34,6 +34,9 @@ type Desk = {
     avgMinutes: number;
     alertLeadMin: number;
     mode: string;
+    scheduled?: boolean;
+    hoursLabel?: string;
+    closedToday?: boolean;
   };
   services: { id: string; name: string }[];
   serving: { unit: number; entry: Card | null }[];
@@ -82,6 +85,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
     : callReason;
   const lineWait = desk.waiting.length ? desk.waiting[desk.waiting.length - 1].waitMin : 0;
   const summary = `${desk.waiting.length} waiting · ~${lineWait} min`;
+  const hoursLabel = desk.state.hoursLabel || (desk.state.isOpen ? "Open" : "Closed");
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1024px)");
@@ -147,12 +151,15 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
           role="switch"
           aria-checked={desk.state.isOpen}
           aria-label={desk.state.isOpen ? "Queue is open" : "Queue is closed"}
-          disabled={busy}
+          disabled={busy || desk.state.closedToday}
           onClick={askClose}
         >
           <span className={`absolute top-1 h-9 w-9 rounded-full bg-white shadow ${desk.state.isOpen ? "left-6" : "left-1"}`} />
         </button>
-        <span className="text-sm font-medium">{desk.state.isOpen ? "Open" : "Closed"}</span>
+        <span className="text-sm font-medium" data-hours-label={hoursLabel}>{hoursLabel}</span>
+        <button className="btn secondary min-h-11" type="button" data-closed-today={desk.state.closedToday ? "yes" : "no"} disabled={busy} onClick={() => void act({ action: desk.state.closedToday ? "open-today" : "close-today" })}>
+          {desk.state.closedToday ? "Undo closed today" : "Closed today"}
+        </button>
         <p className={`text-sm text-muted ${wide ? "" : "w-full"}`} data-queue-summary="yes">{live ? summary : t(lang, "queueRequestMode")}</p>
         {live && wide ? (
           <div className="ml-auto">
@@ -163,7 +170,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
         ) : null}
       </header>
       {typeof monthTries === "number" ? <p className="mt-1 text-xs text-muted">{monthTries.toLocaleString("en-IN")} try-ons this month</p> : null}
-      {!desk.state.isOpen ? <p className="mt-2 text-sm text-muted">{t(lang, "queuePausedNote")}</p> : null}
+      {!desk.state.isOpen && !desk.state.scheduled && !desk.state.closedToday ? <p className="mt-2 text-sm text-muted">{t(lang, "queuePausedNote")}</p> : null}
       {notice ? <p className="mt-3 text-sm" role="status">{notice}</p> : null}
 
       {live ? (
@@ -361,7 +368,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
       {confirmClose ? (
         <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-4 sm:place-items-center" role="dialog" aria-label="Close the queue">
           <div className="card w-full max-w-sm p-4">
-            <p className="text-base">Close the queue? Guests cannot join until you open it again.</p>
+            <p className="text-base">{desk.state.scheduled ? "Close early? New guests cannot join until the next session time, or until you open again. People already waiting stay in line." : "Close the queue? Guests cannot join until you open it again."}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               <button className="btn min-h-11" type="button" onClick={() => { setConfirmClose(false); void act({ action: "pause" }); }}>Close queue</button>
               <button className="btn secondary min-h-11" type="button" onClick={() => setConfirmClose(false)}>Keep open</button>

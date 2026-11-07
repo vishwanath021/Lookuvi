@@ -22,6 +22,8 @@ type Board = {
   hoursClose?: string;
   hoursClosed?: boolean;
   hoursMessage?: string;
+  todayHours?: string;
+  nextOpen?: string;
   services: { id: string; name: string; minutes: number }[];
 };
 
@@ -113,6 +115,8 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
           <QueueWait serverWait={board.waitMin} ahead={board.ahead} lang={lang} phrase="join" />
         ) : <p className="mt-2 text-sm">{t(lang, "queueClosed")}</p>}
       </div>
+      {board.todayHours ? <p className="mt-2 text-sm" data-today-hours={board.todayHours}>{t(lang, "queueTodayLine", { hours: board.todayHours })}</p> : null}
+      {board.nextOpen ? <p className="text-sm" data-next-open={board.nextOpen}>{t(lang, "queueOpensAt", { when: board.nextOpen })}</p> : null}
       <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted">{board.open ? t(lang, "queueOpenNow") : t(lang, "queueClosedNow")}</p>
       {visits.length ? (
         <div className="card mt-4 grid gap-3 p-4" data-queue-visits={visits.length}>

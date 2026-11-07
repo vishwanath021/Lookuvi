@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Sheet } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toaster";
+import { WeekHoursEditor } from "@/components/admin/WeekHoursEditor";
 import { formatIst } from "@/lib/display";
 
 function applySalonPatch(row: SalonRecord, body: Record<string, unknown>): SalonRecord {
@@ -22,12 +23,34 @@ function applySalonPatch(row: SalonRecord, body: Record<string, unknown>): Salon
     ...(typeof body.productMakeupStudio === "boolean" ? { productMakeupStudio: body.productMakeupStudio } : {}),
     ...(typeof body.openTime === "string" ? { openTime: body.openTime } : {}),
     ...(typeof body.closeTime === "string" ? { closeTime: body.closeTime } : {}),
+    ...(typeof body.weeklyHours === "string" ? { weeklyHours: body.weeklyHours } : {}),
   };
 }
 
 function when(value: string | null) {
   if (!value) return "—";
   return formatIst(value, false);
+}
+
+function SalonHoursForm({
+  salon,
+  busy,
+  onSave,
+}: {
+  salon: SalonRecord;
+  busy: boolean;
+  onSave: (hours: { openTime: string; closeTime: string; weeklyHours: string }) => void;
+}) {
+  const [hours, setHours] = useState({ openTime: salon.openTime, closeTime: salon.closeTime, weeklyHours: salon.weeklyHours || "" });
+  useEffect(() => {
+    setHours({ openTime: salon.openTime, closeTime: salon.closeTime, weeklyHours: salon.weeklyHours || "" });
+  }, [salon.id, salon.openTime, salon.closeTime, salon.weeklyHours]);
+  return (
+    <form className="mt-4 grid gap-3" onSubmit={(event) => { event.preventDefault(); onSave(hours); }}>
+      <WeekHoursEditor openTime={hours.openTime} closeTime={hours.closeTime} weeklyHours={hours.weeklyHours} onChange={setHours} />
+      <button className="btn secondary w-fit" type="submit" disabled={busy}>{busy ? "Saving…" : "Save hours"}</button>
+    </form>
+  );
 }
 
 function slugFromName(value: string) {
@@ -321,32 +344,7 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
                 </label>
                 <button className="btn w-fit" type="submit" disabled={busy}>{busy ? "Saving…" : "Save name"}</button>
               </form>
-              <form
-                className="mt-4 grid gap-3"
-                key={`${selected.id}-hours`}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const data = new FormData(event.currentTarget);
-                  void update(selected.id, {
-                    openTime: String(data.get("openTime") || ""),
-                    closeTime: String(data.get("closeTime") || ""),
-                  });
-                }}
-              >
-                <fieldset className="grid gap-2 text-sm">
-                  <legend className="font-medium">Request hours (India time)</legend>
-                  <p className="text-xs text-muted">Leave both empty for 06:00–22:00. This does not open or pause the live queue.</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label>Opens
-                      <input className="field mt-1" type="time" name="openTime" aria-label={`Opens for ${selected.slug}`} defaultValue={selected.openTime} />
-                    </label>
-                    <label>Closes
-                      <input className="field mt-1" type="time" name="closeTime" aria-label={`Closes for ${selected.slug}`} defaultValue={selected.closeTime} />
-                    </label>
-                  </div>
-                </fieldset>
-                <button className="btn secondary w-fit" type="submit" disabled={busy}>{busy ? "Saving…" : "Save hours"}</button>
-              </form>
+              <SalonHoursForm key={`${selected.id}-hours`} salon={selected} busy={busy} onSave={(hours) => void update(selected.id, hours)} />
               <dl className="mt-4 grid gap-2 text-sm">
                 <div><dt className="text-muted">Link</dt><dd><a className="underline" href={`/s/${selected.slug}`}>{selected.slug}</a></dd></div>
                 <div><dt className="text-muted">Owner</dt><dd>{selected.ownerName || "—"}{selected.ownerEmail ? ` · ${selected.ownerEmail}` : ""}</dd></div>

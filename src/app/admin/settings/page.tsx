@@ -66,6 +66,7 @@ export default async function SettingsPage() {
           logoUrl: tenant.logoUrl,
           openTime: tenant.openTime,
           closeTime: tenant.closeTime,
+          weeklyHours: tenant.weeklyHours,
         }}
       />
     </main>

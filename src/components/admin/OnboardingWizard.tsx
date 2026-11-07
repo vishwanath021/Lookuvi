@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { WeekHoursEditor } from "@/components/admin/WeekHoursEditor";
 import { LOCALES, LOCALE_LABELS, type Locale } from "@/data/i18n";
 
 export function OnboardingWizard({
@@ -15,6 +16,9 @@ export function OnboardingWizard({
     address: string;
     languages: string[];
     services: { key: string; name: string; priceInr: number }[];
+    openTime?: string;
+    closeTime?: string;
+    weeklyHours?: string;
   };
 }) {
   const [step, setStep] = useState(0);
@@ -23,14 +27,17 @@ export function OnboardingWizard({
   const [whatsapp, setWhatsapp] = useState(initial.whatsapp);
   const [address, setAddress] = useState(initial.address);
   const [languages, setLanguages] = useState<string[]>(initial.languages);
+  const [openTime, setOpenTime] = useState(initial.openTime ?? "");
+  const [closeTime, setCloseTime] = useState(initial.closeTime ?? "");
+  const [weeklyHours, setWeeklyHours] = useState(initial.weeklyHours ?? "");
   const [message, setMessage] = useState("");
-  const steps = ["Brand", "Services", "WhatsApp", "Languages", "Done"];
+  const steps = ["Brand", "Services", "WhatsApp", "Languages", "Hours", "Done"];
 
   async function save(done = false) {
     const res = await fetch("/api/v1/admin/settings", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, primaryColor: color, whatsapp, address, languages, defaultLang: languages[0] || "en", onboardingDone: done }),
+      body: JSON.stringify({ name, primaryColor: color, whatsapp, address, languages, defaultLang: languages[0] || "en", onboardingDone: done, openTime, closeTime, weeklyHours }),
     });
     const data = await res.json();
     if (!res.ok) setMessage(data.message || "Could not save");
@@ -72,11 +79,25 @@ export function OnboardingWizard({
           ))}
         </div>
       )}
-      {step === 4 && <p className="mt-3 text-sm">Open the try-on, print the QR, and paste the embed if your plan includes it. {hairstyleOnly ? "The try-on is hairstyle for now." : "Colour, style, brows, beard, and nails start on. Turn a tool off in Settings."} Booking stays on WhatsApp unless you require a phone login.</p>}
+      {step === 4 && (
+        <div className="mt-3" data-onboarding-step="hours">
+          <WeekHoursEditor
+            openTime={openTime}
+            closeTime={closeTime}
+            weeklyHours={weeklyHours}
+            onChange={(next) => {
+              setOpenTime(next.openTime);
+              setCloseTime(next.closeTime);
+              setWeeklyHours(next.weeklyHours);
+            }}
+          />
+        </div>
+      )}
+      {step === 5 && <p className="mt-3 text-sm">Open the try-on, print the QR, and paste the embed if your plan includes it. {hairstyleOnly ? "The try-on is hairstyle for now." : "Colour, style, brows, beard, and nails start on. Turn a tool off in Settings."} Booking stays on WhatsApp unless you require a phone login.</p>}
       <div className="mt-4 flex gap-2">
         {step > 0 && <button className="btn secondary" type="button" onClick={() => setStep((value) => value - 1)}>Back</button>}
-        {step < 4 && <button className="btn" type="button" onClick={() => { void save(false); setStep((value) => value + 1); }}>Next</button>}
-        {step === 4 && <button className="btn" type="button" onClick={() => void save(true)}>Finish</button>}
+        {step < 5 && <button className="btn" type="button" onClick={() => { void save(false); setStep((value) => value + 1); }}>Next</button>}
+        {step === 5 && <button className="btn" type="button" onClick={() => void save(true)}>Finish</button>}
       </div>
       {message && <p className="mt-3 text-sm" role="status">{message}</p>}
     </div>

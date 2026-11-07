@@ -4,7 +4,7 @@ import { isPlanId } from "@/data/plans";
 import { applyPlanChange } from "@/lib/billing/plan-assign";
 import { CreditError, grantCredits } from "@/lib/credits";
 import { prisma } from "@/lib/prisma";
-import { parseOperatingHours } from "@/lib/queue/hours";
+import { hoursWrite } from "@/lib/queue/schedule";
 import { requireSuper } from "@/lib/session";
 
 const schema = z.object({
@@ -20,6 +20,7 @@ const schema = z.object({
   productMakeupStudio: z.boolean().optional(),
   openTime: z.string().max(8).nullable().optional(),
   closeTime: z.string().max(8).nullable().optional(),
+  weeklyHours: z.string().max(4000).nullable().optional(),
   remove: z.literal(true).optional(),
 });
 
@@ -46,11 +47,22 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ ok: true, deleted: true });
   }
   if (parsed.data.plan && !isPlanId(parsed.data.plan)) return NextResponse.json({ error: "PLAN" }, { status: 400 });
-  let hours: { open: string; close: string } | undefined;
-  if (parsed.data.openTime !== undefined || parsed.data.closeTime !== undefined) {
-    const parsedHours = parseOperatingHours(parsed.data.openTime ?? "", parsed.data.closeTime ?? "");
-    if (parsedHours.kind === "invalid") return NextResponse.json({ error: "HOURS", message: parsedHours.message }, { status: 400 });
-    hours = parsedHours.kind === "custom" ? { open: parsedHours.open, close: parsedHours.close } : { open: "", close: "" };
+  let hours: { openTime: string; closeTime: string; weeklyHours: string; hoursOverride: string; hoursOverrideUntil: Date | null } | undefined;
+  if (parsed.data.openTime !== undefined || parsed.data.closeTime !== undefined || parsed.data.weeklyHours !== undefined) {
+    const written = hoursWrite({
+      weeklyHours: parsed.data.weeklyHours,
+      openTime: parsed.data.openTime,
+      closeTime: parsed.data.closeTime,
+    });
+    if (!written.ok) return NextResponse.json({ error: "HOURS", message: written.message }, { status: 400 });
+    const changed = written.weeklyHours !== tenant.weeklyHours || written.openTime !== tenant.openTime || written.closeTime !== tenant.closeTime;
+    hours = {
+      openTime: written.openTime,
+      closeTime: written.closeTime,
+      weeklyHours: written.weeklyHours,
+      hoursOverride: changed ? "" : tenant.hoursOverride,
+      hoursOverrideUntil: changed ? null : tenant.hoursOverrideUntil,
+    };
   }
   const planChange = parsed.data.plan && isPlanId(parsed.data.plan) ? await applyPlanChange(id, parsed.data.plan) : null;
   await prisma.tenant.update({
@@ -63,7 +75,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       ...(parsed.data.productBridal !== undefined ? { productBridal: parsed.data.productBridal } : {}),
       ...(parsed.data.productGroom !== undefined ? { productGroom: parsed.data.productGroom } : {}),
       ...(parsed.data.productMakeupStudio !== undefined ? { productMakeupStudio: parsed.data.productMakeupStudio } : {}),
-      ...(hours ? { openTime: hours.open, closeTime: hours.close } : {}),
+      ...(hours ?? {}),
     },
   });
   if (planChange) {

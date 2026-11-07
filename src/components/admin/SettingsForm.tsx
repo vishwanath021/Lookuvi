@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { SalonModeCard } from "@/components/admin/SalonModeCard";
 import { VisitUnlock } from "@/components/admin/VisitUnlock";
+import { WeekHoursEditor } from "@/components/admin/WeekHoursEditor";
 import type { ToolId } from "@/lib/tools";
 
 export function SettingsForm({
@@ -48,6 +49,7 @@ export function SettingsForm({
     logoUrl: string | null;
     openTime?: string;
     closeTime?: string;
+    weeklyHours?: string;
   };
   canRemoveBranding: boolean;
   enabledTools?: ToolId[];
@@ -66,6 +68,7 @@ export function SettingsForm({
     whatsappWalkInJoined: initial.whatsappWalkInJoined ?? false,
     openTime: initial.openTime ?? "",
     closeTime: initial.closeTime ?? "",
+    weeklyHours: initial.weeklyHours ?? "",
   });
   const [message, setMessage] = useState("");
   const [host, setHost] = useState("");
@@ -195,19 +198,12 @@ export function SettingsForm({
         <label className="text-sm">Address<input className="field mt-1" value={form.address} onChange={(event) => set("address", event.target.value)} /></label>
         <label className="text-sm">Maps link<input className="field mt-1" value={form.mapsUrl} onChange={(event) => set("mapsUrl", event.target.value)} /></label>
         <label className="text-sm">City<input className="field mt-1" value={form.city} onChange={(event) => set("city", event.target.value)} /></label>
-        <fieldset className="grid gap-2 text-sm">
-          <legend className="font-medium">Request hours (India time)</legend>
-          <p className="text-xs text-muted">Guests asking for a time must pick inside these hours. Leave both empty for 06:00–22:00. The live queue still opens and pauses from the desk.</p>
-          <div className="grid grid-cols-2 gap-3">
-            <label>Opens
-              <input className="field mt-1" type="time" aria-label="Opens" value={form.openTime} onChange={(event) => set("openTime", event.target.value)} />
-            </label>
-            <label>Closes
-              <input className="field mt-1" type="time" aria-label="Closes" value={form.closeTime} onChange={(event) => set("closeTime", event.target.value)} />
-            </label>
-          </div>
-          <button className="btn secondary w-fit" type="button" onClick={() => { set("openTime", ""); set("closeTime", ""); }}>Clear hours</button>
-        </fieldset>
+        <WeekHoursEditor
+          openTime={form.openTime}
+          closeTime={form.closeTime}
+          weeklyHours={form.weeklyHours}
+          onChange={(next) => setForm((current) => ({ ...current, ...next }))}
+        />
         <fieldset className="grid gap-2 text-sm">
           <legend className="font-medium">Looks on the customer screen</legend>
           <label className="flex items-center gap-2"><input type="checkbox" aria-label="Bridal" checked={form.productBridal} onChange={(event) => set("productBridal", event.target.checked)} /> Bridal</label>

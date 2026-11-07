@@ -6,7 +6,7 @@ import { isLocale, LOCALES } from "@/data/i18n";
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/session";
 import { isAllowedLogoUrl } from "@/lib/logo-url";
-import { parseOperatingHours } from "@/lib/queue/hours";
+import { hoursWrite } from "@/lib/queue/schedule";
 import { toolEnabled, type ToolId } from "@/lib/tools";
 
 const schema = z.object({
@@ -52,6 +52,7 @@ const schema = z.object({
   gstin: z.string().max(20).optional().nullable(),
   openTime: z.string().max(8).optional(),
   closeTime: z.string().max(8).optional(),
+  weeklyHours: z.string().max(4000).optional(),
 });
 
 export async function GET() {
@@ -95,16 +96,26 @@ export async function PUT(req: Request) {
   if (data.productBridal === true && !access.tenant.productBridal) {
     await ensureBridalPackages(access.tenant.id);
   }
-  if (data.openTime !== undefined || data.closeTime !== undefined) {
-    const hours = parseOperatingHours(data.openTime ?? "", data.closeTime ?? "");
-    if (hours.kind === "invalid") return NextResponse.json({ error: "HOURS", message: hours.message }, { status: 400 });
-    rest.openTime = hours.kind === "custom" ? hours.open : "";
-    rest.closeTime = hours.kind === "custom" ? hours.close : "";
+  let hoursPatch: { openTime: string; closeTime: string; weeklyHours: string; hoursOverride?: string; hoursOverrideUntil?: null } | undefined;
+  if (data.weeklyHours !== undefined || data.openTime !== undefined || data.closeTime !== undefined) {
+    const written = hoursWrite({ weeklyHours: data.weeklyHours, openTime: data.openTime, closeTime: data.closeTime });
+    if (!written.ok) return NextResponse.json({ error: "HOURS", message: written.message }, { status: 400 });
+    const changed = written.weeklyHours !== access.tenant.weeklyHours || written.openTime !== access.tenant.openTime || written.closeTime !== access.tenant.closeTime;
+    hoursPatch = {
+      openTime: written.openTime,
+      closeTime: written.closeTime,
+      weeklyHours: written.weeklyHours,
+      ...(changed ? { hoursOverride: "", hoursOverrideUntil: null } : {}),
+    };
+    delete rest.openTime;
+    delete rest.closeTime;
+    delete rest.weeklyHours;
   }
   const tenant = await prisma.tenant.update({
     where: { id: access.tenant.id },
     data: {
       ...rest,
+      ...hoursPatch,
       languages: languages ? JSON.stringify(languages) : undefined,
       defaultLang: defaultLang && isLocale(defaultLang) ? defaultLang : undefined,
       logoUrl,
