@@ -67,20 +67,7 @@ export function AtSalonProvider({ slug, lang, children }: { slug: string; lang: 
         askWait: Boolean(data.askWait),
       }));
     };
-    const redeem = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("counter") || "";
-      if (!code) return;
-      await fetch("/api/v1/at-salon", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "redeem", slug, sessionId, deviceId, code }),
-      }).catch(() => undefined);
-      params.delete("counter");
-      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`;
-      window.history.replaceState(null, "", next);
-    };
-    void redeem().then(pull);
+    void pull();
     const timer = setInterval(() => void pull(), 4000);
     setView((current) => ({
       ...current,

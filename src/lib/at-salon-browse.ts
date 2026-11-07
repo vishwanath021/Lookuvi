@@ -1,0 +1,36 @@
+export type SavedPick = { tool: string; id: string; name: string };
+
+const MAX_SAVED = 12;
+
+export function showLockedBrowse(
+  salonRequires: boolean,
+  state: { ready: boolean; required: boolean; unlocked: boolean },
+) {
+  if (state.ready) return state.required && !state.unlocked;
+  return salonRequires;
+}
+
+export function addSavedPick(list: SavedPick[], pick: SavedPick) {
+  const next = [pick, ...list.filter((item) => !(item.tool === pick.tool && item.id === pick.id))];
+  return next.slice(0, MAX_SAVED);
+}
+
+export function readSavedPicks(raw: string | null): SavedPick[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const row = item as SavedPick;
+      if (!row.tool || !row.id || !row.name) return [];
+      return [{ tool: String(row.tool), id: String(row.id), name: String(row.name) }];
+    }).slice(0, MAX_SAVED);
+  } catch {
+    return [];
+  }
+}
+
+export function savedPicksKey(slug: string) {
+  return `lookuvi-saved:${slug}`;
+}

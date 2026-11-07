@@ -21,6 +21,8 @@ import {
 } from "@/data/groom";
 import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
 import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { LockedPhotoNote } from "@/components/guest/LockedPhotoNote";
+import { showLockedBrowse } from "@/lib/at-salon-browse";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
@@ -42,6 +44,7 @@ function remember(current: Shot | undefined, next: Shot) {
 
 export function GroomFlow({ config }: { config: SalonConfig }) {
   const atSalon = useAtSalon();
+  const locked = showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon);
   const [panel, setPanel] = useState<Panel>("looks");
   const [hairId, setHairId] = useState(GROOM_HAIR[0]?.id || "");
   const [beardId, setBeardId] = useState("");
@@ -375,6 +378,8 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
               onClose={stopLive}
               onShutter={captureLive}
               large
+              locked={locked}
+              lang={config.defaultLang || "en"}
               preview={result?.panel === "looks" && !busy && panel === "looks" ? (
                 <>
                   <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" />
@@ -441,6 +446,8 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
               onClose={stopLive}
               onShutter={captureLive}
               large
+              locked={locked}
+              lang={config.defaultLang || "en"}
               preview={result?.panel === "own" && !busy && panel === "own" ? (
                 <>
                   <BeforeAfter className="relative h-full w-full touch-none overflow-hidden bg-[#F3F0F8]" before={result.before} after={result.after} beforeLabel="Before" afterLabel="After" afterClassName="gen-reveal" />
@@ -503,6 +510,8 @@ function PhotoStep({
   onClose,
   onShutter,
   large = false,
+  locked = false,
+  lang = "en",
   preview = null,
 }: {
   title: string;
@@ -521,6 +530,8 @@ function PhotoStep({
   onClose: () => void;
   onShutter: () => void;
   large?: boolean;
+  locked?: boolean;
+  lang?: string;
   preview?: ReactNode;
 }) {
   const open = live === target;
@@ -551,7 +562,7 @@ function PhotoStep({
   return (
     <div data-photo-cluster="yes">
       {title ? <p className="mb-2 text-sm font-medium">{title}</p> : null}
-      {large ? <LargeFrame boxRef={boxRef} name={target}>{frame}</LargeFrame> : (
+      {locked && !shot && !open && !preview ? <LockedPhotoNote lang={lang} /> : large ? <LargeFrame boxRef={boxRef} name={target}>{frame}</LargeFrame> : (
         <div ref={boxRef} data-photo-box={target} className={open ? "relative mx-auto aspect-[3/4] max-h-[280px] w-full max-w-sm overflow-hidden rounded-2xl bg-black" : "photo-slot mx-auto w-full max-w-sm"}>{frame}</div>
       )}
       {open && large ? <LiveTray ready={camReady} onShutter={() => void onShutter()} /> : null}

@@ -11,9 +11,7 @@ import {
   grantTries,
   markArrived,
   NOT_AT_SALON_MESSAGE,
-  redeemCounter,
   refuseAtSalon,
-  signCounterCode,
   tryAddAmount,
   visitBudget,
 } from "@/lib/at-salon";
@@ -25,8 +23,6 @@ import { reserveTryCaps } from "@/lib/try-allowance";
 vi.mock("@/auth", () => ({
   auth: vi.fn(async () => null),
 }));
-
-const DAY = 24 * 60 * 60 * 1000;
 
 async function salon(slug: string, extra: Record<string, unknown> = {}) {
   return prisma.tenant.create({
@@ -64,6 +60,7 @@ describe("at-salon try-ons", () => {
   afterEach(cleanup);
 
   it("keeps the unlocked copy singular for one try", () => {
+    expect(t("en", "atSalonLocked")).toBe("Your free try-on opens when you reach the salon. Browse and save styles now; staff will unlock it when you arrive.");
     expect(t("en", "atSalonUnlockedOne")).toBe("You're in! You have 1 free try-on");
     expect(t("en", "atSalonUnlockedMany", { count: 2 })).toBe("You're in! You have 2 free try-ons");
     expect(t("hi", "atSalonLocked")).not.toBe("atSalonLocked");
@@ -101,20 +98,6 @@ describe("at-salon try-ons", () => {
     expect(arrived.ok).toBe(true);
     expect(await refuseAtSalon({ tenant, sessionId, deviceId })).toBeNull();
     expect(await refuseAtSalon({ tenant, sessionId: "someone-else-session", deviceId: "someone-else-device" })).not.toBeNull();
-  });
-
-  it("accepts today's counter code and rejects yesterday's", async () => {
-    const tenant = await salon(`salon-lock-qr-${Date.now()}`);
-    const sessionId = "session-qr-12345678";
-    const deviceId = "device-qr-12345678";
-    const today = signCounterCode(tenant.id, kolkataDayKey());
-    const yesterday = signCounterCode(tenant.id, kolkataDayKey(new Date(Date.now() - DAY)));
-    const stale = await redeemCounter(tenant.id, yesterday, sessionId, deviceId);
-    expect(stale.ok).toBe(false);
-    expect(await refuseAtSalon({ tenant, sessionId, deviceId })).not.toBeNull();
-    const fresh = await redeemCounter(tenant.id, today, sessionId, deviceId);
-    expect(fresh.ok).toBe(true);
-    expect(await refuseAtSalon({ tenant, sessionId, deviceId })).toBeNull();
   });
 
   it("lets staff and a salon with the lock off through, and still enforces the visit and monthly caps", async () => {

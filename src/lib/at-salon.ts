@@ -1,14 +1,11 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { AI_PREVIEW_KINDS } from "@/lib/preview-access";
 import { prisma } from "@/lib/prisma";
-import { appBaseUrl } from "@/lib/env";
-import { isLocalSalonHost, salonGuestOrigin } from "@/lib/public-url";
 import { kolkataDayKey } from "@/lib/queue/day";
 import { unlockVisit } from "@/lib/visit-allowance";
 import { VISIT_CAP_MESSAGE, VISIT_TRY_KINDS } from "@/lib/visit-tries";
 
 export const NOT_AT_SALON_MESSAGE =
-  "Your free try-ons open when you reach the salon. Browse and save styles you like, and try them on when you arrive.";
+  "Your free try-on opens when you reach the salon. Browse and save styles now; staff will unlock it when you arrive.";
 
 export const TRY_ADD_MIN = 1;
 export const TRY_ADD_MAX = 9;
@@ -16,26 +13,8 @@ export const ASK_WAIT_MS = 2 * 60 * 1000;
 
 type SalonFlag = { id: string; tryOnsAtSalon: boolean; visitTryLimit: number };
 
-function secret() {
-  return process.env.AUTH_SECRET || "dev-only-secret";
-}
-
 function cleanId(value: string | undefined | null) {
   return (value || "").trim().slice(0, 80);
-}
-
-export function signCounterCode(tenantId: string, dayKey: string) {
-  const sig = createHmac("sha256", secret()).update(`counter.${tenantId}.${dayKey}`).digest("base64url");
-  return `${dayKey}.${sig}`;
-}
-
-export function verifyCounterCode(code: string, tenantId: string, dayKey: string) {
-  if (!code || !dayKey) return false;
-  const expected = signCounterCode(tenantId, dayKey);
-  const left = Buffer.from(code);
-  const right = Buffer.from(expected);
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(left, right);
 }
 
 export function tryAddAmount(value: unknown) {
@@ -333,20 +312,6 @@ export async function askMoreTries(tenantId: string, sessionId: string, deviceId
   return { ok: true as const };
 }
 
-export async function redeemCounter(tenantId: string, code: string, sessionId: string, deviceId: string, now = new Date()) {
-  const dayKey = kolkataDayKey(now);
-  if (!verifyCounterCode(code, tenantId, dayKey)) {
-    return { ok: false as const, error: "COUNTER" as const, message: "That counter code is not valid today." };
-  }
-  if (cleanId(sessionId).length < 8) return { ok: false as const, error: "INVALID" as const, message: "Session is required." };
-  await grantPresence(tenantId, dayKey, "counter", [
-    { kind: "session", value: sessionId },
-    { kind: "device", value: deviceId },
-  ]);
-  await attachGuest(tenantId, sessionId, deviceId, now);
-  return { ok: true as const };
-}
-
 export async function atSalonView(args: {
   tenant: SalonFlag;
   sessionId: string;
@@ -410,19 +375,4 @@ export async function tryLineForEntry(
     used,
     remaining: Math.max(0, allowance - used),
   };
-}
-
-export async function counterTarget(tenantId: string, slug: string, now = new Date()) {
-  const dayKey = kolkataDayKey(now);
-  const code = signCounterCode(tenantId, dayKey);
-  const origin = await salonGuestOrigin(tenantId, slug);
-  let base = appBaseUrl();
-  try {
-    const host = new URL(origin).host;
-    if (!isLocalSalonHost(host)) base = origin.replace(/\/$/, "");
-  } catch {
-    base = appBaseUrl();
-  }
-  const path = base === appBaseUrl() ? `/s/${slug}` : "/";
-  return { url: `${base}${path}?counter=${encodeURIComponent(code)}`, dayKey };
 }

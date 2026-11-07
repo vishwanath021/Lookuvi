@@ -352,17 +352,21 @@ function TryAdder({
           setCustom("");
         }}
       >
-        <input
-          className="field narrow"
-          type="number"
-          min={1}
-          max={9}
-          step={1}
-          inputMode="numeric"
-          aria-label="Custom tries"
-          value={custom}
-          onChange={(event) => setCustom(event.target.value)}
-        />
+        <label className="text-sm">
+          Custom tries
+          <input
+            className="field narrow mt-1"
+            type="number"
+            min={1}
+            max={9}
+            step={1}
+            inputMode="numeric"
+            placeholder="1–9"
+            aria-label="Custom tries"
+            value={custom}
+            onChange={(event) => setCustom(event.target.value)}
+          />
+        </label>
         <button className="btn secondary" type="submit" disabled={busy}>Add</button>
       </form>
       {note ? <p className="text-sm" role="status">{note}</p> : null}

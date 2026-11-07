@@ -34,6 +34,8 @@ import {
   type BridalStyleId,
 } from "@/data/bridal";
 import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { LockedPhotoNote } from "@/components/guest/LockedPhotoNote";
+import { showLockedBrowse } from "@/lib/at-salon-browse";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import { postGuestGenerate } from "@/lib/guest-preview";
@@ -135,6 +137,7 @@ async function blobUrlToData(url: string) {
 
 export function BridalFlow({ config }: { config: SalonConfig }) {
   const atSalon = useAtSalon();
+  const locked = showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon);
   const [eventId, setEventId] = useState<BridalEventId>("wedding");
   const [panel, setPanel] = useState<"looks" | "own" | "mehendi" | "saved">("looks");
   const [lookStyle, setLookStyle] = useState<BridalStyleId>(defaultBridalStyle(BRIDAL_LOOKS));
@@ -650,7 +653,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               { id: "bridal-makeup", label: "Makeup", value: makeupName },
             ]} />
             {result?.kind === "look" && !busy ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
-            <LargeFrame boxRef={faceBox} name="face">
+            {locked && !face && live !== "face" ? <LockedPhotoNote lang={config.defaultLang || "en"} /> : <LargeFrame boxRef={faceBox} name="face">
               {live === "face" ? (
                 <LiveStudio
                   videoRef={videoRef}
@@ -678,7 +681,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
                   {!face && !busyKind ? <p className="absolute inset-0 grid place-items-center px-6 text-center text-sm">Face the light. No sunglasses.</p> : null}
                 </>
               )}
-            </LargeFrame>
+            </LargeFrame>}
             {live === "face" ? (
               <LiveTray ready={camReady} onShutter={() => void captureLive()}>
                 {liveLook ? (
@@ -736,7 +739,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
             <h3 className="text-base font-semibold leading-tight">Photo</h3>
             <p className="text-sm">Hold your hand flat in good light. Fill the photo with your palm.</p>
             {result?.kind === "mehendi" && !busy ? <h3 className="text-center font-serif text-2xl">{result.name}</h3> : null}
-            <LargeFrame boxRef={handBox} name="hand">
+            {locked && !hand && live !== "hand" ? <LockedPhotoNote lang={config.defaultLang || "en"} /> : <LargeFrame boxRef={handBox} name="hand">
               {live === "hand" ? (
                 <LiveStudio
                   videoRef={videoRef}
@@ -762,7 +765,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
                   {busyKind === "mehendi" ? <GeneratingLook tool="mehendi" /> : null}
                 </>
               )}
-            </LargeFrame>
+            </LargeFrame>}
             {live === "hand" ? (
               <LiveTray ready={camReady} onShutter={() => void captureLive()} />
             ) : busyKind === "mehendi" ? null : (
