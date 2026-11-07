@@ -1,3 +1,4 @@
+import { ReminderSettingsCard } from "@/components/admin/ReminderSettingsCard";
 import { SettingsForm } from "@/components/admin/SettingsForm";
 import { gstEnabled } from "@/lib/pricing";
 import { planById } from "@/data/plans";
@@ -26,6 +27,15 @@ export default async function SettingsPage() {
   return (
     <main>
       <h1 className="mb-4 page-title">Settings</h1>
+      <div className="mb-4">
+        <ReminderSettingsCard
+          initial={{
+            reminderDays: tenant.reminderDays,
+            reminderTemplate: tenant.reminderTemplate,
+            reminderMethod: tenant.reminderMethod,
+          }}
+        />
+      </div>
       <SettingsForm
         salonModeUrl={salonModeUrl}
         selfId={membership.userId}

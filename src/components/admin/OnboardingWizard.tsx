@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { ReminderMethodChoice } from "@/components/admin/ReminderMethodChoice";
 import { WeekHoursEditor } from "@/components/admin/WeekHoursEditor";
 import { LOCALES, LOCALE_LABELS, type Locale } from "@/data/i18n";
 
-export const ONBOARDING_STEPS = ["Brand", "Services", "WhatsApp", "Languages", "Hours", "Done"] as const;
+export const ONBOARDING_STEPS = ["Brand", "Services", "WhatsApp", "Languages", "Hours", "Reminders", "Done"] as const;
 export const ONBOARDING_SAVED = "Saved ✓";
 
 export function OnboardingWizard({
@@ -22,6 +23,7 @@ export function OnboardingWizard({
     openTime?: string;
     closeTime?: string;
     weeklyHours?: string;
+    reminderMethod?: string;
   };
 }) {
   const [step, setStep] = useState(0);
@@ -33,6 +35,7 @@ export function OnboardingWizard({
   const [openTime, setOpenTime] = useState(initial.openTime ?? "");
   const [closeTime, setCloseTime] = useState(initial.closeTime ?? "");
   const [weeklyHours, setWeeklyHours] = useState(initial.weeklyHours ?? "");
+  const [reminderMethod, setReminderMethod] = useState<"MANUAL" | "AUTO">(initial.reminderMethod === "AUTO" ? "AUTO" : "MANUAL");
   const [message, setMessage] = useState("");
   const steps = ONBOARDING_STEPS;
 
@@ -40,7 +43,7 @@ export function OnboardingWizard({
     const res = await fetch("/api/v1/admin/settings", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, primaryColor: color, whatsapp, address, languages, defaultLang: languages[0] || "en", onboardingDone: done, openTime, closeTime, weeklyHours }),
+      body: JSON.stringify({ name, primaryColor: color, whatsapp, address, languages, defaultLang: languages[0] || "en", onboardingDone: done, openTime, closeTime, weeklyHours, reminderMethod: reminderMethod === "AUTO" ? "MANUAL" : reminderMethod }),
     });
     const data = await res.json();
     if (!res.ok) setMessage(data.message || "Could not save");
@@ -49,7 +52,7 @@ export function OnboardingWizard({
 
   return (
     <div className="card p-5">
-      <p className="text-xs uppercase tracking-[0.16em] text-muted">Step {step + 1} of {steps.length} · {steps[step]}</p>
+      <p className="text-base">Step {step + 1} of {steps.length} · {steps[step]}</p>
       {step === 0 && (
         <div className="mt-3 space-y-3">
           <label className="block text-sm">Salon name<input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} /></label>
@@ -96,11 +99,17 @@ export function OnboardingWizard({
           />
         </div>
       )}
-      {step === 5 && <p className="mt-3 text-sm">Open the try-on, print the QR, and paste the embed if your plan includes it. {hairstyleOnly ? "The try-on is hairstyle for now." : "Colour, style, brows, beard, and nails start on. Turn a tool off in Settings."} Booking stays on WhatsApp unless you require a phone login.</p>}
+      {step === 5 && (
+        <div className="mt-3" data-onboarding-step="reminders">
+          <ReminderMethodChoice value={reminderMethod} onChange={setReminderMethod} />
+        </div>
+      )}
+      {step === 6 && <p className="mt-3 text-base">Open the try-on, print the QR, and paste the embed if your plan includes it. {hairstyleOnly ? "The try-on is hairstyle for now." : "Colour, style, brows, beard, and nails start on. Turn a tool off in Settings."} Booking stays on WhatsApp unless you require a phone login.</p>}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {step > 0 && <button className="btn secondary" type="button" onClick={() => setStep((value) => value - 1)}>Back</button>}
         {step < 5 && <button className="btn" type="button" onClick={() => { void save(false); setStep((value) => value + 1); }}>Next</button>}
-        {step === 5 && <button className="btn" type="button" onClick={() => void save(true)}>Finish</button>}
+        {step === 5 && <button className="btn" type="button" onClick={() => { void save(false); setStep(6); }}>Continue</button>}
+        {step === 6 && <button className="btn" type="button" onClick={() => void save(true)}>Finish</button>}
         {message ? <p className="text-sm" role="status" data-onboarding-status="yes">{message}</p> : null}
       </div>
     </div>

@@ -55,6 +55,7 @@ export function ownerNav(input: {
   if (input.onboardingDone === false) links.push({ href: "/admin/onboarding", label: "Onboarding", section: "main" });
   if (input.productQueue) links.push({ href: "/admin/queue", label: "Queue", section: "main" });
   if (input.productQueue) links.push({ href: "/admin/customers", label: "Customers", section: "main" });
+  if (input.productQueue && input.role === "OWNER") links.push({ href: "/admin/reminders", label: "Due for a visit", section: "main" });
   links.push({ href: "/admin/leads", label: "Leads", section: "main" });
   if (input.productTryOn) links.push({ href: "/admin/qr", label: input.features.embed ? "QR and embed" : "QR", section: "main" });
   links.push({ href: "/admin/services", label: "Prices", section: "more" });
