@@ -27,6 +27,7 @@ export default async function SettingsPage() {
   return (
     <main>
       <h1 className="mb-4 page-title">Settings</h1>
+      <p className="mb-4 text-sm">Guests choose a service from your own list when they join the queue. <a className="underline" href="/admin/services">Edit services</a></p>
       <div className="mb-4">
         <ReminderSettingsCard
           initial={{

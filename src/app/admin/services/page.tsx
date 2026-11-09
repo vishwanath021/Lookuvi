@@ -20,7 +20,8 @@ export default async function ServicesPage() {
     }));
   return (
     <main>
-      <h1 className="mb-4 page-title">Prices</h1>
+      <h1 className="mb-2 page-title">Services</h1>
+      <p className="mb-4 text-sm text-muted">These names are what guests pick when they join the queue. No preference stays on that list. Turn a service off to hide it.</p>
       <ServiceEditor initial={rows} bridal={tenant.productBridal} canEdit={membership.role === "OWNER"} />
     </main>
   );

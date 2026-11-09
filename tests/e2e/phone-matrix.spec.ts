@@ -231,12 +231,12 @@ test("owner: change a lead, add a service, open QR, and use More", async ({ page
   await expect(row.getByRole("button", { name: /Status Contacted/ })).toBeVisible();
 
   await page.goto("/admin/services");
-  await expect(page.getByRole("heading", { name: "Prices" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Services" })).toBeVisible();
   await expect(page.getByText("Haircut")).toBeVisible();
   const serviceName = `Matrix Cut ${Date.now().toString(36)}`;
   await page.getByLabel("Service name").fill(serviceName);
   await page.getByRole("button", { name: "Add" }).click();
-  await expect(page.getByText(serviceName)).toBeVisible();
+  await expect(page.getByLabel(`${serviceName} name`)).toBeVisible();
   await expect(page.getByText("Saved.")).toBeVisible();
 
   await page.goto("/admin/qr");
@@ -245,7 +245,7 @@ test("owner: change a lead, add a service, open QR, and use More", async ({ page
 
   const nav = await openNav(page);
   await nav.locator("summary", { hasText: "More" }).click();
-  for (const label of ["Prices", "Settings", "Team", "Billing", "Security"]) {
+  for (const label of ["Services", "Settings", "Team", "Billing", "Security"]) {
     await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
   }
 

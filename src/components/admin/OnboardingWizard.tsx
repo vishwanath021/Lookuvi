@@ -64,7 +64,7 @@ export function OnboardingWizard({
           {initial.services.map((service) => (
             <li key={service.key} className="flex justify-between border-b border-line py-1"><span>{service.name}</span><span>₹{service.priceInr}</span></li>
           ))}
-          <li className="pt-2 text-muted">Edit prices on the Services page. This step is a check, not a second price list.</li>
+          <li className="pt-2 text-muted">Guests see these names in the queue, plus No preference. <a className="underline" href="/admin/services">Edit services</a></li>
         </ul>
       )}
       {step === 2 && (

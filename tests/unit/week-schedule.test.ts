@@ -28,6 +28,17 @@ function phone() {
   return `9${String(Math.floor(Math.random() * 1e9)).padStart(9, "0")}`;
 }
 
+/** A future Kolkata weekday, so a fixed calendar date does not become "yesterday". */
+function upcomingWeekday(target: "Sun" | "Tue") {
+  const start = Date.now();
+  for (let offset = 1; offset <= 14; offset += 1) {
+    const at = new Date(start + offset * 24 * 60 * 60 * 1000);
+    const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", weekday: "short" }).format(at);
+    if (weekday === target) return kolkataDayKey(at);
+  }
+  throw new Error(`No upcoming ${target}`);
+}
+
 const SPLIT = weekFromPair("09:00", "13:00");
 SPLIT.mon = [{ open: "09:00", close: "13:00" }, { open: "16:00", close: "21:00" }];
 SPLIT.tue = [{ open: "09:00", close: "13:00" }, { open: "16:00", close: "21:00" }];
@@ -215,18 +226,20 @@ describe("weekly sessions", () => {
   it("accepts a request only inside that day's sessions", async () => {
     const tenant = await salon("REQUEST");
     await saveQueueSettings(tenant.id, { units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "REQUEST", unitLabel: "chair" });
+    const tuesday = upcomingWeekday("Tue");
+    const sunday = upcomingWeekday("Sun");
     await expect(joinQueue({
       slug: tenant.slug, name: "Gap", phone: phone(), consent: true,
-      requestedDate: "2026-11-10", requestedSlot: "14:00", ip: `r-${tag()}`, send,
+      requestedDate: tuesday, requestedSlot: "14:00", ip: `r-${tag()}`, send,
     })).rejects.toThrow(/09:00 and 13:00 or 16:00 and 21:00/);
     const afternoon = await joinQueue({
       slug: tenant.slug, name: "Afternoon", phone: phone(), consent: true,
-      requestedDate: "2026-11-10", requestedSlot: "17:00", ip: `r-${tag()}`, send,
+      requestedDate: tuesday, requestedSlot: "17:00", ip: `r-${tag()}`, send,
     });
     expect(afternoon.requestedSlot).toBe("17:00");
     await expect(joinQueue({
       slug: tenant.slug, name: "Sunday", phone: phone(), consent: true,
-      requestedDate: "2026-11-08", requestedSlot: "11:00", ip: `r-${tag()}`, send,
+      requestedDate: sunday, requestedSlot: "11:00", ip: `r-${tag()}`, send,
     })).rejects.toThrow(/closed that day/);
     const today = kolkataDayKey();
     await prisma.tenant.update({ where: { id: tenant.id }, data: { closedDayKey: today } });

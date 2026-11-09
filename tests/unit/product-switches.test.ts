@@ -32,7 +32,7 @@ describe("owner feature flags", () => {
     expect(labels).not.toContain("AI settings");
     expect(labels).not.toContain("Queue");
     expect(labels).not.toContain("Styles");
-    expect(labels).toContain("Prices");
+    expect(labels).toContain("Services");
     expect(labels).toContain("QR");
     expect(labels).not.toContain("QR and embed");
     expect(ownerNav(off).filter((link) => link.section === "main").map((link) => link.label)).toEqual([
@@ -40,7 +40,7 @@ describe("owner feature flags", () => {
       "QR",
     ]);
     expect(ownerNav(off).filter((link) => link.section === "more").map((link) => link.label)).toEqual([
-      "Prices",
+      "Services",
       "Settings",
       "Team",
       "Billing",

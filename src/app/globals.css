@@ -394,13 +394,14 @@ textarea { min-height: 48px; }
 .step-rail {
   position: sticky;
   top: 4.5rem;
-  z-index: 25;
+  z-index: 24;
   display: flex;
   gap: 0.35rem;
   overflow-x: auto;
-  margin: 0 -0.15rem;
-  padding: 0.45rem 0.15rem;
-  background: var(--bg);
+  margin: 0;
+  padding: 0.45rem 0;
+  background: #f3f0f8;
+  box-shadow: 0 1px 0 var(--line);
   scrollbar-width: none;
 }
 .step-rail::-webkit-scrollbar { display: none; }
@@ -1075,11 +1076,11 @@ textarea { min-height: 48px; }
 }
 
 .try-desk { display: flex; min-width: 0; max-width: 100%; flex-direction: column; gap: 1rem; overflow-x: clip; }
-.try-preview { order: -1; min-width: 0; max-width: 100%; padding: 22px 12px 0; overflow: clip; scroll-margin-top: 4.75rem; }
+.try-preview { order: -1; min-width: 0; max-width: 100%; padding: 8px 0 0; overflow: clip; scroll-margin-top: 4.75rem; }
 .try-preview > section { scroll-margin-top: 4.75rem; }
 .try-picks { min-width: 0; max-width: 100%; }
 .chip-scroll { min-width: 0; max-width: 100%; }
-.try-shot { width: min(100%, calc(52vh * 0.75)); margin-inline: auto; }
+.try-shot { width: 100%; margin-inline: auto; }
 .chip-scroll {
   display: flex;
   width: 100%;
@@ -1100,8 +1101,9 @@ textarea { min-height: 48px; }
     -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 1.75rem), transparent);
     mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 1.75rem), transparent);
   }
-  .look-grid { padding-bottom: 13rem; }
-  .look-grid button { scroll-margin-bottom: 13rem; }
+  .look-grid button { scroll-margin-bottom: 6.5rem; }
+  [data-scroll="salon"] { padding-bottom: calc(7.25rem + env(safe-area-inset-bottom)); }
+  [data-scroll="salon"][data-mini="yes"] { padding-bottom: calc(10.5rem + env(safe-area-inset-bottom)); }
 }
 .chip-scroll::-webkit-scrollbar { display: none; }
 .try-cta {
@@ -1136,9 +1138,10 @@ textarea { min-height: 48px; }
     align-items: start;
     gap: 1.5rem;
   }
-  .try-preview { position: sticky; top: 4.5rem; align-self: start; }
+  .try-preview { position: sticky; top: 4.5rem; align-self: start; padding-top: 0; }
   .try-shot { width: 100%; }
   .try-picks { max-height: calc(100dvh - 7.5rem); overflow: auto; padding-right: 0.25rem; }
+  .try-picks > .step-rail { top: 0; z-index: 6; }
   .try-mini { display: none; }
 }
 @media (max-width: 1023px) {
@@ -1153,7 +1156,7 @@ textarea { min-height: 48px; }
     border-top: 1px solid var(--line);
     background: var(--bg);
   }
-  .try-picks { padding-bottom: 13rem; }
+  .try-picks { padding-bottom: 0.5rem; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
