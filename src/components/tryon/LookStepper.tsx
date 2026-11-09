@@ -76,16 +76,19 @@ export function scrollToStep(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-export function StepRail({ id, label, steps, current }: { id?: string; label: string; steps: StepChip[]; current: string }) {
+export function StepRail({ id, label, steps, current, onPick }: { id?: string; label: string; steps: StepChip[]; current: string; onPick?: (id: string) => void }) {
   return (
-    <nav id={id} className="step-rail" aria-label={label} data-step-rail="yes">
+    <nav id={id} className="step-rail" aria-label={label} data-step-rail="yes" data-step-current={current}>
       {steps.map((step) => (
         <button
           key={step.id}
           className="step-chip"
           type="button"
           aria-current={current === step.id ? "step" : undefined}
-          onClick={() => scrollToStep(step.id)}
+          onClick={() => {
+            onPick?.(step.id);
+            scrollToStep(step.id);
+          }}
         >
           <StepIcon name={step.icon} />
           {step.label}

@@ -58,7 +58,7 @@ export function ownerNav(input: {
   if (input.productQueue && input.role === "OWNER") links.push({ href: "/admin/reminders", label: "Due for a visit", section: "main" });
   links.push({ href: "/admin/leads", label: "Leads", section: "main" });
   if (input.productTryOn) links.push({ href: "/admin/qr", label: input.features.embed ? "QR and embed" : "QR", section: "main" });
-  links.push({ href: "/admin/services", label: "Prices", section: "more" });
+  links.push({ href: "/admin/services", label: "Services", section: "more" });
   if (input.features.bookings) links.push({ href: "/admin/bookings", label: "Bookings", section: "more" });
   if (input.productTryOn && input.features.salonAi && input.role === "OWNER") {
     links.push({ href: "/admin/ai", label: "AI settings", section: "more" });

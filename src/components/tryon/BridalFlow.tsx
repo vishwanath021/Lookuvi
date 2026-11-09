@@ -217,6 +217,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   const [zoom, setZoom] = useState(1);
   const [camError, setCamError] = useState("");
   const [liveLook, setLiveLook] = useState(false);
+  const [activeStep, setActiveStep] = useState("bridal-event");
+  const picksRef = useRef<HTMLDivElement>(null);
   const [served, setServed] = useState({ look: "", mehendi: "" });
   const lookCache = useRef(sharedLookCache(config.slug, "look"));
   const mehendiCache = useRef(sharedLookCache(config.slug, "mehendi"));
@@ -555,6 +557,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   }
 
   function pickMakeup(id: string) {
+    setActiveStep("bridal-makeup");
     const card = BRIDAL_MAKEUP.find((item) => item.id === id);
     if (!card) return;
     setMakeupId(card.id);
@@ -563,6 +566,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   }
 
   function pickHair(id: string) {
+    setActiveStep("bridal-hair");
     setHairId(hairId === id ? "" : id);
   }
 
@@ -577,18 +581,21 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   }
 
   function chooseLookStyle(next: BridalStyleId) {
+    setActiveStep("bridal-look");
     setLookStyle(next);
     const shown = cardsForStyle(looksForEvent(eventId), next);
     if (!shown.some((look) => look.id === lookId)) setLookId(shown[0]?.id || "");
   }
 
   function chooseMakeupStyle(next: BridalStyleId) {
+    setActiveStep("bridal-makeup");
     setMakeupStyle(next);
     const shown = cardsForStyle(BRIDAL_MAKEUP, next);
     if (!shown.some((card) => card.id === makeupId) && shown[0]) pickMakeup(shown[0].id);
   }
 
   function chooseHairStyle(next: BridalStyleId) {
+    setActiveStep("bridal-hair");
     setHairStyle(next);
     const shown = cardsForStyle(BRIDAL_HAIR, next);
     if (hairId && !shown.some((card) => card.id === hairId)) pickHair(hairId);
@@ -655,6 +662,23 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
     setServed((current) => current.mehendi === mehendiKey ? current : { ...current, mehendi: mehendiKey });
   }, [panel, mehendiKey]);
 
+  useEffect(() => {
+    if (panel !== "looks") return;
+    const ids = ["bridal-event", "bridal-look", "bridal-hair", "bridal-makeup", "bridal-selfie"];
+    const desktop = window.matchMedia("(min-width: 1024px)").matches;
+    const root = desktop ? picksRef.current : null;
+    const nodes = ids.map((id) => document.getElementById(id)).filter((node): node is HTMLElement => Boolean(node));
+    if (!nodes.length) return;
+    const ratios = new Map<string, number>();
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) ratios.set(entry.target.id, entry.isIntersecting ? entry.intersectionRatio : 0);
+      const best = ids.reduce((lead, id) => ((ratios.get(id) || 0) > (ratios.get(lead) || 0) ? id : lead), ids[0]);
+      if ((ratios.get(best) || 0) > 0) setActiveStep(best);
+    }, { root, rootMargin: "-12% 0px -50% 0px", threshold: [0.2, 0.45, 0.75] });
+    nodes.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [panel]);
+
   return (
     <div data-bridal="flow" data-busy={busy ? "yes" : "no"}>
       <ConsentSheet open={consent.open} lang={config.defaultLang || "en"} onAgree={(ageGate) => void consent.agree(ageGate)} onClose={consent.close} />
@@ -673,11 +697,12 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
 
       {panel === "looks" && (
         <div className="try-desk mt-4">
-          <div className="try-picks grid gap-4">
+          <div className="try-picks grid gap-4" ref={picksRef}>
           <StepRail
             id="bridal-steps"
             label="Bridal steps"
-            current="bridal-event"
+            current={activeStep}
+            onPick={setActiveStep}
             steps={[
               { id: "bridal-event", label: "Event", icon: "event" },
               { id: "bridal-look", label: "Look", icon: "look" },
@@ -691,11 +716,11 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
           <StepCard id="bridal-event" title="Event">
             <div className="flex flex-wrap gap-2" role="group" aria-label="Event">
               {BRIDAL_EVENTS.map((item) => (
-                <button key={item.id} className="chip" type="button" aria-pressed={eventId === item.id} onClick={() => { setEventId(item.id); setLookId(cardsForStyle(looksForEvent(item.id), lookStyle)[0]?.id || ""); }}>{item.label}</button>
+                <button key={item.id} className="chip" type="button" aria-pressed={eventId === item.id} onClick={() => { setActiveStep("bridal-event"); setEventId(item.id); setLookId(cardsForStyle(looksForEvent(item.id), lookStyle)[0]?.id || ""); }}>{item.label}</button>
               ))}
             </div>
           </StepCard>
-          <PhotoGrid step="look" label="Look" group="Bridal looks" styles={bridalStylesFor(eventLooks)} style={lookStyle} onStyle={chooseLookStyle} items={looks} value={chosen?.id || ""} onChange={(id) => { setLookId(id); }} />
+          <PhotoGrid step="look" label="Look" group="Bridal looks" styles={bridalStylesFor(eventLooks)} style={lookStyle} onStyle={chooseLookStyle} items={looks} value={chosen?.id || ""} onChange={(id) => { setActiveStep("bridal-look"); setLookId(id); }} />
           <PhotoGrid step="hair" label="Hair" hint="Optional. Tap again to leave the look’s own hair." group="Hair" styles={bridalStylesFor(BRIDAL_HAIR)} style={hairStyle} onStyle={chooseHairStyle} items={hairCards} value={hairId} onChange={pickHair} />
           <StepCard id="bridal-makeup" title="Makeup" hint="Lip, cheek, and eye colour.">
             {visibleStylePills(bridalStylesFor(BRIDAL_MAKEUP)).length > 0 ? (

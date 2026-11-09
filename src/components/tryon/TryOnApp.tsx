@@ -998,12 +998,29 @@ export function TryOnApp({
   useEffect(() => {
     const node = previewDockRef.current;
     if (!node) return;
-    const observer = new IntersectionObserver(([entry]) => {
+    let previewAway = false;
+    let footerNear = false;
+    const apply = () => {
       const narrow = window.matchMedia("(max-width: 1023px)").matches;
-      setMiniPreview(narrow && !entry.isIntersecting);
+      setMiniPreview(narrow && previewAway && !footerNear);
+    };
+    const previewObs = new IntersectionObserver(([entry]) => {
+      previewAway = !entry.isIntersecting;
+      apply();
     }, { threshold: 0.25 });
-    observer.observe(node);
-    return () => observer.disconnect();
+    previewObs.observe(node);
+    const footer = document.querySelector("[data-legal-footer]");
+    const footerObs = footer
+      ? new IntersectionObserver(([entry]) => {
+        footerNear = entry.isIntersecting;
+        apply();
+      }, { rootMargin: "0px 0px 140px 0px", threshold: 0 })
+      : null;
+    if (footer && footerObs) footerObs.observe(footer);
+    return () => {
+      previewObs.disconnect();
+      footerObs?.disconnect();
+    };
   }, [section, tool, lockedBrowse]);
 
   function saveCurrentStyle() {
@@ -1059,8 +1076,7 @@ export function TryOnApp({
         />
       ) : null}
       <ConsentSheet open={consent.open} lang={lang} onAgree={(ageGate) => { track("consent_accepted", { lang }); void consent.agree(ageGate); }} onClose={consent.close} />
-      <LegalFooter className="px-4 pb-8" />
-      <div data-scroll="salon" className="pb-16 pt-6">
+      <div data-scroll="salon" data-mini={miniPreview ? "yes" : "no"} className="flex flex-1 flex-col pt-6">
       {sections.length > 1 ? (
         <div className={`mb-4 grid items-start gap-3 ${sections.length > 3 ? "grid-cols-2 sm:grid-cols-4" : sections.length > 2 ? "grid-cols-3" : "grid-cols-2"}`} data-guest-tabs="yes">
           {sections.map((item) => {
@@ -1487,6 +1503,7 @@ export function TryOnApp({
         </p>
       )}
       <p className="mt-6 text-center text-xs text-muted"><a href="/login">Salon login</a></p>
+      <LegalFooter className="mt-auto px-0 pb-2" />
       </div>
     </div>
   );

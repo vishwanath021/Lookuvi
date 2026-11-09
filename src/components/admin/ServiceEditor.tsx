@@ -65,7 +65,21 @@ export function ServiceEditor({ initial, bridal, canEdit }: { initial: Row[]; br
       <ul className="grid gap-2" data-service-count={rows.length}>
         {rows.map((row) => (
           <li key={row.id} className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-sm">
-            <span className="min-w-0 flex-1 truncate font-medium">{row.name}</span>
+            <input
+              className="field min-w-0 flex-1"
+              aria-label={`${row.name} name`}
+              defaultValue={row.name}
+              disabled={!canEdit}
+              onBlur={(event) => {
+                if (!canEdit) return;
+                const next = event.target.value.trim();
+                if (next.length < 2 || next === row.name) {
+                  event.target.value = row.name;
+                  return;
+                }
+                void patch(row, { name: next }, { name: next });
+              }}
+            />
             {canEdit ? (
               <label className="sr-only" htmlFor={`price-${row.id}`}>Price for {row.name}</label>
             ) : null}
