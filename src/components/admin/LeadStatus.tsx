@@ -32,7 +32,7 @@ export function LeadStatus({ id, status }: { id: string; status: string }) {
   }
 
   return (
-    <button className="chip" type="button" aria-label={`Status ${label}. Tap to change.`} onClick={() => void cycle()}>
+    <button className="chip status-chip" type="button" aria-label={`Status ${label}. Tap to change.`} onClick={() => void cycle()}>
       {label}
     </button>
   );

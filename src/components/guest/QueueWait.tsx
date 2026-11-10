@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { t } from "@/data/i18n";
+import { formatToken } from "@/lib/queue/format-token";
 import { displayedWait, waitSample } from "@/lib/queue/wait-display";
 
 /** Counts the server wait down once a minute. Resamples when the server figure changes; never remounts on poll. */
@@ -66,7 +67,7 @@ export function QueueWait({
           <p className="mt-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">{t(lang, "queueEstWait")}</p>
         </>
       )}
-      {token == null ? null : <p className="mt-4 text-base" data-queue-token={token}>{t(lang, "queueToken", { token })}</p>}
+      {token == null ? null : <p className="nums mt-4 text-base font-normal" data-queue-token={token}>{t(lang, "queueToken", { token: formatToken(token) })}</p>}
       <p className={token == null ? "mt-4 text-sm text-muted" : "text-sm text-muted"}>{t(lang, "queueAheadShort", { ahead })}</p>
     </div>
   );

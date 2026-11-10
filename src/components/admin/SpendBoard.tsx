@@ -63,15 +63,15 @@ export function SpendBoard({ tiles, rows }: { tiles: Tiles; rows: SalonMargin[] 
       <section className="mt-6 grid gap-3 sm:grid-cols-3">
         <article className="card p-4">
           <p className="text-sm text-muted">Month spend</p>
-          <p className="mt-1 font-serif text-3xl">{formatAiInr(tiles.monthInr)}</p>
+          <p className="nums mt-1 text-3xl">{formatAiInr(tiles.monthInr)}</p>
         </article>
         <article className="card p-4">
           <p className="text-sm text-muted">Images</p>
-          <p className="mt-1 font-serif text-3xl">{tiles.images.toLocaleString("en-IN")}</p>
+          <p className="nums mt-1 text-3xl">{tiles.images.toLocaleString("en-IN")}</p>
         </article>
         <article className="card p-4">
           <p className="text-sm text-muted">Average ₹/image</p>
-          <p className="mt-1 font-serif text-3xl">{tiles.averageInr == null ? "—" : formatAiInr(tiles.averageInr)}</p>
+          <p className="nums mt-1 text-3xl">{tiles.averageInr == null ? "—" : formatAiInr(tiles.averageInr)}</p>
         </article>
       </section>
       <div className="mt-6 flex flex-wrap gap-2">

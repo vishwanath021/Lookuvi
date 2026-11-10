@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { t } from "@/data/i18n";
+import { formatToken } from "@/lib/queue/format-token";
 import { DESK_STALE_MESSAGE, deskFailure, type DeskPayload } from "@/lib/queue/desk-client";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
 
@@ -53,7 +54,7 @@ type Desk = {
 const LABELS: Record<string, string> = { chair: "queueChair", station: "queueStation", room: "queueRoom" };
 
 function tokenLabel(token: number) {
-  return `#${String(token).padStart(2, "0")}`;
+  return formatToken(token);
 }
 
 function minutesInChair(iso?: string | null) {
@@ -300,7 +301,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
                     {desk.waiting.map((card) => (
                       <Fragment key={card.id}>
                         <tr className="border-t border-line align-middle" data-queue-row={card.token}>
-                          <td className="py-2 pr-2 text-base font-semibold" data-queue-token={card.token}>{tokenLabel(card.token)}</td>
+                          <td className="nums py-2 pr-2 text-base" data-queue-token={card.token}>{tokenLabel(card.token)}</td>
                           <td className="max-w-36 truncate py-2 pr-2">{card.name}</td>
                           <td className="whitespace-nowrap py-2 pr-2">{t(lang, "queueMinShort", { min: card.waitMin })}</td>
                           <td className="py-2 pr-2"><StatusPills card={card} lang={lang} /></td>
@@ -334,14 +335,14 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
                     {seat.entry?.status === "CALLED" ? (
                       <>
                         {" · Waiting for "}
-                        <span className="text-base font-semibold" data-queue-token={seat.entry.token}>{tokenLabel(seat.entry.token)}</span>
+                        <span className="nums text-base" data-queue-token={seat.entry.token}>{tokenLabel(seat.entry.token)}</span>
                         {" "}
                         {seat.entry.name}
                       </>
                     ) : seat.entry ? (
                       <>
                         {" · "}
-                        <span className="text-base font-semibold" data-queue-token={seat.entry.token}>{tokenLabel(seat.entry.token)}</span>
+                        <span className="nums text-base" data-queue-token={seat.entry.token}>{tokenLabel(seat.entry.token)}</span>
                         {" "}
                         {seat.entry.name}
                       </>
@@ -539,16 +540,16 @@ function StatusPills({ card, lang }: { card: Card; lang: string }) {
 
 function WhatsAppIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="#128C7E">
-      <path d="M12 3a9 9 0 0 0-7.8 13.4L3 21l4.7-1.2A9 9 0 1 0 12 3zm5 12.2c-.2.6-1.2 1.1-1.7 1.2-.4.1-.9.2-2.6-.6-2.2-.9-3.6-3.1-3.7-3.2-.1-.2-1-1.3-1-2.5s.6-1.8.9-2c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .5.4.2.6.7 1.8.7 1.9.1.2 0 .3-.1.5l-.3.4c-.1.1-.2.2-.1.4.2.3.7 1.1 1.5 1.8 1 .8 1.8 1.1 2.1 1.2.2.1.4.1.5-.1l.4-.5c.1-.2.3-.2.5-.1.2.1 1.4.7 1.6.8.2.1.4.2.4.3.1.2 0 .8-.2 1.3z" />
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22">
+      <path fill="#25D366" d="M12.04 2C6.58 2 2.15 6.4 2.15 11.83c0 1.74.46 3.44 1.34 4.94L2 22l5.39-1.41a10 10 0 0 0 4.65 1.18h.01c5.46 0 9.89-4.4 9.89-9.83C21.94 6.4 17.5 2 12.04 2zm5.76 13.89c-.24.68-1.4 1.3-1.94 1.38-.5.08-1.12.11-1.81-.11-.41-.14-.94-.31-1.62-.6-2.85-1.23-4.7-4.1-4.84-4.29-.14-.19-1.16-1.54-1.16-2.94s.73-2.08 1-2.37c.24-.27.64-.39.85-.39h.61c.2 0 .46-.04.72.55.27.64.92 2.2.1 2.3.1.16.05.3-.04.46l-.28.4c-.1.12-.2.25-.09.48.14.27.63 1.04 1.36 1.68.93.83 1.72 1.09 1.98 1.21.24.12.38.1.52-.06l.4-.47c.14-.16.3-.13.5-.08.21.06 1.32.62 1.55.73.23.12.38.17.44.27.05.1.05.58-.19 1.26z" />
     </svg>
   );
 }
 
 function PhoneIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 3.5h3l1.2 3.2-1.8 1.1a12 12 0 0 0 5.8 5.8l1.1-1.8 3.2 1.2v3A1.5 1.5 0 0 1 18 17.5 15 15 0 0 1 6.5 6 1.5 1.5 0 0 1 7 3.5z" />
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22">
+      <path fill="currentColor" d="M6.62 10.79a15.1 15.1 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 7a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.24.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z" />
     </svg>
   );
 }
@@ -566,18 +567,18 @@ function WaitingRow({ card, busy, lang, onArrive, onAdd, onDismiss, onMore }: {
     <article className="card px-3 py-2" data-queue-row={card.token}>
       <div className="flex items-center gap-2">
         <p className="min-w-0 flex-1">
-          <span className="text-base font-semibold" data-queue-token={card.token}>{tokenLabel(card.token)}</span>
+          <span className="nums text-base" data-queue-token={card.token}>{tokenLabel(card.token)}</span>
           {" "}
           <span className="text-sm">{card.name}</span>
         </p>
         {card.arrived ? (
-          <span className="inline-flex min-h-11 items-center rounded-full bg-[#1c7c54] px-3 text-sm text-white" data-arrived="yes">Arrived ✓</span>
+          <span className="queue-arrived inline-flex items-center rounded-full bg-[#1c7c54] px-3 text-sm text-white" data-arrived="yes">Arrived ✓</span>
         ) : (
-          <button className="btn min-h-11 px-3" type="button" data-arrived="yes" disabled={busy} onClick={onArrive}>Arrived</button>
+          <button className="btn queue-arrived px-3" type="button" data-arrived="yes" disabled={busy} onClick={onArrive}>Arrived</button>
         )}
-        {card.whatsappUrl ? <a className="btn secondary inline-flex h-11 w-11 items-center justify-center px-0" href={card.whatsappUrl} target="_blank" rel="noreferrer" aria-label="WhatsApp"><WhatsAppIcon /></a> : null}
-        {card.callUrl ? <a className="btn secondary inline-flex h-11 w-11 items-center justify-center px-0" href={card.callUrl} aria-label="Call"><PhoneIcon /></a> : null}
-        <button className="btn secondary min-h-11 min-w-11 px-0" type="button" aria-label="More actions" onClick={(event) => onMore(event)}>⋯</button>
+        {card.whatsappUrl ? <a className="btn secondary queue-icon" href={card.whatsappUrl} target="_blank" rel="noreferrer" aria-label="WhatsApp"><WhatsAppIcon /></a> : null}
+        {card.callUrl ? <a className="btn secondary queue-icon" href={card.callUrl} aria-label="Call"><PhoneIcon /></a> : null}
+        <button className="btn secondary queue-icon" type="button" aria-label="More actions" onClick={(event) => onMore(event)}>⋯</button>
       </div>
       <p className="mt-1 text-xs text-muted">{t(lang, "queueMinShort", { min: card.waitMin })}{card.serviceName ? ` · ${card.serviceName}` : ""}</p>
       <div className="mt-1"><StatusPills card={card} lang={lang} /></div>
@@ -596,13 +597,13 @@ function RowActions({ card, busy, lang, onArrive, onMore }: {
   return (
     <div className="flex flex-wrap items-center gap-1">
       {card.arrived ? (
-        <span className="inline-flex min-h-11 items-center rounded-full bg-[#1c7c54] px-3 text-sm text-white" data-arrived="yes">Arrived ✓</span>
+        <span className="queue-arrived inline-flex items-center rounded-full bg-[#1c7c54] px-3 text-sm text-white" data-arrived="yes">Arrived ✓</span>
       ) : (
-        <button className="btn min-h-11 px-3" type="button" data-arrived="yes" disabled={busy} onClick={onArrive}>{t(lang, "queueArrived")}</button>
+        <button className="btn queue-arrived px-3" type="button" data-arrived="yes" disabled={busy} onClick={onArrive}>{t(lang, "queueArrived")}</button>
       )}
-      {card.whatsappUrl ? <a className="btn secondary inline-flex h-11 w-11 items-center justify-center px-0" href={card.whatsappUrl} target="_blank" rel="noreferrer" aria-label="WhatsApp"><WhatsAppIcon /></a> : null}
-      {card.callUrl ? <a className="btn secondary inline-flex h-11 w-11 items-center justify-center px-0" href={card.callUrl} aria-label="Call"><PhoneIcon /></a> : null}
-      <button className="btn secondary min-h-11 min-w-11 px-0" type="button" aria-label="More actions" onClick={(event) => onMore(event)}>⋯</button>
+      {card.whatsappUrl ? <a className="btn secondary queue-icon" href={card.whatsappUrl} target="_blank" rel="noreferrer" aria-label="WhatsApp"><WhatsAppIcon /></a> : null}
+      {card.callUrl ? <a className="btn secondary queue-icon" href={card.callUrl} aria-label="Call"><PhoneIcon /></a> : null}
+      <button className="btn secondary queue-icon" type="button" aria-label="More actions" onClick={(event) => onMore(event)}>⋯</button>
     </div>
   );
 }

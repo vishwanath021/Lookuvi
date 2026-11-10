@@ -12,6 +12,7 @@ import { attributeReturn, recordVisit, rememberCustomer } from "@/lib/customers/
 import { bindTicket, linkSessionToEntry, tryLineForEntry } from "@/lib/at-salon";
 import { earnVisitPoints, listRewards, LoyaltyError, pointsBalance, pointsBalanceLine, pointsBalances, redeemReward, rewardProgress } from "@/lib/loyalty";
 import { almostMessage, confirmedMessage, deskWhatsAppText, joinedMessage, queueHomeUrl, statusPath, statusUrl, tryOnUrl } from "@/lib/queue/messages";
+import { formatToken } from "@/lib/queue/format-token";
 import { indianMobile } from "@/lib/queue/phone";
 
 export class QueueError extends Error {
@@ -150,7 +151,7 @@ function visitLinks(slug: string, ref: string) {
 }
 
 export function existingTokenMessage(token: number, name: string) {
-  return `This number already has token #${token} for ${name}. Open it or cancel before joining as someone else.`;
+  return `This number already has token ${formatToken(token)} for ${name}. Open it or cancel before joining as someone else.`;
 }
 
 function sameGuestName(left: string, right: string) {

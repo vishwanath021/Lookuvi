@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImportCustomers } from "@/components/admin/ImportCustomers";
 import { WeekHoursEditor } from "@/components/admin/WeekHoursEditor";
 import type { ToolId } from "@/lib/tools";
@@ -84,6 +84,15 @@ export function SettingsForm({
   const [team, setTeam] = useState(members);
   const [section, setSection] = useState<string | null>(null);
   const logoRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)");
+    const openDetails = () => {
+      if (media.matches) setSection((current) => current ?? "details");
+    };
+    openDetails();
+    media.addEventListener("change", openDetails);
+    return () => media.removeEventListener("change", openDetails);
+  }, []);
   const ownerCount = team.filter((member) => member.role === "OWNER").length;
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
@@ -211,18 +220,23 @@ export function SettingsForm({
     );
   }
 
+  const active = section ?? "details";
+
   return (
-    <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]" data-settings-menu="yes">
-      <nav className={section ? "hidden md:grid" : "grid"} aria-label="Settings sections">
-        {sections.map((item) => (
-          <button key={item.id} className={`btn secondary min-h-11 justify-start ${section === item.id ? "ring-2 ring-[var(--brand)]" : ""}`} type="button" aria-current={section === item.id ? "true" : undefined} onClick={() => setSection(item.id)}>
-            {item.label}
-          </button>
-        ))}
+    <div className="settings-menu grid items-start gap-4 md:grid-cols-[220px_minmax(0,1fr)]" data-settings-menu="yes" data-open={section ?? ""}>
+      <nav className="flex w-full flex-col gap-2 self-start" aria-label="Settings sections">
+        {sections.map((item) => {
+          const on = section === item.id;
+          return (
+            <button key={item.id} className={`btn settings-nav-btn h-11 w-full shrink-0 justify-start ${on ? "is-on" : "secondary"}`} data-default={item.id === "details" ? "yes" : undefined} type="button" aria-current={on ? "page" : undefined} onClick={() => setSection(item.id)}>
+              {item.label}
+            </button>
+          );
+        })}
       </nav>
-      <div className={section ? "grid gap-3" : "hidden md:grid"}>
-        {section ? <button className="btn ghost w-fit md:hidden" type="button" onClick={() => setSection(null)}>Back</button> : <p className="text-sm text-muted">Choose a section.</p>}
-        {section === "details" ? (
+      <div className={`${section ? "grid" : "hidden md:grid"} min-w-0 gap-3`}>
+        {section ? <button className="btn ghost w-fit md:hidden" type="button" onClick={() => setSection(null)}>Back</button> : null}
+        {active === "details" ? (
       <form className="card grid gap-3 p-4" onSubmit={save}>
         <h2 className="font-serif text-2xl">Salon details</h2>
         <Switch label="Try-ons only at the salon" hint="Free try-ons start when the customer is at the salon. Staff can add more at the queue." checked={form.tryOnsAtSalon} onChange={(next) => set("tryOnsAtSalon", next)} />

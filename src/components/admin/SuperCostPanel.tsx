@@ -109,11 +109,11 @@ export function SuperCostPanel({ initial }: { initial: Report }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-[14px] border border-line bg-sand p-4">
           <p className="text-sm text-muted">Estimate</p>
-          <p className="font-serif text-2xl">{money(totals.estimateInr)}</p>
+          <p className="nums text-2xl">{money(totals.estimateInr)}</p>
         </div>
         <div className="rounded-[14px] border border-line bg-sand p-4">
           <p className="text-sm text-muted">Actual</p>
-          <p className="font-serif text-2xl">{money(totals.actualInr)}</p>
+          <p className="nums text-2xl">{money(totals.actualInr)}</p>
           <p className="text-sm text-muted">{totals.actualCount} with a known actual</p>
         </div>
       </div>

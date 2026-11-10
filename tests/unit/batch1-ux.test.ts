@@ -32,7 +32,8 @@ describe("batch 1 guest and owner copy", () => {
     expect(settings).not.toContain("VisitUnlock");
     expect(settings).toContain("ImportCustomers");
     expect(focus).not.toContain("All settings");
-    expect(customers).toContain("Send this offer on WhatsApp to all customers");
+    expect(customers).toContain("Send offer on WhatsApp");
+    expect(customers).toContain("until this month");
     expect(customers).not.toContain("Two come-back messages per visit");
     expect(customers).not.toContain("Add customer");
   });

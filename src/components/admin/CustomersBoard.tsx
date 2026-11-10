@@ -115,10 +115,10 @@ export function CustomersBoard({
     <div className="mt-4 grid gap-4">
       <section className="card grid gap-3 p-4" data-return-panel="yes">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <p><span className="block text-xs uppercase tracking-[0.14em] text-muted">Reminders</span><span className="font-serif text-3xl" data-reminders-sent={stats.remindersSent}>{stats.remindersSent}</span></p>
-          <p><span className="block text-xs uppercase tracking-[0.14em] text-muted">Offers</span><span className="font-serif text-3xl">{stats.offersSent}</span></p>
-          <p><span className="block text-xs uppercase tracking-[0.14em] text-muted">WhatsApp used</span><span className="font-serif text-3xl" data-whatsapp-used={stats.used}>{stats.used} of {stats.cap}</span></p>
-          <p><span className="block text-xs uppercase tracking-[0.14em] text-muted">Came back</span><span className="font-serif text-3xl" data-returns={stats.returnsThisMonth}>{stats.returnsThisMonth}</span></p>
+          <p><span className="block text-xs uppercase tracking-[0.14em] text-muted">Reminders</span><span className="nums text-3xl" data-reminders-sent={stats.remindersSent}>{stats.remindersSent}</span></p>
+          <p><span className="block text-xs uppercase tracking-[0.14em] text-muted">Offers</span><span className="nums text-3xl">{stats.offersSent}</span></p>
+          <p><span className="block text-xs uppercase tracking-[0.14em] text-muted">WhatsApp used</span><span className="nums text-3xl" data-whatsapp-used={stats.used}>{stats.used} of {stats.cap}</span></p>
+          <p><span className="block text-xs uppercase tracking-[0.14em] text-muted">Came back</span><span className="nums text-3xl" data-returns={stats.returnsThisMonth}>{stats.returnsThisMonth}</span></p>
         </div>
         {whatsapp !== "ready" ? <p className="rounded-xl bg-[#f8efdc] px-3 py-2 text-sm" role="status">WhatsApp is not connected. Reminders are paused.</p> : null}
       </section>
@@ -131,17 +131,25 @@ export function CustomersBoard({
             void act({ action: "settings", remindersOn: form.remindersOn, reminderDays: Number(form.reminderDays), whatsappMonthlyCap: Number(form.whatsappMonthlyCap) });
           }}
         >
-          <h2 className="text-base font-semibold">Reminders</h2>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.remindersOn} onChange={(event) => setForm({ ...form, remindersOn: event.target.checked })} />
-            On
-          </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold">Reminders</h2>
+            <button
+              className={`relative h-11 w-16 shrink-0 rounded-full border border-line ${form.remindersOn ? "bg-[var(--brand)]" : "bg-sand"}`}
+              type="button"
+              role="switch"
+              aria-checked={form.remindersOn}
+              aria-label="Reminders"
+              onClick={() => setForm({ ...form, remindersOn: !form.remindersOn })}
+            >
+              <span className={`absolute top-1 h-9 w-9 rounded-full bg-white shadow ${form.remindersOn ? "left-6" : "left-1"}`} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <label className="text-sm">Days
-              <input className="field narrow mt-1" type="number" min={28} max={42} aria-label="Days after the last visit" value={form.reminderDays} onChange={(event) => setForm({ ...form, reminderDays: Number(event.target.value) })} />
+              <input className="field mt-1" type="number" min={28} max={42} aria-label="Days after the last visit" value={form.reminderDays} onChange={(event) => setForm({ ...form, reminderDays: Number(event.target.value) })} />
             </label>
             <label className="text-sm">Monthly cap
-              <input className="field narrow mt-1" type="number" min={0} max={5000} aria-label="Monthly WhatsApp limit" value={form.whatsappMonthlyCap} onChange={(event) => setForm({ ...form, whatsappMonthlyCap: Number(event.target.value) })} />
+              <input className="field mt-1" type="number" min={0} max={5000} aria-label="Monthly WhatsApp limit" value={form.whatsappMonthlyCap} onChange={(event) => setForm({ ...form, whatsappMonthlyCap: Number(event.target.value) })} />
             </label>
           </div>
           <button className="btn w-fit" type="submit" disabled={busy}>Save</button>
@@ -150,17 +158,18 @@ export function CustomersBoard({
 
       {owner ? (
         <form
-          className="card flex flex-wrap items-center gap-2 p-4"
+          className="card grid gap-2 p-4"
           onSubmit={(event) => {
             event.preventDefault();
             void act({ action: "broadcast", text: offer });
           }}
         >
-          <input className="field min-w-0 flex-1" maxLength={180} aria-label="Offer" value={offer} onChange={(event) => setOffer(event.target.value)} placeholder="Offer" />
-          <div className="grid gap-1">
-            <button className="btn" type="submit" disabled={busy}>Send this offer on WhatsApp to all customers</button>
-            <p className="text-sm text-muted">It goes to everyone in your customer list, until this month&apos;s WhatsApp limit is used.</p>
-          </div>
+          <input className="field" maxLength={180} aria-label="Offer" value={offer} onChange={(event) => setOffer(event.target.value)} placeholder="Offer" />
+          <button className="btn w-fit whitespace-nowrap" type="submit" disabled={busy}>
+            <WhatsAppIcon />
+            Send offer on WhatsApp
+          </button>
+          <p className="max-w-3xl text-sm text-muted">It goes to everyone in your customer list, until this month&apos;s WhatsApp limit is used.</p>
         </form>
       ) : null}
 
@@ -194,6 +203,7 @@ function CustomerTable({
   onPage: (value: number) => void;
   onAct: (body: Record<string, unknown>) => void;
 }) {
+  const [adjust, setAdjust] = useState<Customer | null>(null);
   const pages = Math.max(1, Math.ceil(customers.length / CUSTOMER_PAGE));
   const safePage = Math.min(page, pages - 1);
   const rows = customers.slice(safePage * CUSTOMER_PAGE, safePage * CUSTOMER_PAGE + CUSTOMER_PAGE);
@@ -201,60 +211,43 @@ function CustomerTable({
     <section className="grid gap-3" data-customer-table="yes">
       <input className="field max-w-sm" aria-label="Search customers" placeholder="Name or phone" value={query} onChange={(event) => onQuery(event.target.value)} />
       {customers.length === 0 ? <p className="text-sm text-muted">No customers yet.</p> : (
-        <div className="overflow-x-auto rounded-[14px] border border-line bg-white">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="text-xs uppercase text-muted">
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Phone</th>
-                <th className="px-3 py-2 font-medium">Visits</th>
-                <th className="px-3 py-2 font-medium">Last visit</th>
-                <th className="px-3 py-2 font-medium">Points</th>
-                <th className="px-3 py-2 font-medium">Reminders</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-t border-line align-top" data-customer-phone={row.phone}>
-                  <td className="px-3 py-2 font-medium">{row.name || "No name"}</td>
-                  <td className="px-3 py-2">{row.phoneLabel}</td>
-                  <td className="px-3 py-2">{row.visitCount}</td>
-                  <td className="px-3 py-2">{row.lastVisitLabel}</td>
-                  <td className="px-3 py-2" data-customer-points={row.points}>{row.points}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {row.stop ? <span>Replied STOP</span> : null}
-                      {!row.stop && row.canResume && !owner ? <span>Stopped at the desk</span> : null}
-                      {!row.stop && row.canResume && owner ? (
-                        <button className="btn secondary min-h-11" type="button" disabled={busy} onClick={() => onAct({ action: "resume", id: row.id })}>Turn reminders on</button>
-                      ) : null}
-                      {!row.stop && !row.optedOut ? (
-                        <button className="btn secondary min-h-11" type="button" disabled={busy} onClick={() => onAct({ action: "stop", id: row.id })}>Stop reminders</button>
-                      ) : null}
-                      <details>
-                        <summary className="cursor-pointer text-sm font-medium">Adjust points</summary>
-                        <form
-                          className="mt-2 flex flex-wrap items-end gap-2"
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            const data = new FormData(event.currentTarget);
-                            onAct({ action: "adjust", id: row.id, delta: Number(data.get("delta")), reason: String(data.get("reason") || "") });
-                            event.currentTarget.reset();
-                          }}
-                        >
-                          <input className="field narrow" name="delta" type="number" step={1} required aria-label={`Points change for ${row.phoneLabel}`} placeholder="+1" />
-                          <input className="field w-28" name="reason" required maxLength={120} aria-label={`Reason for ${row.phoneLabel}`} placeholder="Reason" />
-                          <button className="btn secondary min-h-11" type="submit" disabled={busy}>Save</button>
-                        </form>
-                      </details>
-                    </div>
-                  </td>
+        <>
+          <div className="grid md:hidden">
+            {rows.map((row) => (
+              <CustomerCard key={row.id} row={row} busy={busy} owner={owner} onAct={onAct} onAdjust={() => setAdjust(row)} />
+            ))}
+          </div>
+          <div className="hidden overflow-x-hidden rounded-[14px] border border-line bg-white md:block">
+            <table className="w-full table-fixed text-left text-sm">
+              <thead>
+                <tr className="text-xs uppercase text-muted">
+                  <th className="w-[24%] px-3 py-2 font-medium">Name</th>
+                  <th className="w-[18%] px-3 py-2 font-medium">Phone</th>
+                  <th className="w-[10%] px-3 py-2 font-medium">Visits</th>
+                  <th className="w-[18%] px-3 py-2 font-medium">Last visit</th>
+                  <th className="w-[10%] px-3 py-2 font-medium">Points</th>
+                  <th className="w-[20%] px-3 py-2 font-medium">Reminders</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id} className="border-t border-line" data-customer-phone={row.phone}>
+                    <td className="truncate px-3 py-2 font-medium">{row.name || "No name"}</td>
+                    <td className="nums truncate px-3 py-2 font-normal">{row.phoneLabel}</td>
+                    <td className="nums px-3 py-2 font-normal">{row.visitCount}</td>
+                    <td className="nums truncate px-3 py-2 font-normal">{row.lastVisitLabel}</td>
+                    <td className="nums px-3 py-2 font-normal" data-customer-points={row.points}>{row.points}</td>
+                    <td className="px-3 py-2">
+                      <RowActions row={row} busy={busy} owner={owner} onAct={onAct} onAdjust={() => setAdjust(row)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
+      <AdjustSheet row={adjust} busy={busy} owner={owner} onClose={() => setAdjust(null)} onAct={onAct} />
       {customers.length > CUSTOMER_PAGE ? (
         <div className="flex items-center gap-2">
           <button className="btn secondary min-h-11" type="button" disabled={safePage === 0} onClick={() => onPage(safePage - 1)}>Previous</button>
@@ -263,6 +256,119 @@ function CustomerTable({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function CustomerCard({
+  row,
+  busy,
+  owner,
+  onAct,
+  onAdjust,
+}: {
+  row: Customer;
+  busy: boolean;
+  owner: boolean;
+  onAct: (body: Record<string, unknown>) => void;
+  onAdjust: () => void;
+}) {
+  return (
+    <article className="flex items-center gap-2 border-b border-line py-2" data-customer-phone={row.phone}>
+      <div className="min-w-0 flex-1">
+        <p className="flex items-baseline gap-2">
+          <span className="min-w-0 truncate font-medium">{row.name || "No name"}</span>
+          <span className="nums shrink-0 text-sm font-normal" data-customer-points={row.points}>{row.points}</span>
+        </p>
+        <p className="truncate text-xs text-muted">{row.phoneLabel} · {row.visitCount} {row.visitCount === 1 ? "visit" : "visits"} · {row.lastVisitLabel}</p>
+      </div>
+      <RowActions row={row} busy={busy} owner={owner} onAct={onAct} onAdjust={onAdjust} />
+    </article>
+  );
+}
+
+function RowActions({
+  row,
+  busy,
+  owner,
+  onAct,
+  onAdjust,
+}: {
+  row: Customer;
+  busy: boolean;
+  owner: boolean;
+  onAct: (body: Record<string, unknown>) => void;
+  onAdjust: () => void;
+}) {
+  const blocked = row.stop || row.optedOut;
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      {owner ? (
+        <button className="btn secondary h-11 w-11 shrink-0 p-0" type="button" aria-label={`Remind ${row.name || row.phoneLabel} on WhatsApp`} disabled={busy || blocked} onClick={() => onAct({ action: "comeback", ids: [row.id] })}>
+          <WhatsAppIcon />
+        </button>
+      ) : null}
+      <button className="btn secondary h-11 w-11 shrink-0 p-0" type="button" aria-label={`Points for ${row.name || row.phoneLabel}`} onClick={onAdjust}>⋯</button>
+    </div>
+  );
+}
+
+function AdjustSheet({
+  row,
+  busy,
+  owner,
+  onClose,
+  onAct,
+}: {
+  row: Customer | null;
+  busy: boolean;
+  owner: boolean;
+  onClose: () => void;
+  onAct: (body: Record<string, unknown>) => void;
+}) {
+  if (!row) return null;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-4 sm:place-items-center" role="dialog" aria-label="Adjust points">
+      <div className="card grid w-full max-w-sm gap-3 p-4">
+        <h2 className="text-base font-semibold">{row.name || "No name"}</h2>
+        <p className="nums text-sm font-normal text-muted">{row.points} points</p>
+        {row.stop ? <p className="text-sm">Replied STOP</p> : null}
+        {!row.stop && row.canResume && !owner ? <p className="text-sm">Stopped at the desk</p> : null}
+        {!row.stop && row.canResume && owner ? (
+          <button className="btn secondary" type="button" disabled={busy} onClick={() => { onAct({ action: "resume", id: row.id }); onClose(); }}>Turn reminders on</button>
+        ) : null}
+        {!row.stop && !row.optedOut ? (
+          <button className="btn secondary" type="button" disabled={busy} onClick={() => { onAct({ action: "stop", id: row.id }); onClose(); }}>Stop reminders</button>
+        ) : null}
+        {owner ? (
+          <form
+            className="grid gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const data = new FormData(event.currentTarget);
+              onAct({ action: "adjust", id: row.id, delta: Number(data.get("delta")), reason: String(data.get("reason") || "") });
+              onClose();
+            }}
+          >
+            <label className="text-sm">Points change
+              <input className="field mt-1" name="delta" type="number" step={1} required aria-label={`Points change for ${row.phoneLabel}`} placeholder="+1" />
+            </label>
+            <label className="text-sm">Reason
+              <input className="field mt-1" name="reason" required maxLength={120} aria-label={`Reason for ${row.phoneLabel}`} placeholder="Reason" />
+            </label>
+            <button className="btn" type="submit" disabled={busy}>Save</button>
+          </form>
+        ) : null}
+        <button className="btn ghost" type="button" onClick={onClose}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="#128C7E">
+      <path d="M12 3a9 9 0 0 0-7.8 13.4L3 21l4.7-1.2A9 9 0 1 0 12 3zm5 12.2c-.2.6-1.2 1.1-1.7 1.2-.4.1-.9.2-2.6-.6-2.2-.9-3.6-3.1-3.7-3.2-.1-.2-1-1.3-1-2.5s.6-1.8.9-2c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .5.4.2.6.7 1.8.7 1.9.1.2 0 .3-.1.5l-.3.4c-.1.1-.2.2-.1.4.2.3.7 1.1 1.5 1.8 1 .8 1.8 1.1 2.1 1.2.2.1.4.1.5-.1l.4-.5c.1-.2.3-.2.5-.1.2.1 1.4.7 1.6.8.2.1.4.2.4.3.1.2 0 .8-.2 1.3z" />
+    </svg>
   );
 }
 

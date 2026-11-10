@@ -1,4 +1,5 @@
 import { appBaseUrl } from "@/lib/env";
+import { formatToken } from "@/lib/queue/format-token";
 import type { NotifyMessage } from "@/lib/notify";
 import { whatsAppDate, whatsAppTime } from "@/lib/whatsapp-format";
 
@@ -30,20 +31,21 @@ export function joinedMessage(input: { salon: string; token: number; waitMin: nu
   return {
     to: "",
     kind: "joined",
-    body: withLinks(`${input.salon}: you have joined, token ${input.token}, about ${input.waitMin} min. ${input.link}`, input.home, input.tryOn),
-    parameters: [input.salon, String(input.token), String(input.waitMin), input.link, input.home, input.tryOn],
+    body: withLinks(`${input.salon}: you have joined, token ${formatToken(input.token)}, about ${input.waitMin} min. ${input.link}`, input.home, input.tryOn),
+    parameters: [input.salon, formatToken(input.token), String(input.waitMin), input.link, input.home, input.tryOn],
   };
 }
 
 export function almostMessage(input: { salon: string; token: number; waitMin: number; link: string; home: string; tryOn: string }): NotifyMessage {
+  const token = formatToken(input.token);
   const core = input.waitMin <= 0
-    ? `${input.salon}: token ${input.token}, please come in now. ${input.link}`
-    : `${input.salon}: token ${input.token}, about ${input.waitMin} min left. ${input.link}`;
+    ? `${input.salon}: token ${token}, please come in now. ${input.link}`
+    : `${input.salon}: token ${token}, about ${input.waitMin} min left. ${input.link}`;
   return {
     to: "",
     kind: "almost",
     body: withLinks(core, input.home, input.tryOn),
-    parameters: [input.salon, String(input.token), String(input.waitMin), input.link, input.home, input.tryOn],
+    parameters: [input.salon, token, String(input.waitMin), input.link, input.home, input.tryOn],
   };
 }
 
@@ -79,5 +81,5 @@ export function offerMessage(input: { salon: string; offer: string; join: string
 export function deskWhatsAppText(salon: string, token: number, name: string, links?: { home: string; tryOn: string }) {
   const who = name.trim() || "there";
   const extra = links ? ` Join from home next time: ${links.home} Try a look: ${links.tryOn}` : "";
-  return `Hi ${who}, this is ${salon}. Your token is ${token}.${extra}`;
+  return `Hi ${who}, this is ${salon}. Your token is ${formatToken(token)}.${extra}`;
 }
