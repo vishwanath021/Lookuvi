@@ -857,6 +857,13 @@ textarea { min-height: 48px; }
   padding: 0;
 }
 .queue-icon svg { width: 22px; height: 22px; display: block; }
+@media (max-width: 767px) {
+  .owner-shell h1.page-title,
+  .owner-shell [data-queue-mode] > header > h1,
+  .super-shell h1.page-title {
+    display: none;
+  }
+}
 .status-chip {
   width: 8.5rem;
   min-width: 8.5rem;

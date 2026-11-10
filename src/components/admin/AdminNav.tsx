@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SignOutButton } from "@/components/admin/SignOutButton";
 import { LegalFooter } from "@/components/legal/LegalFooter";
@@ -29,6 +30,7 @@ export function AdminNav({
   salons?: { id: string; name: string }[];
   currentTenantId?: string;
 }) {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const [left, setLeft] = useState(credits);
@@ -47,10 +49,13 @@ export function AdminNav({
   const links = ownerNav({ role, slug, productTryOn, productQueue, features, onboardingDone });
   const main = links.filter((link) => link.section === "main");
   const more = links.filter((link) => link.section === "more");
+  const pageTitle = links.find((link) => pathname === link.href || (link.href !== "/admin" && pathname.startsWith(`${link.href}/`)))?.label
+    || (pathname.startsWith("/admin/onboarding") ? "Onboarding" : "Lookuvi");
   return (
     <div className="print:hidden">
-      <div className="mb-3 flex items-center justify-between gap-3 md:hidden">
-        <p className="min-w-0 truncate font-serif text-lg leading-tight">{name}</p>
+      <div className="owner-mobile-bar sticky top-0 z-40 -mx-3 -mt-6 mb-3 flex h-14 items-center gap-2 border-b border-line bg-[var(--bg)] px-3 md:hidden">
+        <p className="min-w-0 max-w-[38%] truncate text-sm font-semibold">{name}</p>
+        <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{pageTitle}</h1>
         <button className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-line bg-white text-[#3e304b]" type="button" data-ready={ready ? "yes" : "no"} aria-expanded={open} aria-controls="salon-nav" aria-label={open ? "Close menu" : "Menu"} onClick={() => setOpen((value) => !value)}>
           {open ? (
             <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">

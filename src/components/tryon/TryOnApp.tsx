@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { flushSync } from "react-dom";
 import { isPlatformLogo, LookuviMark } from "@/components/brand/LookuviMark";
+import { WhatsAppIcon } from "@/components/icons/ContactIcons";
 import { BeforeAfter } from "@/components/tryon/BeforeAfter";
 import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
 import { GuestNav } from "@/components/guest/GuestNav";
@@ -1078,7 +1079,7 @@ export function TryOnApp({
 
   return (
     <div data-salon-mode={salonMode ? "yes" : "no"} data-queue-mode={queueMode} className={embed ? "flex min-h-dvh flex-col" : "guest-shell flex min-h-dvh w-full flex-col"}>
-      <header className={`salon-bar header-metal sticky top-0 z-30 px-4 ${embed ? "" : "guest-bar-bleed"}`}>
+      <header className={`salon-bar header-metal sticky top-0 z-30 border-b border-white/15 px-4 py-3 ${embed ? "" : "guest-bar-bleed"}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white">
@@ -1094,7 +1095,7 @@ export function TryOnApp({
             <div className="flex gap-2">
               <a className="btn bar-book flex-1 whitespace-nowrap sm:flex-none" href={bookHref} target="_blank" rel="noreferrer">{t(lang, "bookNow")}</a>
               <a className="btn bar-chat flex-1 whitespace-nowrap sm:flex-none" href={chatHref} target="_blank" rel="noreferrer">
-                <WhatsAppGlyph />
+                <WhatsAppIcon />
                 {t(lang, "whatsappBtn")}
               </a>
             </div>
@@ -1571,14 +1572,6 @@ export function TryOnApp({
       </div>
       {embed ? null : <GuestNav slug={config.slug} lang={lang} joinHref={joinHref} current="try" />}
     </div>
-  );
-}
-
-function WhatsAppGlyph() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="#25D366">
-      <path d="M12 3a9 9 0 0 0-7.8 13.4L3 21l4.7-1.2A9 9 0 1 0 12 3zm5 12.2c-.2.6-1.2 1.1-1.7 1.2-.4.1-.9.2-2.6-.6-2.2-.9-3.6-3.1-3.7-3.2-.1-.2-1-1.3-1-2.5s.6-1.8.9-2c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .5.4.2.6.7 1.8.7 1.9.1.2 0 .3-.1.5l-.3.4c-.1.1-.2.2-.1.4.2.3.7 1.1 1.5 1.8 1 .8 1.8 1.1 2.1 1.2.2.1.4.1.5-.1l.4-.5c.1-.2.3-.2.5-.1.2.1 1.4.7 1.6.8.2.1.4.2.4.3.1.2 0 .8-.2 1.3z" />
-    </svg>
   );
 }
 
