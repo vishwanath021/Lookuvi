@@ -113,6 +113,24 @@ describe("queue joins", () => {
     expect(send.mock.calls.filter((call) => call[0].kind === "almost")).toHaveLength(0);
   });
 
+  it("keeps a seated guest and the waiting line when the chair count would hide that seat", async () => {
+    const { slug, tenant } = await salon();
+    await saveQueueSettings(tenant.id, { units: 2, avgMinutes: 20, alertLeadMin: 5, mode: "LIVE", unitLabel: "chair" });
+    await joinQueue({ slug, name: "Seated one", phone: "9876500801", consent: true, ip: "seat-a", send });
+    await joinQueue({ slug, name: "Seated two", phone: "9876500802", consent: true, ip: "seat-b", send });
+    const waiting = await joinQueue({ slug, name: "Still waiting", phone: "9876500803", consent: true, ip: "seat-c", send });
+    await callNext(tenant.id, send);
+    await callNext(tenant.id, send);
+    await expect(saveQueueSettings(tenant.id, { units: 1, avgMinutes: 20, alertLeadMin: 5, mode: "LIVE", unitLabel: "chair" })).rejects.toMatchObject({ code: "CHAIRS" });
+    const state = await prisma.queueState.findUniqueOrThrow({ where: { tenantId: tenant.id } });
+    expect(state.units).toBe(2);
+    const line = await prisma.queueEntry.findFirstOrThrow({ where: { cancelToken: waiting.ref } });
+    expect(line.status).toBe("WAITING");
+    const desk = await saveQueueSettings(tenant.id, { units: 2, avgMinutes: 20, alertLeadMin: 5, mode: "LIVE", unitLabel: "chair" });
+    expect(desk.serving.filter((seat) => seat.entry).length).toBe(2);
+    expect(desk.waiting.some((card) => card.name === "Still waiting")).toBe(true);
+  });
+
   it("sends an online guest one near-turn alert and does not send it again when they are called", async () => {
     const { slug, tenant } = await salon();
     await prisma.tenant.update({ where: { id: tenant.id }, data: { whatsappAlmostOn: true } });

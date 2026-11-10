@@ -21,7 +21,7 @@ export const LOOK_CATEGORIES = [
   { id: "long", label: "Long" },
   { id: "curly", label: "Curly" },
   { id: "trending", label: "Trending" },
-  { id: "saved", label: "Saved" },
+  { id: "saved", label: "Saved looks" },
 ] as const;
 
 export function lookTagsForStyle(

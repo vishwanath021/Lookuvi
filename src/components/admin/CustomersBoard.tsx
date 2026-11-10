@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Customer = {
   id: string;
@@ -68,11 +68,14 @@ export function CustomersBoard({
   const [stats, setStats] = useState(initialStats);
   const [form, setForm] = useState(settings);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [offer, setOffer] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const skipQueryFetch = useRef(true);
+  const reloadRef = useRef<(nextQuery?: string) => Promise<void>>(async () => undefined);
 
   async function reload(nextQuery = query) {
     const res = await fetch(`/api/v1/admin/customers?q=${encodeURIComponent(nextQuery)}`);
@@ -82,6 +85,18 @@ export function CustomersBoard({
     if (data.stats) setStats(data.stats);
     if (data.settings) setForm(data.settings);
   }
+
+  reloadRef.current = reload;
+
+  useEffect(() => {
+    if (skipQueryFetch.current) {
+      skipQueryFetch.current = false;
+      return;
+    }
+    setPage(0);
+    const timer = setTimeout(() => { void reloadRef.current(query); }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   async function act(body: Record<string, unknown>) {
     setBusy(true);
@@ -187,53 +202,101 @@ export function CustomersBoard({
 
       {notice ? <p className="text-sm" role="status">{notice}</p> : null}
 
-      <section className="grid gap-3">
-        <form
-          className="flex gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void reload(query);
-          }}
-        >
-          <input className="field" aria-label="Search customers" placeholder="Name or phone" value={query} onChange={(event) => setQuery(event.target.value)} />
-          <button className="btn secondary" type="submit" disabled={busy}>Search</button>
-        </form>
-        {customers.length === 0 ? <p className="text-sm text-muted">No customers yet.</p> : null}
-        {customers.map((row) => (
-          <article key={row.id} className="card grid gap-1 p-4" data-customer-phone={row.phone}>
-            <p className="text-lg">{row.name || "No name"}</p>
-            <p className="text-sm">{row.phoneLabel}</p>
-            <p className="text-sm text-muted">{row.visitCount} {row.visitCount === 1 ? "visit" : "visits"} · {row.lastVisitLabel}</p>
-            <p className="text-sm" data-customer-points={row.points}>{row.points} {row.points === 1 ? "point" : "points"}</p>
-            <form
-              className="mt-2 flex flex-wrap items-end gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const data = new FormData(event.currentTarget);
-                void act({ action: "adjust", id: row.id, delta: Number(data.get("delta")), reason: String(data.get("reason") || "") });
-                event.currentTarget.reset();
-              }}
-            >
-              <label className="text-sm">Change
-                <input className="field narrow mt-1" name="delta" type="number" step={1} required aria-label={`Points change for ${row.phoneLabel}`} placeholder="+1" />
-              </label>
-              <label className="text-sm">Reason
-                <input className="field mt-1" name="reason" required maxLength={120} aria-label={`Reason for ${row.phoneLabel}`} placeholder="Reason" />
-              </label>
-              <button className="btn secondary min-h-11" type="submit" disabled={busy}>Adjust points</button>
-            </form>
-            {row.stop ? <p className="text-sm">Replied STOP</p> : null}
-            {!row.stop && row.canResume && owner ? (
-              <button className="btn secondary mt-2 w-fit" type="button" disabled={busy} onClick={() => void act({ action: "resume", id: row.id })}>Turn reminders on</button>
-            ) : null}
-            {!row.stop && row.canResume && !owner ? <p className="text-sm">Stopped at the desk</p> : null}
-            {!row.stop && !row.optedOut ? (
-              <button className="btn secondary mt-2 w-fit" type="button" disabled={busy} onClick={() => void act({ action: "stop", id: row.id })}>Stop reminders</button>
-            ) : null}
-          </article>
-        ))}
-      </section>
+      <CustomerTable customers={customers} query={query} page={page} busy={busy} owner={owner} onQuery={setQuery} onPage={setPage} onAct={(body) => void act(body)} />
     </div>
+  );
+}
+
+const CUSTOMER_PAGE = 8;
+
+function CustomerTable({
+  customers,
+  query,
+  page,
+  busy,
+  owner,
+  onQuery,
+  onPage,
+  onAct,
+}: {
+  customers: Customer[];
+  query: string;
+  page: number;
+  busy: boolean;
+  owner: boolean;
+  onQuery: (value: string) => void;
+  onPage: (value: number) => void;
+  onAct: (body: Record<string, unknown>) => void;
+}) {
+  const pages = Math.max(1, Math.ceil(customers.length / CUSTOMER_PAGE));
+  const safePage = Math.min(page, pages - 1);
+  const rows = customers.slice(safePage * CUSTOMER_PAGE, safePage * CUSTOMER_PAGE + CUSTOMER_PAGE);
+  return (
+    <section className="grid gap-3" data-customer-table="yes">
+      <input className="field max-w-sm" aria-label="Search customers" placeholder="Name or phone" value={query} onChange={(event) => onQuery(event.target.value)} />
+      {customers.length === 0 ? <p className="text-sm text-muted">No customers yet.</p> : (
+        <div className="overflow-x-auto rounded-[14px] border border-line bg-white">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="text-xs uppercase text-muted">
+                <th className="px-3 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 font-medium">Phone</th>
+                <th className="px-3 py-2 font-medium">Visits</th>
+                <th className="px-3 py-2 font-medium">Last visit</th>
+                <th className="px-3 py-2 font-medium">Points</th>
+                <th className="px-3 py-2 font-medium">Reminders</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} className="border-t border-line align-top" data-customer-phone={row.phone}>
+                  <td className="px-3 py-2 font-medium">{row.name || "No name"}</td>
+                  <td className="px-3 py-2">{row.phoneLabel}</td>
+                  <td className="px-3 py-2">{row.visitCount}</td>
+                  <td className="px-3 py-2">{row.lastVisitLabel}</td>
+                  <td className="px-3 py-2" data-customer-points={row.points}>{row.points}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {row.stop ? <span>Replied STOP</span> : null}
+                      {!row.stop && row.canResume && !owner ? <span>Stopped at the desk</span> : null}
+                      {!row.stop && row.canResume && owner ? (
+                        <button className="btn secondary min-h-11" type="button" disabled={busy} onClick={() => onAct({ action: "resume", id: row.id })}>Turn reminders on</button>
+                      ) : null}
+                      {!row.stop && !row.optedOut ? (
+                        <button className="btn secondary min-h-11" type="button" disabled={busy} onClick={() => onAct({ action: "stop", id: row.id })}>Stop reminders</button>
+                      ) : null}
+                      <details>
+                        <summary className="cursor-pointer text-sm font-medium">Adjust points</summary>
+                        <form
+                          className="mt-2 flex flex-wrap items-end gap-2"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            const data = new FormData(event.currentTarget);
+                            onAct({ action: "adjust", id: row.id, delta: Number(data.get("delta")), reason: String(data.get("reason") || "") });
+                            event.currentTarget.reset();
+                          }}
+                        >
+                          <input className="field narrow" name="delta" type="number" step={1} required aria-label={`Points change for ${row.phoneLabel}`} placeholder="+1" />
+                          <input className="field w-28" name="reason" required maxLength={120} aria-label={`Reason for ${row.phoneLabel}`} placeholder="Reason" />
+                          <button className="btn secondary min-h-11" type="submit" disabled={busy}>Save</button>
+                        </form>
+                      </details>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {customers.length > CUSTOMER_PAGE ? (
+        <div className="flex items-center gap-2">
+          <button className="btn secondary min-h-11" type="button" disabled={safePage === 0} onClick={() => onPage(safePage - 1)}>Previous</button>
+          <p className="text-sm">{safePage + 1} of {pages}</p>
+          <button className="btn secondary min-h-11" type="button" disabled={safePage >= pages - 1} onClick={() => onPage(safePage + 1)}>Next</button>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -259,7 +322,7 @@ function NotBackYet({
       <div>
         <h2 className="text-base font-semibold">Not back yet</h2>
         <p className="mt-1 text-sm" data-lapsed-summary="yes">{lapsed.summary}</p>
-        <p className="text-sm text-muted">Two come-back messages per visit: one around 6 weeks, one at 2 months. Then it stops until the next visit.</p>
+        <p className="text-sm text-muted">Two come-back messages per visit: one around 6 weeks, one at 2 months. Then it stops until the next visit. These three groups stay fixed so a customer is not messaged again after that. To change who shows on Due for a visit, set Days since their last visit in Reminders.</p>
       </div>
       {!ready ? (
         <p className="rounded-xl bg-[#f8efdc] px-3 py-2 text-sm" role="status">

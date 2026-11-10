@@ -294,8 +294,7 @@ export function SettingsForm({
                 <label className="text-sm">Included try-ons per month
                   <input className="field mt-1" type="number" min={0} max={5000} aria-label="Included try-ons per month" value={form.monthlyTryAllowance} onChange={(event) => set("monthlyTryAllowance", Number(event.target.value))} />
                 </label>
-                <p className="text-xs text-muted">0 means no AI previews for that group. The monthly number is a hard stop for the salon, including staff. Guests who are not signed in use the anonymous daily cap. Provider rupee caps still apply.{enabledTools.includes("colour") ? " Live colour stays free." : ""}</p>
-                <SalonModeCard initialUrl={salonModeUrl} canRotate />
+                <p className="text-xs text-muted">0 means no AI previews for that group. The monthly number is a hard stop for the salon, including staff. Guests who are not signed in use the anonymous daily cap. These caps are not the try-ons left in the sidebar. Try-ons left is the salon balance, which a super-admin adds or removes. Provider rupee caps still apply.{enabledTools.includes("colour") ? " Live colour stays free." : ""}</p>
               </>
             ) : null}
           </div>
@@ -312,6 +311,7 @@ export function SettingsForm({
         </label>
         <button className="btn" type="submit">Save</button>
       </form>
+      {showTryOn ? <SalonModeCard initialUrl={salonModeUrl} canRotate /> : null}
       {showDomain ? <form className="card grid gap-2 p-4" onSubmit={(event) => { event.preventDefault(); void addDomain(false); }}>
         <h2 className="font-serif text-2xl">Custom domain</h2>
         <input className="field" placeholder="try.yoursalon.in" value={host} onChange={(event) => setHost(event.target.value)} aria-label="Custom domain" />

@@ -712,6 +712,15 @@ export async function setClosedToday(tenantId: string, closed: boolean, now = ne
   return deskSnapshot(tenantId, now);
 }
 
+/** Highest chair, station, or room that still has someone called or in service. Waiting guests do not count. */
+export function occupiedSeatFloor(entries: { status: string; unitSlot: number | null }[]) {
+  let floor = 0;
+  for (const row of entries) {
+    if ((row.status === "CALLED" || row.status === "IN_SERVICE") && row.unitSlot && row.unitSlot > floor) floor = row.unitSlot;
+  }
+  return floor;
+}
+
 export async function saveQueueSettings(tenantId: string, input: {
   units: number;
   avgMinutes: number;
@@ -721,6 +730,16 @@ export async function saveQueueSettings(tenantId: string, input: {
 }) {
   await requireDesk(tenantId);
   await ensureQueueState(tenantId);
+  const day = await loadDay(tenantId, kolkataDayKey());
+  const floor = occupiedSeatFloor(day.entries);
+  if (input.units < floor) {
+    const place = input.unitLabel === "station" ? "station" : input.unitLabel === "room" ? "room" : "chair";
+    throw new QueueError(
+      "CHAIRS",
+      `Someone is still at ${place} ${floor}. Finish that visit, or send them back to the line, before you use fewer ${place}s. People waiting stay in line.`,
+      409,
+    );
+  }
   await prisma.queueState.update({
     where: { tenantId },
     data: {

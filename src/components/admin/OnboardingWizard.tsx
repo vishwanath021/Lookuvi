@@ -46,8 +46,12 @@ export function OnboardingWizard({
       body: JSON.stringify({ name, primaryColor: color, whatsapp, address, languages, defaultLang: languages[0] || "en", onboardingDone: done, openTime, closeTime, weeklyHours, reminderMethod: reminderMethod === "AUTO" ? "MANUAL" : reminderMethod }),
     });
     const data = await res.json();
-    if (!res.ok) setMessage(data.message || "Could not save");
-    else setMessage(done ? "Salon page is ready." : ONBOARDING_SAVED);
+    if (!res.ok) {
+      setMessage(data.message || "Could not save");
+      return;
+    }
+    setMessage(done ? "Salon page is ready." : ONBOARDING_SAVED);
+    if (done) window.location.assign("/admin");
   }
 
   return (

@@ -1,4 +1,5 @@
 import { ReminderSettingsCard } from "@/components/admin/ReminderSettingsCard";
+import { SettingsFocus } from "@/components/admin/SettingsFocus";
 import { SettingsForm } from "@/components/admin/SettingsForm";
 import { gstEnabled } from "@/lib/pricing";
 import { planById } from "@/data/plans";
@@ -28,15 +29,19 @@ export default async function SettingsPage() {
     <main>
       <h1 className="mb-4 page-title">Settings</h1>
       <p className="mb-4 text-sm">Guests choose a service from your own list when they join the queue. <a className="underline" href="/admin/services">Edit services</a></p>
-      <div className="mb-4">
-        <ReminderSettingsCard
-          initial={{
-            reminderDays: tenant.reminderDays,
-            reminderTemplate: tenant.reminderTemplate,
-            reminderMethod: tenant.reminderMethod,
-          }}
-        />
-      </div>
+      <SettingsFocus
+        reminder={(
+          <div className="mb-4">
+            <ReminderSettingsCard
+              initial={{
+                reminderDays: tenant.reminderDays,
+                reminderTemplate: tenant.reminderTemplate,
+                reminderMethod: tenant.reminderMethod,
+              }}
+            />
+          </div>
+        )}
+        rest={(
       <SettingsForm
         salonModeUrl={salonModeUrl}
         selfId={membership.userId}
@@ -83,6 +88,8 @@ export default async function SettingsPage() {
           loyaltyPointsPerVisit: tenant.loyaltyPointsPerVisit,
           rewards: rewards.map((reward) => ({ name: reward.name, cost: reward.cost })),
         }}
+      />
+        )}
       />
     </main>
   );
