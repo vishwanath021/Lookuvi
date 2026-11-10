@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { WhatsAppIcon } from "@/components/icons/ContactIcons";
+import { PhoneIcon, WhatsAppIcon } from "@/components/icons/ContactIcons";
+import { Notice, RequiredMark } from "@/components/ui/Notice";
+import { indianMobile } from "@/lib/queue/phone";
 
 type Customer = {
   id: string;
@@ -71,8 +73,8 @@ export function CustomersBoard({
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [offer, setOffer] = useState("");
-  const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ key: string; text: string; tone: "error" | "warning" | "info" | "success" } | null>(null);
+  const [pending, setPending] = useState("");
   const skipQueryFetch = useRef(true);
   const reloadRef = useRef<(nextQuery?: string) => Promise<void>>(async () => undefined);
 
@@ -97,19 +99,24 @@ export function CustomersBoard({
     return () => clearTimeout(timer);
   }, [query]);
 
-  async function act(body: Record<string, unknown>) {
-    setBusy(true);
-    setNotice("");
+  async function act(body: Record<string, unknown>, key: string) {
+    setPending(key);
+    setNotice(null);
     const res = await fetch("/api/v1/admin/customers", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
-    setNotice(data.message || (res.ok ? "Saved." : "That did not work."));
+    const text = data.message || (res.ok ? "Saved." : "That did not work.");
+    const tone = /not connected|nothing was sent|template is missing/i.test(text) ? "warning" : !res.ok ? "error" : "success";
+    setNotice({ key, text, tone });
+    if (res.ok && body.action === "adjust" && typeof data.balance === "number") {
+      setCustomers((current) => current.map((row) => row.id === body.id ? { ...row, points: data.balance } : row));
+    }
     if (res.ok) await reload();
-    setBusy(false);
-    return res.ok;
+    setPending("");
+    return { ok: res.ok, ...data };
   }
 
   return (
@@ -121,15 +128,26 @@ export function CustomersBoard({
           <p><span className="block text-xs uppercase tracking-[0.14em] text-muted">WhatsApp used</span><span className="nums text-3xl" data-whatsapp-used={stats.used}>{stats.used} of {stats.cap}</span></p>
           <p><span className="block text-xs uppercase tracking-[0.14em] text-muted">Came back</span><span className="nums text-3xl" data-returns={stats.returnsThisMonth}>{stats.returnsThisMonth}</span></p>
         </div>
-        {whatsapp !== "ready" ? <p className="rounded-xl bg-[#f8efdc] px-3 py-2 text-sm" role="status">WhatsApp is not connected. Reminders are paused.</p> : null}
+        {whatsapp !== "ready" ? (
+          <Notice tone="warning">
+            {whatsapp === "template"
+              ? "The WhatsApp template is still waiting for approval. Nothing can be sent."
+              : "WhatsApp is not connected yet. Reminders are paused and nothing is sent."}
+          </Notice>
+        ) : null}
       </section>
 
       {owner ? (
         <form
           className="card grid gap-2 p-4"
+          noValidate
           onSubmit={(event) => {
             event.preventDefault();
-            void act({ action: "settings", remindersOn: form.remindersOn, reminderDays: Number(form.reminderDays), whatsappMonthlyCap: Number(form.whatsappMonthlyCap) });
+            const days = Number(form.reminderDays);
+            const cap = Number(form.whatsappMonthlyCap);
+            if (!Number.isInteger(days) || days < 28 || days > 42) return;
+            if (!Number.isInteger(cap) || cap < 0 || cap > 5000) return;
+            void act({ action: "settings", remindersOn: form.remindersOn, reminderDays: days, whatsappMonthlyCap: cap }, "settings");
           }}
         >
           <div className="flex items-center justify-between gap-3">
@@ -145,15 +163,38 @@ export function CustomersBoard({
               <span className={`absolute top-1 h-9 w-9 rounded-full bg-white shadow ${form.remindersOn ? "left-6" : "left-1"}`} />
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm">Days
-              <input className="field mt-1" type="number" min={28} max={42} aria-label="Days after the last visit" value={form.reminderDays} onChange={(event) => setForm({ ...form, reminderDays: Number(event.target.value) })} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-sm">Remind after (days)
+              <input
+                className="field mt-1"
+                inputMode="numeric"
+                aria-label="Remind after (days)"
+                aria-invalid={form.reminderDays < 28 || form.reminderDays > 42}
+                value={form.reminderDays ? String(form.reminderDays) : ""}
+                onChange={(event) => {
+                  const raw = event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+                  setForm({ ...form, reminderDays: raw === "" ? 0 : Number(raw) });
+                }}
+              />
+              <span className="mt-1 block text-xs text-muted">At least 28 days after the last visit, so a reminder is not sent the same month they came.</span>
             </label>
             <label className="text-sm">Monthly cap
-              <input className="field mt-1" type="number" min={0} max={5000} aria-label="Monthly WhatsApp limit" value={form.whatsappMonthlyCap} onChange={(event) => setForm({ ...form, whatsappMonthlyCap: Number(event.target.value) })} />
+              <input
+                className="field mt-1"
+                inputMode="numeric"
+                aria-label="Monthly WhatsApp limit"
+                aria-invalid={form.whatsappMonthlyCap < 0 || form.whatsappMonthlyCap > 5000}
+                value={String(form.whatsappMonthlyCap)}
+                onChange={(event) => {
+                  const raw = event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+                  setForm({ ...form, whatsappMonthlyCap: raw === "" ? 0 : Number(raw) });
+                }}
+              />
             </label>
           </div>
-          <button className="btn w-fit" type="submit" disabled={busy}>Save</button>
+          {(form.reminderDays < 28 || form.reminderDays > 42) ? <Notice tone="error">Enter a whole number from 28 to 42 days.</Notice> : null}
+          <button className="btn w-fit" type="submit" disabled={pending === "settings"}>{pending === "settings" ? "Saving…" : "Save"}</button>
+          {notice?.key === "settings" ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
         </form>
       ) : null}
 
@@ -162,23 +203,22 @@ export function CustomersBoard({
           className="card grid gap-2 p-4"
           onSubmit={(event) => {
             event.preventDefault();
-            void act({ action: "broadcast", text: offer });
+            void act({ action: "broadcast", text: offer }, "broadcast");
           }}
         >
           <input className="field" maxLength={180} aria-label="Offer" value={offer} onChange={(event) => setOffer(event.target.value)} placeholder="Offer" />
-          <button className="btn w-fit whitespace-nowrap" type="submit" disabled={busy}>
+          <button className="btn w-fit whitespace-nowrap" type="submit" disabled={pending === "broadcast"}>
             <WhatsAppIcon />
-            Send offer on WhatsApp
+            {pending === "broadcast" ? "Sending…" : "Send offer on WhatsApp"}
           </button>
           <p className="max-w-3xl text-sm text-muted">It goes to everyone in your customer list, until this month&apos;s WhatsApp limit is used.</p>
+          {notice?.key === "broadcast" ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
         </form>
       ) : null}
 
-      {owner ? <NotBackYet lapsed={lapsed} whatsapp={whatsapp} busy={busy} onSend={(ids) => void act({ action: "comeback", ids })} /> : null}
+      {owner ? <NotBackYet lapsed={lapsed} whatsapp={whatsapp} pending={pending} onSend={(ids, key) => void act({ action: "comeback", ids }, key)} notice={notice?.key.startsWith("comeback") ? notice : null} /> : null}
 
-      {notice ? <p className="text-sm" role="status">{notice}</p> : null}
-
-      <CustomerTable customers={customers} query={query} page={page} busy={busy} owner={owner} onQuery={setQuery} onPage={setPage} onAct={(body) => void act(body)} />
+      <CustomerTable customers={customers} query={query} page={page} pending={pending} owner={owner} onQuery={setQuery} onPage={setPage} onAct={(body, key) => act(body, key)} />
     </div>
   );
 }
@@ -189,7 +229,7 @@ function CustomerTable({
   customers,
   query,
   page,
-  busy,
+  pending,
   owner,
   onQuery,
   onPage,
@@ -198,11 +238,11 @@ function CustomerTable({
   customers: Customer[];
   query: string;
   page: number;
-  busy: boolean;
+  pending: string;
   owner: boolean;
   onQuery: (value: string) => void;
   onPage: (value: number) => void;
-  onAct: (body: Record<string, unknown>) => void;
+  onAct: (body: Record<string, unknown>, key: string) => Promise<{ ok?: boolean; balance?: number; history?: PointRow[]; message?: string }>;
 }) {
   const [adjust, setAdjust] = useState<Customer | null>(null);
   const pages = Math.max(1, Math.ceil(customers.length / CUSTOMER_PAGE));
@@ -215,7 +255,7 @@ function CustomerTable({
         <>
           <div className="grid md:hidden">
             {rows.map((row) => (
-              <CustomerCard key={row.id} row={row} busy={busy} owner={owner} onAct={onAct} onAdjust={() => setAdjust(row)} />
+              <CustomerCard key={row.id} row={row} pending={pending} owner={owner} onAct={onAct} onAdjust={() => setAdjust(row)} />
             ))}
           </div>
           <div className="hidden overflow-x-hidden rounded-[14px] border border-line bg-white md:block">
@@ -239,7 +279,7 @@ function CustomerTable({
                     <td className="nums truncate px-3 py-2 font-normal">{row.lastVisitLabel}</td>
                     <td className="nums px-3 py-2 font-normal" data-customer-points={row.points}>{row.points}</td>
                     <td className="px-3 py-2">
-                      <RowActions row={row} busy={busy} owner={owner} onAct={onAct} onAdjust={() => setAdjust(row)} />
+                      <RowActions row={row} pending={pending} owner={owner} onAct={onAct} onAdjust={() => setAdjust(row)} />
                     </td>
                   </tr>
                 ))}
@@ -248,7 +288,7 @@ function CustomerTable({
           </div>
         </>
       )}
-      <AdjustSheet row={adjust} busy={busy} owner={owner} onClose={() => setAdjust(null)} onAct={onAct} />
+      <AdjustSheet row={adjust} pending={pending} owner={owner} onClose={() => setAdjust(null)} onAct={onAct} />
       {customers.length > CUSTOMER_PAGE ? (
         <div className="flex items-center gap-2">
           <button className="btn secondary min-h-11" type="button" disabled={safePage === 0} onClick={() => onPage(safePage - 1)}>Previous</button>
@@ -260,17 +300,25 @@ function CustomerTable({
   );
 }
 
+type PointRow = { id: string; delta: number; kind: string; reason: string; label: string };
+
+function contactLinks(phone: string) {
+  const mobile = indianMobile(phone);
+  if (!mobile) return null;
+  return { callUrl: `tel:+${mobile}`, whatsappUrl: `https://wa.me/${mobile}` };
+}
+
 function CustomerCard({
   row,
-  busy,
+  pending,
   owner,
   onAct,
   onAdjust,
 }: {
   row: Customer;
-  busy: boolean;
+  pending: string;
   owner: boolean;
-  onAct: (body: Record<string, unknown>) => void;
+  onAct: (body: Record<string, unknown>, key: string) => Promise<{ ok?: boolean; balance?: number; history?: PointRow[]; message?: string }>;
   onAdjust: () => void;
 }) {
   return (
@@ -281,30 +329,43 @@ function CustomerCard({
           <span className="nums shrink-0 text-sm font-normal" data-customer-points={row.points}>{row.points}</span>
         </p>
         <p className="truncate text-xs text-muted">{row.phoneLabel} · {row.visitCount} {row.visitCount === 1 ? "visit" : "visits"} · {row.lastVisitLabel}</p>
+        <ContactLinks phone={row.phone} />
       </div>
-      <RowActions row={row} busy={busy} owner={owner} onAct={onAct} onAdjust={onAdjust} />
+      <RowActions row={row} pending={pending} owner={owner} onAct={onAct} onAdjust={onAdjust} />
     </article>
+  );
+}
+
+function ContactLinks({ phone }: { phone: string }) {
+  const links = contactLinks(phone);
+  if (!links) return <p className="text-xs text-muted">No phone</p>;
+  return (
+    <p className="mt-1 flex gap-2 text-xs">
+      <a className="inline-flex min-h-11 items-center gap-1" href={links.callUrl}><PhoneIcon /> Call</a>
+      <a className="inline-flex min-h-11 items-center gap-1" href={links.whatsappUrl} target="_blank" rel="noreferrer"><WhatsAppIcon /> WhatsApp</a>
+    </p>
   );
 }
 
 function RowActions({
   row,
-  busy,
+  pending,
   owner,
   onAct,
   onAdjust,
 }: {
   row: Customer;
-  busy: boolean;
+  pending: string;
   owner: boolean;
-  onAct: (body: Record<string, unknown>) => void;
+  onAct: (body: Record<string, unknown>, key: string) => Promise<{ ok?: boolean }>;
   onAdjust: () => void;
 }) {
   const blocked = row.stop || row.optedOut;
+  const key = `remind-${row.id}`;
   return (
     <div className="flex shrink-0 items-center gap-1">
       {owner ? (
-        <button className="btn secondary queue-icon" type="button" aria-label={`Remind ${row.name || row.phoneLabel} on WhatsApp`} disabled={busy || blocked} onClick={() => onAct({ action: "comeback", ids: [row.id] })}>
+        <button className="btn secondary queue-icon" type="button" aria-label={`Remind ${row.name || row.phoneLabel} on WhatsApp`} disabled={pending === key || blocked} onClick={() => void onAct({ action: "comeback", ids: [row.id] }, key)}>
           <WhatsAppIcon />
         </button>
       ) : null}
@@ -313,68 +374,157 @@ function RowActions({
   );
 }
 
+/** Keep each keystroke exactly. Trim only when the owner saves. */
+export function reasonDraft(value: string) {
+  return value.slice(0, 120);
+}
+
 function AdjustSheet({
   row,
-  busy,
+  pending,
   owner,
   onClose,
   onAct,
 }: {
   row: Customer | null;
-  busy: boolean;
+  pending: string;
   owner: boolean;
   onClose: () => void;
-  onAct: (body: Record<string, unknown>) => void;
+  onAct: (body: Record<string, unknown>, key: string) => Promise<{ ok?: boolean; balance?: number; history?: PointRow[]; message?: string }>;
 }) {
   if (!row) return null;
   return (
-    <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-4 sm:place-items-center" role="dialog" aria-label="Adjust points">
-      <div className="card grid w-full max-w-sm gap-3 p-4">
-        <h2 className="text-base font-semibold">{row.name || "No name"}</h2>
-        <p className="nums text-sm font-normal text-muted">{row.points} points</p>
-        {row.stop ? <p className="text-sm">Replied STOP</p> : null}
-        {!row.stop && row.canResume && !owner ? <p className="text-sm">Stopped at the desk</p> : null}
-        {!row.stop && row.canResume && owner ? (
-          <button className="btn secondary" type="button" disabled={busy} onClick={() => { onAct({ action: "resume", id: row.id }); onClose(); }}>Turn reminders on</button>
-        ) : null}
-        {!row.stop && !row.optedOut ? (
-          <button className="btn secondary" type="button" disabled={busy} onClick={() => { onAct({ action: "stop", id: row.id }); onClose(); }}>Stop reminders</button>
-        ) : null}
-        {owner ? (
-          <form
-            className="grid gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const data = new FormData(event.currentTarget);
-              onAct({ action: "adjust", id: row.id, delta: Number(data.get("delta")), reason: String(data.get("reason") || "") });
-              onClose();
-            }}
-          >
-            <label className="text-sm">Points change
-              <input className="field mt-1" name="delta" type="number" step={1} required aria-label={`Points change for ${row.phoneLabel}`} placeholder="+1" />
-            </label>
-            <label className="text-sm">Reason
-              <input className="field mt-1" name="reason" required maxLength={120} aria-label={`Reason for ${row.phoneLabel}`} placeholder="Reason" />
-            </label>
-            <button className="btn" type="submit" disabled={busy}>Save</button>
-          </form>
-        ) : null}
-        <button className="btn ghost" type="button" onClick={onClose}>Close</button>
+    <div className="fixed inset-0 z-50 grid items-start overflow-y-auto bg-black/40 p-4 pt-8 sm:place-items-center" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <div className="card grid w-full max-w-sm gap-3 p-4" role="dialog" aria-label="Adjust points" onMouseDown={(event) => event.stopPropagation()}>
+        <PointsEditor key={row.id} row={row} pending={pending} owner={owner} onClose={onClose} onAct={onAct} />
       </div>
     </div>
+  );
+}
+
+function PointsEditor({
+  row,
+  pending,
+  owner,
+  onClose,
+  onAct,
+}: {
+  row: Customer;
+  pending: string;
+  owner: boolean;
+  onClose: () => void;
+  onAct: (body: Record<string, unknown>, key: string) => Promise<{ ok?: boolean; balance?: number; history?: PointRow[]; message?: string }>;
+}) {
+  const [mode, setMode] = useState<"add" | "correct">("add");
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState("");
+  const [balance, setBalance] = useState(row.points);
+  const [history, setHistory] = useState<PointRow[]>([]);
+  const saving = pending === "adjust";
+
+  useEffect(() => {
+    let alive = true;
+    void fetch(`/api/v1/admin/customers?history=${row.id}`).then((res) => res.json()).then((data) => {
+      if (alive && Array.isArray(data.history)) setHistory(data.history);
+    }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [row.id]);
+
+  return (
+    <>
+      <h2 className="text-base font-semibold">{row.name || "No name"}</h2>
+      <p className="nums text-sm font-normal" data-points-balance={balance}>Balance is {balance}.</p>
+      {row.stop ? <Notice tone="warning">Replied STOP</Notice> : null}
+      {!row.stop && row.canResume && !owner ? <p className="text-sm text-muted">Stopped at the desk</p> : null}
+      {!row.stop && row.canResume && owner ? (
+        <button className="btn secondary" type="button" disabled={pending === "resume"} onClick={() => { void onAct({ action: "resume", id: row.id }, "resume"); onClose(); }}>Turn reminders on</button>
+      ) : null}
+      {!row.stop && !row.optedOut ? (
+        <button className="btn secondary" type="button" disabled={pending === "stop"} onClick={() => { void onAct({ action: "stop", id: row.id }, "stop"); onClose(); }}>Stop reminders</button>
+      ) : null}
+      {owner ? (
+        <form
+          className="grid gap-2"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            const count = Number(amount);
+            if (!Number.isInteger(count) || count < 1) {
+              setError("Enter a whole number of points, at least 1.");
+              return;
+            }
+            if (!reason.trim()) {
+              setError("Add a reason.");
+              return;
+            }
+            setError("");
+            void onAct({ action: "adjust", id: row.id, mode, amount: count, reason: reason.trim() }, "adjust").then((result) => {
+              if (!result?.ok) {
+                setError(result?.message || "That did not work.");
+                return;
+              }
+              if (typeof result.balance === "number") setBalance(result.balance);
+              if (result.history) setHistory(result.history);
+              setSaved(result.message || "Saved.");
+              setAmount("");
+              setReason("");
+            });
+          }}
+        >
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label="Points change">
+            <button className={`btn min-h-11 ${mode === "add" ? "" : "secondary"}`} type="button" onClick={() => setMode("add")}>Add points</button>
+            <button className={`btn min-h-11 ${mode === "correct" ? "" : "secondary"}`} type="button" onClick={() => setMode("correct")}>Deduct / correct</button>
+          </div>
+          <label className="text-sm">{mode === "add" ? "Points to add" : "Points to deduct"}<RequiredMark />
+            <input className="field mt-1 text-base" inputMode="numeric" aria-invalid={Boolean(error && !amount)} aria-label={mode === "add" ? "Points to add" : "Points to deduct"} value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, ""))} />
+          </label>
+          <label className="text-sm">Reason<RequiredMark />
+            <input
+              className="field mt-1 text-base"
+              aria-label={`Reason for ${row.phoneLabel}`}
+              aria-invalid={Boolean(error && !reason.trim())}
+              value={reason}
+              onChange={(event) => setReason(reasonDraft(event.target.value))}
+            />
+          </label>
+          {error ? <Notice tone="error">{error}</Notice> : null}
+          <button className="btn" type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</button>
+          {saved ? <Notice tone="success">{saved}</Notice> : null}
+        </form>
+      ) : null}
+      {history.length ? (
+        <ul className="grid gap-1 text-sm" data-points-history="yes">
+          {history.map((entry) => (
+            <li key={entry.id}>
+              <span className="nums">{entry.delta > 0 ? `+${entry.delta}` : entry.delta}</span>
+              {" · "}
+              {entry.kind === "correct" ? "Correction" : entry.kind === "redeem" ? "Redeemed" : entry.kind === "earn" ? "Visit" : "Added"}
+              {entry.reason ? ` · ${entry.reason}` : ""}
+              {" · "}
+              <span className="text-muted">{entry.label}</span>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="text-sm text-muted">No points changes yet.</p>}
+      <button className="btn ghost" type="button" onClick={onClose}>Close</button>
+    </>
   );
 }
 
 function NotBackYet({
   lapsed,
   whatsapp,
-  busy,
+  pending,
+  notice,
   onSend,
 }: {
   lapsed: Lapsed;
   whatsapp: "off" | "template" | "ready";
-  busy: boolean;
-  onSend: (ids: string[]) => void;
+  pending: string;
+  notice: { text: string; tone: "error" | "warning" | "info" | "success" } | null;
+  onSend: (ids: string[], key: string) => void;
 }) {
   const ready = whatsapp === "ready";
   const bands = [
@@ -389,12 +539,13 @@ function NotBackYet({
         <p className="mt-1 text-sm" data-lapsed-summary="yes">{lapsed.summary}</p>
       </div>
       {!ready ? (
-        <p className="rounded-xl bg-[#f8efdc] px-3 py-2 text-sm" role="status">
+        <Notice tone="warning">
           {whatsapp === "template"
             ? "The WhatsApp template is still waiting for approval. Nothing can be sent."
-            : "WhatsApp is not connected. Nothing can be sent."}
-        </p>
+            : "WhatsApp is not connected yet. Nothing was sent."}
+        </Notice>
       ) : null}
+      {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
       {bands.map((band) => (
         <div key={band.id} className="grid gap-2" data-lapsed-band={band.id}>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -402,10 +553,10 @@ function NotBackYet({
             <button
               className="btn secondary disabled:opacity-40"
               type="button"
-              disabled={busy || !ready || band.rows.every((row) => row.optedOut)}
-              onClick={() => onSend(band.rows.filter((row) => !row.optedOut).map((row) => row.id))}
+              disabled={pending === `comeback-${band.id}` || !ready || band.rows.every((row) => row.optedOut)}
+              onClick={() => onSend(band.rows.filter((row) => !row.optedOut).map((row) => row.id), `comeback-${band.id}`)}
             >
-              Send come-back message
+              {pending === `comeback-${band.id}` ? "Sending…" : "Send come-back message"}
             </button>
           </div>
           {band.rows.length === 0 ? <p className="text-sm text-muted">No one in this group.</p> : null}
@@ -415,8 +566,8 @@ function NotBackYet({
               <p className="text-sm">{row.phoneLabel}</p>
               <p className="text-sm text-muted">{row.visitCount} {row.visitCount === 1 ? "visit" : "visits"} · {row.lastVisitLabel} · {row.points} {row.points === 1 ? "point" : "points"}</p>
               {row.optedOut ? <p className="text-sm">Reminders off</p> : null}
-              <button className="btn secondary mt-2 disabled:opacity-40" type="button" disabled={busy || !ready || row.optedOut} onClick={() => onSend([row.id])}>
-                Send come-back message
+              <button className="btn secondary mt-2 disabled:opacity-40" type="button" disabled={pending === `comeback-${row.id}` || !ready || row.optedOut} onClick={() => onSend([row.id], `comeback-${row.id}`)}>
+                {pending === `comeback-${row.id}` ? "Sending…" : "Send come-back message"}
               </button>
             </article>
           ))}

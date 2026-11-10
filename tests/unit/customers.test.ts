@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as generate } from "@/app/api/v1/tryon/generate/route";
 import { GET as webhookGet, POST as webhook } from "@/app/api/whatsapp/webhook/route";
-import { isStopText, parseCustomerImport } from "@/lib/customers/parse";
-import { addCustomer, applyStop, attributeReturn, importCustomers, listCustomers, recordVisit, rememberCustomer, resumeReminders, returnStats } from "@/lib/customers/service";
+import { reasonDraft } from "@/components/admin/CustomersBoard";
+import { classifyImportFile, decodeImportText, isStopText, parseCustomerImport } from "@/lib/customers/parse";
+import { addCustomer, adjustCustomerPoints, applyStop, attributeReturn, importCustomers, listCustomers, pointsHistory, recordVisit, rememberCustomer, resumeReminders, returnStats } from "@/lib/customers/service";
 import type { NotifyEnv } from "@/lib/notify";
 import { prisma } from "@/lib/prisma";
-import { addWalkIn, finishEntry, joinQueue } from "@/lib/queue/service";
+import { deleteGuestLeads } from "@/lib/data-request";
+import { addWalkIn, deskSnapshot, finishEntry, joinQueue } from "@/lib/queue/service";
 import { sendBroadcast, sweepDueReminders } from "@/lib/reminders";
 import { resetRateLimits } from "@/lib/ratelimit";
 import { refuseMonthlyTries } from "@/lib/try-allowance";
@@ -70,6 +72,18 @@ describe("customer import", () => {
     expect(parsed.rows[1]).toMatchObject({ phone: "919876543211", name: "Asha Two", visitedOn: "" });
     expect(parsed.rows[2].visitedOn).toBe("");
     expect(parseCustomerImport(Array.from({ length: 501 }, () => "9876543210").join("\n")).tooLong).toBe(true);
+    const sheet = parseCustomerImport("Name,Phone number\nLishika,9492827337\n");
+    expect(sheet.rows).toEqual([{ phone: "919492827337", name: "Lishika", visitedOn: "" }]);
+    expect(sheet.invalid).toBe(0);
+    const messy = parseCustomerImport("\uFEFFPhone number\tName\r+91 94928 27337\tAsha\r09876543210,Leading zero");
+    expect(messy.rows.map((row) => row.phone).sort()).toEqual(["919492827337", "919876543210"]);
+    const science = parseCustomerImport("9.492827337e+9,Lishika");
+    expect(science.rows[0]?.phone).toBe("919492827337");
+    const utf16 = new Uint8Array([0xff, 0xfe, ..."Name,Phone\nAsha,9876543210".split("").flatMap((char) => [char.charCodeAt(0), 0])]);
+    expect(decodeImportText(utf16)).toContain("9876543210");
+    expect(classifyImportFile(new Uint8Array([0x50, 0x4b, 0x03, 0x04]))).toBe("spreadsheet");
+    expect(reasonDraft("heXllo")).toBe("heXllo");
+    expect(reasonDraft(`  ${"a".repeat(200)}`)).toHaveLength(120);
   });
 });
 
@@ -89,9 +103,10 @@ describe("salon customer list", () => {
     expect(await listCustomers(beta.id, "Asha")).toHaveLength(0);
 
     await prisma.queueState.create({ data: { tenantId: alpha.id, isOpen: true, mode: "LIVE" } });
-    await addWalkIn(alpha.id, { phone: "9100002222" }, quiet);
+    await expect(addWalkIn(alpha.id, { phone: "9100002222" }, quiet)).rejects.toMatchObject({ code: "NAME" });
+    await addWalkIn(alpha.id, { name: "Temp", phone: "9100002222" }, quiet);
     const saved = await prisma.customer.findFirstOrThrow({ where: { tenantId: alpha.id, phone: "919100002222" } });
-    expect(saved.name).toBe("");
+    expect(saved.name).toBe("Temp");
     expect(saved.visitCount).toBe(0);
     const entry = await prisma.queueEntry.findFirstOrThrow({ where: { tenantId: alpha.id, phone: "919100002222" } });
     await finishEntry(alpha.id, entry.id, "NO_SHOW", quiet);
@@ -102,7 +117,12 @@ describe("salon customer list", () => {
     const visited = await prisma.customer.findFirstOrThrow({ where: { id: saved.id } });
     expect(visited.visitCount).toBe(1);
     expect(visited.name).toBe("Neel");
+    expect(visited.lastVisitAt).toBeTruthy();
     expect(visited.needsReminder).toBe(true);
+    await addWalkIn(alpha.id, { name: "Neel", phone: "9100002222" }, quiet);
+    const desk = await deskSnapshot(alpha.id);
+    const card = desk.waiting.find((row) => row.name === "Neel");
+    expect(card?.lastVisitLabel).toMatch(/\d/);
   });
 
   it("imports a last visit without replacing a later one", async () => {
@@ -118,6 +138,64 @@ describe("salon customer list", () => {
     const kept = await prisma.customer.findFirstOrThrow({ where: { id: row.id } });
     expect(kept.lastVisitAt?.toISOString().slice(0, 10)).toBe("2026-10-20");
     expect(kept.visitCount).toBe(2);
+  });
+
+  it("does not reset visits or points when the same phone is added again", async () => {
+    const alpha = await salon("return-exists");
+    await rememberCustomer({ tenantId: alpha.id, phone: "9100004444", name: "Lishika" });
+    await recordVisit(alpha.id, "9100004444", "Lishika", new Date("2026-10-02T08:00:00+05:30"));
+    const before = await prisma.customer.findFirstOrThrow({ where: { tenantId: alpha.id, phone: "919100004444" } });
+    const again = await addCustomer(alpha.id, "9100004444", "Someone else");
+    expect(again.ok).toBe(false);
+    if (!again.ok) expect(again.message).toMatch(/Already a customer: Lishika, last visit/);
+    const untouched = await prisma.customer.findFirstOrThrow({ where: { id: before.id } });
+    expect(untouched.name).toBe("Lishika");
+    expect(untouched.visitCount).toBe(before.visitCount);
+    expect(untouched.lastVisitAt?.toISOString()).toBe(before.lastVisitAt?.toISOString());
+    const renamed = await addCustomer(alpha.id, "+91 91000 04444", "Lisha", true);
+    expect(renamed.ok).toBe(true);
+    const after = await prisma.customer.findFirstOrThrow({ where: { id: before.id } });
+    expect(after.name).toBe("Lisha");
+    expect(after.visitCount).toBe(before.visitCount);
+    expect(after.lastVisitAt?.toISOString()).toBe(before.lastVisitAt?.toISOString());
+    await importCustomers(alpha.id, "Name,Phone number\nOther,9100004444");
+    const imported = await prisma.customer.findFirstOrThrow({ where: { id: before.id } });
+    expect(imported.visitCount).toBe(before.visitCount);
+    expect(imported.lastVisitAt?.toISOString()).toBe(before.lastVisitAt?.toISOString());
+  });
+
+  it("records a correction separately from a redemption and will not go below zero", async () => {
+    const alpha = await salon("return-points");
+    const row = await rememberCustomer({ tenantId: alpha.id, phone: "9100005555", name: "Asha" });
+    const added = await adjustCustomerPoints(alpha.id, row!.id, { mode: "add", amount: 4, reason: "Goodwill" }, "staff");
+    expect(added.ok).toBe(true);
+    if (added.ok) expect(added.balance).toBe(4);
+    const corrected = await adjustCustomerPoints(alpha.id, row!.id, { mode: "correct", amount: 1, reason: "Wrong tap" }, "staff");
+    expect(corrected.ok).toBe(true);
+    const ledger = await prisma.loyaltyLedger.findMany({ where: { tenantId: alpha.id }, orderBy: { createdAt: "asc" } });
+    expect(ledger.map((entry) => entry.kind)).toEqual(["adjust", "correct"]);
+    expect(ledger.some((entry) => entry.kind === "redeem")).toBe(false);
+    const tooFar = await adjustCustomerPoints(alpha.id, row!.id, { mode: "correct", amount: 10, reason: "Too much" }, "staff");
+    expect(tooFar.ok).toBe(false);
+    if (!tooFar.ok) expect(tooFar.message).toMatch(/below 0/);
+    const history = await pointsHistory(alpha.id, row!.id);
+    expect(history[0]?.kind).toBe("correct");
+    expect(history[0]?.reason).toBe("Wrong tap");
+  });
+
+  it("deletes only the guest's own lead for that salon", async () => {
+    const alpha = await salon("return-lead");
+    const beta = await salon("return-lead-b");
+    const own = await prisma.lead.create({ data: { tenantId: alpha.id, sessionId: "session-own-1234", name: "Asha", phone: "919100006666", lookName: "bob" } });
+    const other = await prisma.lead.create({ data: { tenantId: alpha.id, sessionId: "session-other-99", name: "Bea", phone: "919100007777", lookName: "bob" } });
+    const elsewhere = await prisma.lead.create({ data: { tenantId: beta.id, sessionId: "session-own-1234", name: "Asha", phone: "919100006666", lookName: "bob" } });
+    const removed = await deleteGuestLeads({ tenantId: alpha.id, sessionId: "session-own-1234", guest: null });
+    expect(removed.deleted).toBe(1);
+    expect(await prisma.lead.findUnique({ where: { id: own.id } })).toBeNull();
+    expect(await prisma.lead.findUnique({ where: { id: other.id } })).toBeTruthy();
+    expect(await prisma.lead.findUnique({ where: { id: elsewhere.id } })).toBeTruthy();
+    const missed = await deleteGuestLeads({ tenantId: alpha.id, sessionId: "nope", guest: null });
+    expect(missed.deleted).toBe(0);
   });
 });
 

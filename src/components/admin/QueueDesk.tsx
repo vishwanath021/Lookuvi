@@ -4,6 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { t } from "@/data/i18n";
 import { formatToken } from "@/lib/queue/format-token";
 import { PhoneIcon, WhatsAppIcon } from "@/components/icons/ContactIcons";
+import { Notice, RequiredMark } from "@/components/ui/Notice";
 import { DESK_STALE_MESSAGE, deskFailure, type DeskPayload } from "@/lib/queue/desk-client";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
 
@@ -27,6 +28,7 @@ type Card = {
   used?: number;
   remaining?: number;
   points?: number | null;
+  lastVisitLabel?: string;
 };
 
 type Reward = { id: string; name: string; cost: number };
@@ -69,6 +71,11 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
   const [notice, setNotice] = useState("");
   const [stale, setStale] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [settingsNote, setSettingsNote] = useState("");
+  const [invalidField, setInvalidField] = useState("");
+  const [walkError, setWalkError] = useState("");
+  const settingsDirty = useRef(false);
   const ticket = useRef(0);
   const refreshRef = useRef<() => void>(() => {});
   const staleFromPoll = useRef(false);
@@ -122,7 +129,16 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
     setSheetAt(null);
   }
 
-  function applySnapshot(data: Desk) {
+  function applySettings(data: Desk) {
+    settingsDirty.current = false;
+    setUnits(String(data.state.units));
+    setAvg(String(data.state.avgMinutes));
+    setAlertMin(String(data.state.alertLeadMin));
+    setMode(data.state.mode);
+    setUnitLabel(data.state.unitLabel);
+  }
+
+  function applySnapshot(data: Desk, includeSettings = false) {
     if (staleFromPoll.current) setNotice("");
     staleFromPoll.current = false;
     setStale(false);
@@ -132,11 +148,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
       const seated = (data.serving || []).map((seat) => seat.entry).filter(Boolean) as Card[];
       return [...data.waiting, ...seated, ...data.requests, ...data.confirmed].find((item) => item.id === open.id) || open;
     });
-    setUnits(String(data.state.units));
-    setAvg(String(data.state.avgMinutes));
-    setAlertMin(String(data.state.alertLeadMin));
-    setMode(data.state.mode);
-    setUnitLabel(data.state.unitLabel);
+    if (includeSettings) applySettings(data);
   }
 
   function keepList(message: string, fromPoll: boolean) {
@@ -187,9 +199,11 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
     };
   }, []);
 
-  async function act(body: Record<string, unknown>) {
-    setBusy(true);
+  async function act(body: Record<string, unknown>, scope: "desk" | "settings" = "desk") {
+    if (scope === "settings") setSettingsBusy(true);
+    else setBusy(true);
     setNotice("");
+    if (scope === "settings") setSettingsNote("");
     const id = claim();
     try {
       const res = await fetch("/api/v1/admin/queue", {
@@ -213,19 +227,24 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
       if (!res.ok) {
         staleFromPoll.current = false;
         setStale(false);
-        setNotice(data.message || "That did not work.");
+        const message = data.message || "That did not work.";
+        if (scope === "settings") setSettingsNote(message);
+        else setNotice(message);
         return;
       }
       if (!data?.state) {
         keepList(DESK_STALE_MESSAGE, false);
         return;
       }
-      applySnapshot(data);
+      applySnapshot(data, body.action === "settings");
+      if (scope === "settings") setSettingsNote("Saved");
+      return true;
     } catch {
       if (!current(id)) return;
       keepList(DESK_STALE_MESSAGE, false);
     } finally {
-      setBusy(false);
+      if (scope === "settings") setSettingsBusy(false);
+      else setBusy(false);
     }
   }
 
@@ -270,15 +289,17 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
       {typeof monthTries === "number" ? <p className="mt-1 text-xs text-muted">{monthTries.toLocaleString("en-IN")} try-ons this month</p> : null}
       {!desk.state.isOpen && !desk.state.scheduled && !desk.state.closedToday ? <p className="mt-2 text-sm text-muted">{t(lang, "queuePausedNote")}</p> : null}
       {notice ? (
-        <p className="mt-3 text-sm" role="status" data-queue-stale={stale ? "yes" : "no"}>
-          {notice}
-          {stale ? (
-            <>
-              {" "}
-              <button className="underline" type="button" onClick={() => refreshRef.current()}>Retry</button>
-            </>
-          ) : null}
-        </p>
+        <div className="mt-3" data-queue-stale={stale ? "yes" : "no"}>
+          <Notice tone={stale ? "warning" : "error"}>
+            {notice}
+            {stale ? (
+              <>
+                {" "}
+                <button className="underline" type="button" onClick={() => refreshRef.current()}>Retry</button>
+              </>
+            ) : null}
+          </Notice>
+        </div>
       ) : null}
 
       {live ? (
@@ -303,7 +324,11 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
                       <Fragment key={card.id}>
                         <tr className="border-t border-line align-middle" data-queue-row={card.token}>
                           <td className="nums py-2 pr-2 text-base" data-queue-token={card.token}>{tokenLabel(card.token)}</td>
-                          <td className="max-w-36 truncate py-2 pr-2">{card.name}</td>
+                          <td className="max-w-36 py-2 pr-2">
+                            <p className="truncate">{card.name}</p>
+                            {card.lastVisitLabel ? <p className="text-xs text-muted" data-last-visit={card.lastVisitLabel}>Last visit {card.lastVisitLabel}</p> : null}
+                            {!card.phone ? <p className="text-xs text-muted">No phone</p> : null}
+                          </td>
                           <td className="whitespace-nowrap py-2 pr-2">{t(lang, "queueMinShort", { min: card.waitMin })}</td>
                           <td className="py-2 pr-2"><StatusPills card={card} lang={lang} /></td>
                           <td className="py-2">
@@ -383,9 +408,16 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
 
       <form
         className="card mt-4 grid gap-2 p-3"
+        noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          void act({ action: "walkin", name: walkName, phone: walkPhone }).then(() => {
+          if (!walkName.trim()) {
+            setWalkError("Enter the guest's name.");
+            return;
+          }
+          setWalkError("");
+          void act({ action: "walkin", name: walkName.trim(), phone: walkPhone }).then((ok) => {
+            if (!ok) return;
             setWalkName("");
             setWalkPhone("");
           });
@@ -393,13 +425,14 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
       >
         <h2 className="text-base font-semibold">{t(lang, "queueWalkIn")}</h2>
         <div className="flex flex-wrap gap-2">
-          <label className="min-w-0 flex-1 text-sm">{t(lang, "queueWalkName")}
-            <input className="field mt-1" value={walkName} maxLength={80} onChange={(event) => setWalkName(event.target.value)} />
+          <label className="min-w-0 flex-1 text-sm">{t(lang, "queueWalkName")}<RequiredMark />
+            <input className="field mt-1" aria-label={t(lang, "queueWalkName")} aria-invalid={Boolean(walkError)} value={walkName} maxLength={80} required onChange={(event) => { setWalkName(event.target.value); setWalkError(""); }} />
           </label>
           <label className="min-w-0 flex-1 text-sm">{t(lang, "queuePhoneOptional")}
             <input className="field mt-1" inputMode="tel" value={walkPhone} onChange={(event) => setWalkPhone(event.target.value)} />
           </label>
         </div>
+        {walkError ? <Notice tone="error">{walkError}</Notice> : null}
         <button className="btn w-fit min-h-11" type="submit" disabled={busy}>{t(lang, "queueWalkIn")}</button>
       </form>
 
@@ -435,44 +468,69 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
         <summary className="cursor-pointer text-lg">{t(lang, "queueSettings")}</summary>
         <form
           className="mt-4 grid gap-3"
+          noValidate
           onSubmit={(event) => {
             event.preventDefault();
+            const chairCount = /^\d+$/.test(units.trim()) ? Number(units) : NaN;
+            const usual = /^\d+$/.test(avg.trim()) ? Number(avg) : NaN;
+            const alert = /^\d+$/.test(alertMin.trim()) ? Number(alertMin) : NaN;
+            if (!Number.isInteger(chairCount) || chairCount < 1 || chairCount > 30) {
+              setInvalidField("units");
+              setSettingsNote("Enter a whole number of places from 1 to 30.");
+              return;
+            }
+            if (!Number.isInteger(usual) || usual < 5 || usual > 240) {
+              setInvalidField("avg");
+              setSettingsNote("Usual minutes must be a whole number from 5 to 240.");
+              return;
+            }
+            if (mode === "LIVE" && (!Number.isInteger(alert) || alert < 0 || alert > 120)) {
+              setInvalidField("alert");
+              setSettingsNote("Alert minutes must be a whole number from 0 to 120.");
+              return;
+            }
+            setInvalidField("");
+            settingsDirty.current = false;
             void act({
               action: "settings",
-              units: Number(units),
-              avgMinutes: Number(avg),
-              alertLeadMin: Number(alertMin),
+              units: chairCount,
+              avgMinutes: usual,
+              alertLeadMin: Number.isInteger(alert) ? alert : 0,
               mode,
               unitLabel,
-            });
+            }, "settings");
           }}
         >
           <label className="text-sm">{t(lang, "queueUnits", { unit: unitLabel === "station" ? "Stations" : unitLabel === "room" ? "Rooms" : "Chairs" })}
-            <input className="field mt-1" type="number" min={1} max={30} value={units} onChange={(event) => setUnits(event.target.value)} />
+            <input className="field mt-1" inputMode="numeric" aria-invalid={invalidField === "units"} value={units} onChange={(event) => { settingsDirty.current = true; setUnits(event.target.value.replace(/[^\d]/g, "")); }} />
           </label>
           <p className="text-xs text-muted">You can add seats at any time. An empty seat can be removed. A seat with someone in it stays until you finish the visit or send them back to the line. People waiting are not removed.</p>
           <label className="text-sm">{t(lang, "queueAvg")}
-            <input className="field mt-1" type="number" min={5} max={240} value={avg} onChange={(event) => setAvg(event.target.value)} />
+            <input className="field mt-1" inputMode="numeric" aria-invalid={invalidField === "avg"} aria-label={t(lang, "queueAvg")} value={avg} onChange={(event) => { settingsDirty.current = true; setAvg(event.target.value.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "")); }} />
           </label>
+          {invalidField === "avg" ? <Notice tone="error">{settingsNote}</Notice> : null}
           {mode === "LIVE" ? (
             <label className="text-sm">{t(lang, "queueAlert")}
-              <input className="field mt-1" type="number" min={0} max={120} value={alertMin} onChange={(event) => setAlertMin(event.target.value)} />
+              <input className="field mt-1" inputMode="numeric" aria-invalid={invalidField === "alert"} aria-label={t(lang, "queueAlert")} value={alertMin} onChange={(event) => { settingsDirty.current = true; setAlertMin(event.target.value.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "")); }} />
             </label>
           ) : null}
+          {invalidField === "alert" ? <Notice tone="error">{settingsNote}</Notice> : null}
           <label className="text-sm">{t(lang, "queuePlace")}
-            <select className="field mt-1" aria-label={t(lang, "queuePlace")} value={unitLabel} onChange={(event) => setUnitLabel(event.target.value)}>
+            <select className="field mt-1" aria-label={t(lang, "queuePlace")} value={unitLabel} onChange={(event) => { settingsDirty.current = true; setUnitLabel(event.target.value); }}>
               <option value="chair">{t(lang, "queueChair")}</option>
               <option value="station">{t(lang, "queueStation")}</option>
               <option value="room">{t(lang, "queueRoom")}</option>
             </select>
           </label>
           <label className="text-sm">{t(lang, "queueHow")}
-            <select className="field mt-1" aria-label={t(lang, "queueHow")} value={mode} onChange={(event) => setMode(event.target.value)}>
+            <select className="field mt-1" aria-label={t(lang, "queueHow")} value={mode} onChange={(event) => { settingsDirty.current = true; setMode(event.target.value); }}>
               <option value="LIVE">{t(lang, "queueLive")}</option>
               <option value="REQUEST">{t(lang, "queueRequestMode")}</option>
             </select>
           </label>
-          <button className="btn min-h-11 w-fit" type="submit" disabled={busy}>{t(lang, "queueSave")}</button>
+          <button className="btn min-h-11 w-fit" type="submit" disabled={settingsBusy}>{settingsBusy ? "Saving…" : t(lang, "queueSave")}</button>
+          {settingsNote && !invalidField ? <Notice tone={settingsNote === "Saved" ? "success" : "error"}>{settingsNote}</Notice> : null}
+          {invalidField && invalidField !== "avg" && invalidField !== "alert" ? <Notice tone="error">{settingsNote}</Notice> : null}
         </form>
       </details>
 
@@ -555,6 +613,8 @@ function WaitingRow({ card, busy, lang, onArrive, onAdd, onDismiss, onMore }: {
           <span className="nums text-base" data-queue-token={card.token}>{tokenLabel(card.token)}</span>
           {" "}
           <span className="text-sm">{card.name}</span>
+          {card.lastVisitLabel ? <span className="mt-0.5 block text-xs text-muted" data-last-visit={card.lastVisitLabel}>Last visit {card.lastVisitLabel}</span> : null}
+          {!card.phone ? <span className="mt-0.5 block text-xs text-muted">No phone</span> : null}
         </p>
         {card.arrived ? (
           <span className="queue-arrived inline-flex items-center rounded-full bg-[#1c7c54] px-3 text-sm text-white" data-arrived="yes">Arrived ✓</span>
@@ -654,6 +714,7 @@ function ActionSheet({ card, at, rewards, busy, onClose, onAdd, onRedeem, onNoSh
           </div>
           <form
             className="grid gap-1"
+            noValidate
             onSubmit={(event) => {
               event.preventDefault();
               const amount = Number(custom);
@@ -667,11 +728,11 @@ function ActionSheet({ card, at, rewards, busy, onClose, onAdd, onRedeem, onNoSh
           >
             <label className="text-sm" htmlFor={`custom-tries-${card.id}`}>Custom tries</label>
             <div className="flex items-center gap-2">
-              <input id={`custom-tries-${card.id}`} className="field min-w-0 flex-1" type="number" min={1} max={9} step={1} inputMode="numeric" placeholder="1–9" aria-label="Custom tries" value={custom} onChange={(event) => setCustom(event.target.value)} />
+              <input id={`custom-tries-${card.id}`} className="field min-w-0 flex-1" inputMode="numeric" placeholder="1–9" aria-label="Custom tries" aria-invalid={Boolean(note)} value={custom} onChange={(event) => setCustom(event.target.value.replace(/[^\d]/g, ""))} />
               <button className="btn secondary h-12 shrink-0" type="submit" disabled={busy}>Add</button>
             </div>
           </form>
-          {note ? <p className="text-sm" role="status">{note}</p> : null}
+          {note ? <Notice tone="error">{note}</Notice> : null}
           <button className="btn danger min-h-11" type="button" onClick={onNoShow}>No-show</button>
           <button className="btn secondary min-h-11" type="button" onClick={onClose}>Close</button>
         </div>

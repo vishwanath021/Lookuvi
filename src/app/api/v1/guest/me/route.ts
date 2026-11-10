@@ -23,7 +23,7 @@ export async function GET(req: Request) {
   if (closed) return closed;
   const slug = new URL(req.url).searchParams.get("slug") || "";
   const found = await current(slug);
-  if (!found?.tenant) return NextResponse.json({ error: "TENANT" }, { status: 404 });
+  if (!found?.tenant) return NextResponse.json({ error: "NOT_FOUND", message: "We could not find that salon." }, { status: 404 });
   if (!found.customer) return NextResponse.json({ customer: null });
   const { phone, ...rest } = found.customer;
   return NextResponse.json({ customer: { ...rest, phoneHint: `…${phone.slice(-4)}` } });

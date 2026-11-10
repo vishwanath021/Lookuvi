@@ -122,7 +122,7 @@ describe("operating hours", () => {
     const inside = new Date("2026-06-01T05:00:00.000Z");
     await expect(joinQueue({
       slug: tenant.slug, name: "Late", phone: phone(), consent: true, ip: `live-${tag()}`, send, now: outside,
-    })).rejects.toThrow(/from 10:00 to 18:00 India time/);
+    })).rejects.toThrow(/from 10:00 AM to 6:00 PM India time/);
     const joined = await joinQueue({
       slug: tenant.slug, name: "Walk up", phone: phone(), consent: true, ip: `live-${tag()}`, send, now: inside,
     });

@@ -495,6 +495,7 @@ async function deskCard(tenantName: string, slug: string, row: EntryRow, avgMinu
     requestedSlot: row.requestedSlot,
     whatsappUrl: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : "",
     callUrl: phone ? `tel:+${phone}` : "",
+    lastVisitLabel: "",
     startedAt: row.startedAt ? row.startedAt.toISOString() : null,
     ...(await tryLineForEntry(row, tenant)),
   };
@@ -523,10 +524,21 @@ export async function deskSnapshot(tenantId: string, now = new Date()) {
   const everyone = [...entries, ...requests];
   const balances = tenant.loyaltyOn ? await pointsBalances(tenant.id, everyone.map((row) => row.phone)) : new Map<string, number>();
   const rewards = tenant.loyaltyOn ? await listRewards(tenant.id) : [];
-  const card = async (row: EntryRow) => ({
-    ...(await deskCard(tenant.name, tenant.slug, row, state.avgMinutes, entries, state.units, tenant)),
-    points: tenant.loyaltyOn && row.phone ? balances.get(row.phone) ?? 0 : null,
-  });
+  const phones = [...new Set(everyone.map((row) => row.phone).filter(Boolean))];
+  const known = phones.length
+    ? await prisma.customer.findMany({ where: { tenantId, phone: { in: phones } }, select: { phone: true, lastVisitAt: true } })
+    : [];
+  const lastVisits = new Map(known.filter((row) => row.lastVisitAt).map((row) => [row.phone, row.lastVisitAt as Date]));
+  const visitLabel = (at: Date) => new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" }).format(at);
+  const card = async (row: EntryRow) => {
+    const prior = row.phone ? lastVisits.get(row.phone) : undefined;
+    const earlier = prior && prior.getTime() < row.joinedAt.getTime() ? prior : null;
+    return {
+      ...(await deskCard(tenant.name, tenant.slug, row, state.avgMinutes, entries, state.units, tenant)),
+      points: tenant.loyaltyOn && row.phone ? balances.get(row.phone) ?? 0 : null,
+      lastVisitLabel: earlier ? visitLabel(earlier) : "",
+    };
+  };
   const serving = await Promise.all(Array.from({ length: state.units }, async (_, index) => {
     const unit = index + 1;
     const entry = entries.find((row) => row.unitSlot === unit && (row.status === "CALLED" || row.status === "IN_SERVICE"));
@@ -655,7 +667,8 @@ export async function addWalkIn(tenantId: string, input: { name?: string; phone?
   if ((input.phone || "").trim() && !phone) throw new QueueError("PHONE", "Enter a 10-digit Indian mobile number, or leave the phone empty.", 400);
   await findService(tenantId, input.serviceId);
   const dayKey = kolkataDayKey();
-  const name = (input.name || "").trim().slice(0, 80) || "Walk-in";
+  const name = (input.name || "").trim().slice(0, 80);
+  if (!name) throw new QueueError("NAME", "Enter the guest's name.", 400);
   const created = await createQueuedEntry({
     tenantId,
     dayKey,

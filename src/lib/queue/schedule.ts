@@ -84,6 +84,35 @@ export function formatSessions(sessions: Session[]) {
   return sessions.map((session) => `${formatClock(session.open)}–${formatClock(session.close)}`).join(", ");
 }
 
+/** Close must be after open. A gap under an hour is almost always an AM/PM miss (10:00 vs 22:00). */
+export function sessionSpanWarning(open: string, close: string) {
+  if (!/^\d{2}:\d{2}$/.test(open) || !/^\d{2}:\d{2}$/.test(close)) return "";
+  const minutes = (value: string) => {
+    const [hour, minute] = value.split(":").map(Number);
+    return hour * 60 + minute;
+  };
+  const span = minutes(close) - minutes(open);
+  if (span <= 0) return `Close is ${formatClock(close)}, which is not after ${formatClock(open)}.`;
+  if (span < 120) return `That is only ${span} minutes (${formatClock(open)} to ${formatClock(close)}). If you meant the evening, pick the PM time.`;
+  return "";
+}
+
+/**
+ * Ticking Closed stores no sessions but keeps the times on screen.
+ * Unticking writes those same times back, not the 10:00–20:00 suggestion.
+ */
+export function hoursAfterClosedToggle(
+  current: { open: string; close: string; open2: string; close2: string },
+  closed: boolean,
+) {
+  if (closed) return { ...current, sessions: [] as Session[] };
+  const open = current.open || SUGGESTED_OPEN;
+  const close = current.close || SUGGESTED_CLOSE;
+  const sessions: Session[] = [{ open, close }];
+  if (current.open2 && current.close2) sessions.push({ open: current.open2, close: current.close2 });
+  return { open, close, open2: current.open2, close2: current.close2, sessions };
+}
+
 export const SUGGESTED_OPEN = "10:00";
 export const SUGGESTED_CLOSE = "20:00";
 
@@ -363,9 +392,9 @@ export function hoursView(tenant: HoursTenant, isOpen: boolean, now = new Date()
     if (holiday || todaySessions.length === 0) hoursMessage = "This salon is closed today.";
     else if (overrideOn && override === "closed" && inside) hoursMessage = "The queue is paused. Please ask at the desk.";
     else if (todaySessions.length === 1) {
-      hoursMessage = `This salon takes queue joins from ${todaySessions[0].open} to ${todaySessions[0].close} India time.`;
+      hoursMessage = `This salon takes queue joins from ${formatClock(todaySessions[0].open)} to ${formatClock(todaySessions[0].close)} India time.`;
     } else {
-      hoursMessage = `This salon takes queue joins from ${todaySessions[0].open} to ${todaySessions[0].close} and ${todaySessions[1].open} to ${todaySessions[1].close} India time.`;
+      hoursMessage = `This salon takes queue joins from ${formatClock(todaySessions[0].open)} to ${formatClock(todaySessions[0].close)} and ${formatClock(todaySessions[1].open)} to ${formatClock(todaySessions[1].close)} India time.`;
     }
   }
 

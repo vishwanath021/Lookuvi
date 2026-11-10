@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ONBOARDING_SAVED, ONBOARDING_STEPS, OnboardingWizard } from "@/components/admin/OnboardingWizard";
 import { WeekHoursEditor } from "@/components/admin/WeekHoursEditor";
-import { serializeWeek, suggestedWeek, weekFromPair } from "@/lib/queue/schedule";
+import { hoursAfterClosedToggle, serializeWeek, sessionSpanWarning, suggestedWeek, weekFromPair } from "@/lib/queue/schedule";
 
 describe("suggested hours", () => {
   it("shows 10:00–20:00 as a suggestion and does not mark the week closed", () => {
@@ -46,6 +46,24 @@ describe("suggested hours", () => {
     expect(html).not.toContain("Suggested — not saved yet");
     expect(html).toContain('value="11:00"');
     expect(html).toContain('value="19:00"');
+  });
+});
+
+describe("closed toggle and AM/PM", () => {
+  it("keeps the previous times when closed is ticked and unticked", () => {
+    const closed = hoursAfterClosedToggle({ open: "09:00", close: "22:00", open2: "", close2: "" }, true);
+    expect(closed.sessions).toEqual([]);
+    expect(closed.open).toBe("09:00");
+    expect(closed.close).toBe("22:00");
+    const opened = hoursAfterClosedToggle(closed, false);
+    expect(opened.sessions).toEqual([{ open: "09:00", close: "22:00" }]);
+    expect(opened.sessions).not.toEqual([{ open: "10:00", close: "20:00" }]);
+  });
+
+  it("warns when close is earlier or only a few minutes later", () => {
+    expect(sessionSpanWarning("09:00", "10:00")).toMatch(/only 60 minutes|only \d+ minutes|9:00 AM/);
+    expect(sessionSpanWarning("09:00", "08:00")).toMatch(/not after/);
+    expect(sessionSpanWarning("09:00", "21:00")).toBe("");
   });
 });
 

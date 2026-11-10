@@ -29,7 +29,9 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "INVALID" }, { status: 400 });
   const tenant = await loadTenantBySlug(parsed.data.slug);
-  if (!tenant || isBlockedStatus(tenant.status)) return NextResponse.json({ error: "TENANT" }, { status: 404 });
+  if (!tenant || isBlockedStatus(tenant.status)) {
+    return NextResponse.json({ error: "NOT_FOUND", message: "We could not find that salon." }, { status: 404 });
+  }
   const config = await toSalonConfig(tenant);
   const tool = parsed.data.tool ?? "style";
   const look = resolveLook(tool, parsed.data.styleId);

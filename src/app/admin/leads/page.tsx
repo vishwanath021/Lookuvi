@@ -1,16 +1,26 @@
-import { LeadStatus } from "@/components/admin/LeadStatus";
+import { LeadList } from "@/components/admin/LeadList";
 import { planById } from "@/data/plans";
-import { formatIst, humanLookName, humanShade } from "@/lib/display";
+import { humanLookName, humanShade } from "@/lib/display";
 import { formatEventDate, sortLeads } from "@/lib/leads";
 import { prisma } from "@/lib/prisma";
 import { pageTenant } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
+function leadWhen(date: Date) {
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+}
+
 export default async function LeadsPage() {
   const { tenant } = await pageTenant();
   const canExport = planById(tenant.plan).leadExport;
-  // Unordered take drops a new bridal trial once the salon has a long list of older looks.
   const [dated, recent] = await Promise.all([
     prisma.lead.findMany({
       where: { tenantId: tenant.id, type: "BRIDAL", eventDate: { not: "" } },
@@ -28,45 +38,30 @@ export default async function LeadsPage() {
     if (seen.has(lead.id)) return false;
     seen.add(lead.id);
     return true;
+  })).map((lead) => ({
+    id: lead.id,
+    when: leadWhen(lead.createdAt),
+    look: humanLookName(lead.lookName),
+    shade: lead.shadeName ? humanShade(lead.shadeName) : "",
+    type: lead.type,
+    eventName: lead.eventName,
+    eventDate: lead.eventDate ? formatEventDate(lead.eventDate) : "",
+    name: lead.name || "",
+    phone: lead.phone || "",
+    status: lead.status,
   }));
   return (
     <main>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="page-title">Leads</h1>
           <p className="mt-1 text-sm text-muted">People who asked to book a look they tried.</p>
         </div>
         {/* File download, not a client navigation. */}
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-        {canExport ? <a className="btn" href="/api/v1/admin/leads/export">Download CSV</a> : <p className="text-sm text-muted">Lead export is included with Standard and Pro.</p>}
+        {canExport ? <a className="btn secondary min-h-11 shrink-0" href="/api/v1/admin/leads/export" aria-label="Download CSV">CSV</a> : <p className="text-sm text-muted">Lead export is included with Standard and Pro.</p>}
       </div>
-      {leads.length === 0 && <p className="card p-4 text-sm">No booking taps yet. A lead is created when a guest taps Book this look.</p>}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="text-xs uppercase tracking-wide text-muted">
-              <th className="py-2">When</th>
-              <th>Look</th>
-              <th>Guest</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {leads.map((lead) => (
-              <tr key={lead.id} className="border-t border-line">
-                <td className="py-2">{formatIst(lead.createdAt)}</td>
-                <td>
-                  {lead.type === "BRIDAL" ? <span className="mr-2 rounded-full bg-[#F3E6D8] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide">Bridal</span> : null}
-                  {humanLookName(lead.lookName)}{lead.shadeName ? ` · ${humanShade(lead.shadeName)}` : ""}
-                  {lead.type === "BRIDAL" && lead.eventDate ? <span className="mt-1 block text-xs text-muted">{lead.eventName} · {formatEventDate(lead.eventDate)}</span> : null}
-                </td>
-                <td>{lead.name || "—"} {lead.phone || ""}</td>
-                <td><LeadStatus id={lead.id} status={lead.status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <LeadList leads={leads} />
     </main>
   );
 }

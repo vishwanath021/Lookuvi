@@ -186,7 +186,12 @@ export function GuestHub({
 
   async function deleteData() {
     if (!window.confirm(t(lang, "hubDeleteConfirm"))) return;
-    await fetch(`/api/v1/guest/me?slug=${config.slug}`, { method: "DELETE" });
+    const res = await fetch(`/api/v1/guest/me?slug=${config.slug}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setStatus(data.message || t(lang, "hubError"));
+      return;
+    }
     setCustomer(null);
     setSent(false);
     setCode("");

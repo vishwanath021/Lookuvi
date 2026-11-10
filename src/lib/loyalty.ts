@@ -63,7 +63,7 @@ export async function changePoints(input: {
   tenantId: string;
   phone: string;
   delta: number;
-  kind: "earn" | "redeem" | "adjust";
+  kind: "earn" | "redeem" | "adjust" | "correct";
   reason: string;
   staffId?: string;
   visitId?: string;

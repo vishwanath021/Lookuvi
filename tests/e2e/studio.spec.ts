@@ -120,7 +120,7 @@ test("photo notice, countdown, live makeup, and metallic buttons", async ({ page
   await page.goto("/admin/leads");
   const ownerBtn = page.getByRole("link", { name: "Download CSV" });
   await expect(ownerBtn).toBeVisible();
-  expect(await ownerBtn.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain("gradient");
+  await expect(ownerBtn).toHaveClass(/secondary/);
   await page.screenshot({ path: `${SHOTS}/06-owner-metal.png` });
 
   await page.goto("/login");

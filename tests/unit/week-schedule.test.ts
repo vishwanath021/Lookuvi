@@ -163,7 +163,7 @@ describe("weekly sessions", () => {
       hoursOverrideUntil: atKolkata("2026-06-01", "13:00"),
     }, false, gap);
     expect(expired.accepting).toBe(false);
-    expect(expired.hoursMessage).toMatch(/09:00 to 13:00 and 16:00 to 21:00/);
+    expect(expired.hoursMessage).toMatch(/9:00 AM to 1:00 PM and 4:00 PM to 9:00 PM/);
 
     expect(hoursView({
       ...source,
@@ -186,7 +186,7 @@ describe("weekly sessions", () => {
     expect(joined.status).toBe("WAITING");
     await expect(joinQueue({
       slug: tenant.slug, name: "Aarav", phone: phone(), consent: true, ip: `w-${tag()}`, send, now: gap,
-    })).rejects.toThrow(/09:00 to 13:00 and 16:00 to 21:00/);
+    })).rejects.toThrow(/9:00 AM to 1:00 PM and 4:00 PM to 9:00 PM/);
     const duringGap = await deskSnapshot(tenant.id, gap);
     expect(duringGap.waiting.map((card) => card.name)).toEqual(["Nila"]);
     expect(duringGap.state.hoursLabel).toBe("Closed · opens 4:00 PM");
