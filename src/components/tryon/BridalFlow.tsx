@@ -682,8 +682,10 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   return (
     <div data-bridal="flow" data-busy={busy ? "yes" : "no"}>
       <ConsentSheet open={consent.open} lang={config.defaultLang || "en"} onAgree={(ageGate) => void consent.agree(ageGate)} onClose={consent.close} />
-      <h2 className="page-title">Bridal</h2>
-      <p className="mt-1 text-sm text-muted">Hair, makeup, and jewellery in one look. Then mehendi, and a trial with the salon.</p>
+      <div className="bridal-intro">
+        <h2 className="page-title">Bridal</h2>
+        <p className="mt-1 text-sm text-muted">Hair, makeup, and jewellery in one look. Then mehendi, and a trial with the salon.</p>
+      </div>
       <div className="seg mt-4" role="tablist" aria-label="Bridal">
         {(["looks", "own", "mehendi", "saved"] as const).map((item) => (
           <button key={item} className="seg-btn" type="button" role="tab" aria-selected={panel === item} onClick={() => setPanel(item)}>

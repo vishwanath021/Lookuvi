@@ -80,6 +80,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
   const [unitLabel, setUnitLabel] = useState(initial.state.unitLabel);
   const [confirmClose, setConfirmClose] = useState(false);
   const [sheet, setSheet] = useState<Card | null>(null);
+  const [sheetAt, setSheetAt] = useState<{ top: number; left: number } | null>(null);
   const [confirmNoShow, setConfirmNoShow] = useState<Card | null>(null);
   const [away, setAway] = useState<Card | null>(null);
   const [wide, setWide] = useState(false);
@@ -103,6 +104,20 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
 
   function current(id: number) {
     return id === ticket.current;
+  }
+
+  function openMore(card: Card, event: { currentTarget: HTMLElement }) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const width = 320;
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+    const top = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 240));
+    setSheetAt({ top, left });
+    setSheet(card);
+  }
+
+  function closeMore() {
+    setSheet(null);
+    setSheetAt(null);
   }
 
   function applySnapshot(data: Desk) {
@@ -223,7 +238,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
   }
 
   return (
-    <div className={wide ? "overflow-x-hidden" : "overflow-x-hidden pb-28"} data-ready={ready ? "yes" : "no"} data-queue-mode={desk.state.mode} data-queue-open={desk.state.isOpen ? "yes" : "no"} data-queue-wide={wide ? "yes" : "no"}>
+    <div className={wide ? "" : "pb-28"} data-ready={ready ? "yes" : "no"} data-queue-mode={desk.state.mode} data-queue-open={desk.state.isOpen ? "yes" : "no"} data-queue-wide={wide ? "yes" : "no"}>
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="font-serif text-3xl leading-none">Queue</h1>
         <button
@@ -304,7 +319,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
                     <button className="btn min-h-11 px-3" type="button" disabled={busy} onClick={() => void act({ action: "done", id: seat.entry?.id })}>Finish</button>
                   ) : null}
                   {seat.entry ? (
-                    <button className="btn secondary min-h-11 min-w-11 px-2" type="button" aria-label="More actions" onClick={() => setSheet(seat.entry)}>⋯</button>
+                    <button className="btn secondary min-h-11 min-w-11 px-2" type="button" aria-label="More actions" onClick={(event) => { if (seat.entry) openMore(seat.entry, event); }}>⋯</button>
                   ) : null}
                 </article>
               ))}
@@ -315,7 +330,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
             <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted">{t(lang, "queueWaiting")}</h2>
             {desk.waiting.length === 0 ? <p className="mt-2 text-sm text-muted">{stale ? "Waiting list could not be loaded." : t(lang, "queueNobody")}</p> : null}
             {wide ? (
-              <div className="mt-2 overflow-x-hidden">
+              <div className="mt-2 overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="text-xs uppercase tracking-[0.12em] text-muted">
@@ -336,7 +351,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
                           <td className="py-2 pr-2"><StatusPills card={card} lang={lang} /></td>
                           <td className="py-2">
                             <div className="flex flex-wrap items-center gap-1">
-                              <RowActions card={card} busy={busy} lang={lang} onArrive={() => void act({ action: "arrived", id: card.id })} onMore={() => setSheet(card)} />
+                              <RowActions card={card} busy={busy} lang={lang} onArrive={() => void act({ action: "arrived", id: card.id })} onMore={(event) => openMore(card, event)} />
                               {card.wantsTries && card.arrived ? <TryChips compact busy={busy} onAdd={(extra) => addTries(card.id, extra)} onDismiss={() => void act({ action: "dismiss", id: card.id })} /> : null}
                             </div>
                           </td>
@@ -349,7 +364,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
             ) : (
               <div className="mt-2 grid gap-2">
                 {desk.waiting.map((card) => (
-                  <WaitingRow key={card.id} card={card} busy={busy} lang={lang} onArrive={() => void act({ action: "arrived", id: card.id })} onAdd={(extra) => addTries(card.id, extra)} onDismiss={() => void act({ action: "dismiss", id: card.id })} onMore={() => setSheet(card)} />
+                  <WaitingRow key={card.id} card={card} busy={busy} lang={lang} onArrive={() => void act({ action: "arrived", id: card.id })} onAdd={(extra) => addTries(card.id, extra)} onDismiss={() => void act({ action: "dismiss", id: card.id })} onMore={(event) => openMore(card, event)} />
                 ))}
               </div>
             )}
@@ -407,7 +422,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
                 <article key={card.id} className="card flex flex-wrap items-center gap-2 p-3">
                   <p className="min-w-0 flex-1 text-sm">{card.name} · {card.requestedDate} · {card.requestedSlot}</p>
                   <button className="btn min-h-11" type="button" disabled={busy} onClick={() => void act({ action: "done", id: card.id })}>Mark visited</button>
-                  <button className="btn secondary min-h-11" type="button" aria-label="More actions" onClick={() => setSheet(card)}>⋯</button>
+                  <button className="btn secondary min-h-11" type="button" aria-label="More actions" onClick={(event) => openMore(card, event)}>⋯</button>
                 </article>
               ))}
             </div>
@@ -434,6 +449,7 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
           <label className="text-sm">{t(lang, "queueUnits", { unit: unitLabel === "station" ? "Stations" : unitLabel === "room" ? "Rooms" : "Chairs" })}
             <input className="field mt-1" type="number" min={1} max={30} value={units} onChange={(event) => setUnits(event.target.value)} />
           </label>
+          <p className="text-xs text-muted">You can add seats at any time. An empty seat can be removed. A seat with someone in it stays until you finish the visit or send them back to the line. People waiting are not removed.</p>
           <label className="text-sm">{t(lang, "queueAvg")}
             <input className="field mt-1" type="number" min={5} max={240} value={avg} onChange={(event) => setAvg(event.target.value)} />
           </label>
@@ -499,9 +515,10 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
       {sheet ? (
         <ActionSheet
           card={sheet}
+          at={sheetAt}
           rewards={desk.rewards || []}
           busy={busy}
-          onClose={() => setSheet(null)}
+          onClose={closeMore}
           onAdd={(extra) => addTries(sheet.id, extra)}
           onRedeem={(rewardId) => void act({ action: "redeem", id: sheet.id, rewardId })}
           onNoShow={() => setConfirmNoShow(sheet)}
@@ -528,7 +545,7 @@ function WaitingRow({ card, busy, lang, onArrive, onAdd, onDismiss, onMore }: {
   onArrive: () => void;
   onAdd: (extra: number) => void;
   onDismiss: () => void;
-  onMore: () => void;
+  onMore: (event: { currentTarget: HTMLElement }) => void;
 }) {
   return (
     <article className="card px-3 py-2" data-queue-row={card.token}>
@@ -543,7 +560,7 @@ function WaitingRow({ card, busy, lang, onArrive, onAdd, onDismiss, onMore }: {
         ) : (
           <button className="btn min-h-11 px-3" type="button" data-arrived="yes" disabled={busy} onClick={onArrive}>Arrived</button>
         )}
-        <button className="btn secondary min-h-11 min-w-11 px-0" type="button" aria-label="More actions" onClick={onMore}>⋯</button>
+        <button className="btn secondary min-h-11 min-w-11 px-0" type="button" aria-label="More actions" onClick={(event) => onMore(event)}>⋯</button>
       </div>
       <p className="mt-1 text-xs text-muted">{t(lang, "queueMinShort", { min: card.waitMin })}{card.serviceName ? ` · ${card.serviceName}` : ""}</p>
       <div className="mt-1"><StatusPills card={card} lang={lang} /></div>
@@ -557,10 +574,10 @@ function RowActions({ card, busy, lang, onArrive, onMore }: {
   busy: boolean;
   lang: string;
   onArrive: () => void;
-  onMore: () => void;
+  onMore: (event: { currentTarget: HTMLElement }) => void;
 }) {
   return (
-    <div className="flex flex-nowrap items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       {card.arrived ? (
         <span className="inline-flex min-h-11 items-center rounded-full bg-[#1c7c54] px-3 text-sm text-white" data-arrived="yes">Arrived ✓</span>
       ) : (
@@ -568,7 +585,7 @@ function RowActions({ card, busy, lang, onArrive, onMore }: {
       )}
       {card.whatsappUrl ? <a className="btn secondary inline-flex min-h-11 min-w-11 items-center justify-center px-2" href={card.whatsappUrl} target="_blank" rel="noreferrer" aria-label="WhatsApp">WA</a> : null}
       {card.callUrl ? <a className="btn secondary inline-flex min-h-11 min-w-11 items-center justify-center px-2" href={card.callUrl} aria-label="Call">Call</a> : null}
-      <button className="btn secondary min-h-11 min-w-11 px-0" type="button" aria-label="More actions" onClick={onMore}>⋯</button>
+      <button className="btn secondary min-h-11 min-w-11 px-0" type="button" aria-label="More actions" onClick={(event) => onMore(event)}>⋯</button>
     </div>
   );
 }
@@ -586,8 +603,9 @@ function TryChips({ busy, onAdd, onDismiss, compact = false }: { busy: boolean; 
   );
 }
 
-function ActionSheet({ card, rewards, busy, onClose, onAdd, onRedeem, onNoShow }: {
+function ActionSheet({ card, at, rewards, busy, onClose, onAdd, onRedeem, onNoShow }: {
   card: Card;
+  at: { top: number; left: number } | null;
   rewards: Reward[];
   busy: boolean;
   onClose: () => void;
@@ -600,8 +618,15 @@ function ActionSheet({ card, rewards, busy, onClose, onAdd, onRedeem, onNoShow }
   const [pick, setPick] = useState<Reward | null>(null);
   const points = typeof card.points === "number" ? card.points : null;
   return (
-    <div className="fixed inset-0 z-40 bg-black/40" role="presentation" onClick={onClose}>
-      <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-white p-4" role="dialog" aria-label="More actions" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-40" role="presentation" onClick={onClose}>
+      <div
+        className="fixed z-50 max-h-[min(32rem,calc(100dvh-1rem))] w-80 overflow-y-auto rounded-2xl border border-line bg-white p-4 shadow-lift"
+        style={at ? { top: at.top, left: at.left } : { top: "4.5rem", right: "1rem" }}
+        role="dialog"
+        aria-label="More actions"
+        data-action-menu="float"
+        onClick={(event) => event.stopPropagation()}
+      >
         <p className="text-base font-semibold">{tokenLabel(card.token)} {card.name}</p>
         {points !== null ? <p className="mt-1 text-sm" data-points={points}>Points: {points}</p> : null}
         <div className="mt-3 grid gap-2">

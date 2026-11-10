@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LOW_TRYONS, PLANS, type PlanId } from "@/data/plans";
 import type { SalonRecord } from "@/lib/super/directory";
 import { Badge, statusTone } from "@/components/ui/badge";
@@ -71,6 +71,8 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
   const [status, setStatus] = useState("");
   const [focus, setFocus] = useState("");
   const [selected, setSelected] = useState<SalonRecord | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const dialogClosedAt = useRef(0);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -125,8 +127,18 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
     toast(text, ok);
   }
 
+  function guardRowClick() {
+    return Date.now() - dialogClosedAt.current < 500;
+  }
+
+  function noteDialogClose() {
+    dialogClosedAt.current = Date.now();
+  }
+
   function openSalon(row: SalonRecord) {
+    if (guardRowClick()) return;
     setSelected(row);
+    setDetailOpen(true);
   }
 
   function openPlan(row: SalonRecord) {
@@ -322,7 +334,7 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
         </div>
       )}
 
-      <Sheet open={Boolean(selected) && !planOpen && !creditOpen && !suspendOpen && !payOpen && !deleteOpen} onOpenChange={(open) => { if (!open) setSelected(null); }} title={selected?.name || "Salon"} description={selected ? selected.slug : undefined}>
+      <Sheet open={detailOpen && !planOpen && !creditOpen && !suspendOpen && !payOpen && !deleteOpen} onOpenChange={(open) => { if (!open) { setDetailOpen(false); setSelected(null); } }} title={selected?.name || "Salon"} description={selected ? selected.slug : undefined}>
         {selected ? (
           <Tabs defaultValue="profile">
             <TabsList>
@@ -358,7 +370,7 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
                 <Badge tone="neutral">{selected.planName}</Badge>
                 <Badge tone={statusTone(selected.status)}>{selected.status}</Badge>
               </div>
-              <p className="mt-3 text-sm">{selected.credits} try-ons left</p>
+              <p className="mt-3 text-sm">{selected.credits} try-ons left. {selected.planName} lists {PLANS[selected.plan as PlanId]?.credits ?? ""} included when a payment is marked paid. That list is not the balance. Adjust try-ons adds or removes the balance for this salon.</p>
               <fieldset className="mt-4 grid gap-2">
                 <legend className="text-sm font-medium">Products</legend>
                 <label className="flex min-h-11 items-center gap-2 text-sm">
@@ -459,8 +471,8 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
         </DialogContent>
       </Dialog>
 
-      <Dialog open={planOpen} onOpenChange={setPlanOpen}>
-        <DialogContent title="Change plan" description="Sets the plan. It does not add try-ons. Mark paid does that.">
+      <Dialog open={planOpen} onOpenChange={(open) => { setPlanOpen(open); if (!open) { noteDialogClose(); setDetailOpen(false); } }}>
+        <DialogContent title="Change plan" description="Sets the plan. It does not add or remove the try-ons this salon has left. Mark paid adds the included tries.">
           <form
             className="grid gap-3"
             onSubmit={(event) => {
@@ -472,16 +484,17 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
             <label className="text-sm">Plan
               <select className="field mt-1" aria-label="Plan" value={nextPlan} onChange={(event) => setNextPlan(event.target.value as PlanId)}>
                 {Object.values(PLANS).map((item) => (
-                  <option key={item.id} value={item.id}>{item.name} · {item.credits} tries</option>
+                  <option key={item.id} value={item.id}>{item.name} · {item.credits} included when marked paid</option>
                 ))}
               </select>
             </label>
+            {selected ? <p className="text-sm">{selected.name} has {selected.credits} try-ons left. Changing the plan leaves that number as it is.</p> : null}
             <button className="btn" type="submit" disabled={busy}>{busy ? "Saving…" : "Set plan"}</button>
           </form>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={creditOpen} onOpenChange={(open) => { setCreditOpen(open); if (!open) setGoodwillConfirm(false); }}>
+      <Dialog open={creditOpen} onOpenChange={(open) => { setCreditOpen(open); if (!open) { setGoodwillConfirm(false); noteDialogClose(); setDetailOpen(false); } }}>
         <DialogContent title="Adjust try-ons" description="1 try-on is 1 credit. The try-ons are free to the salon. The reason is saved on the ledger and the audit log.">
           <form
             className="grid gap-3"
@@ -491,6 +504,7 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
               void update(selected.id, { creditDelta: Number(delta), note: reason.trim() });
             }}
           >
+            {selected ? <p className="text-sm">{selected.name} has {selected.credits} try-ons left. Use a positive number to add, or a negative number to remove. The balance cannot go below zero.</p> : null}
             <label className="text-sm">Amount
               <input className="field mt-1" aria-label="Credit amount" type="number" value={delta} onChange={(event) => setDelta(event.target.value)} required />
             </label>
@@ -532,7 +546,7 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
         </DialogContent>
       </Dialog>
 
-      <Dialog open={payOpen} onOpenChange={setPayOpen}>
+      <Dialog open={payOpen} onOpenChange={(open) => { setPayOpen(open); if (!open) { noteDialogClose(); setDetailOpen(false); } }}>
         <DialogContent title="Mark paid" description="Enter the UPI reference. This activates the plan and adds the try-ons.">
           <form className="grid gap-3" onSubmit={markPaid}>
             <label className="text-sm">UPI reference
@@ -543,7 +557,7 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
         </DialogContent>
       </Dialog>
 
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <Dialog open={deleteOpen} onOpenChange={(open) => { setDeleteOpen(open); if (!open) { noteDialogClose(); setDetailOpen(false); } }}>
         <DialogContent title="Delete salon" description="This is not suspend. Guest links return not found, and this screen cannot resume the salon. The salon's rows stay in the database.">
           <form
             className="grid gap-3"
@@ -564,7 +578,7 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
         </DialogContent>
       </Dialog>
 
-      <Dialog open={suspendOpen} onOpenChange={setSuspendOpen}>
+      <Dialog open={suspendOpen} onOpenChange={(open) => { setSuspendOpen(open); if (!open) { noteDialogClose(); setDetailOpen(false); } }}>
         <DialogContent
           title={selected?.status === "SUSPENDED" ? "Resume salon" : "Suspend salon"}
           description={selected?.status === "SUSPENDED" ? "The salon home opens again." : "Guests see a paused page until you resume."}

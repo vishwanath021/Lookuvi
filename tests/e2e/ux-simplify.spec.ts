@@ -46,8 +46,12 @@ test("bridal is its own section and the hair styles stay in the gallery", async 
   }
   await expect(gallery.getByRole("button", { name: "Curtain Wolf" })).toHaveCount(0);
   await expect(gallery.getByRole("button", { name: "Wolf Cut" })).toBeVisible();
-  await gallery.getByRole("searchbox", { name: "Search styles" }).fill("Voluminous");
-  await expect(gallery.getByRole("button", { name: "Voluminous Blowout" }).locator("img")).toHaveAttribute("src", /voluminous-blowout\.jpg/);
+  await expect(gallery.getByRole("searchbox", { name: "Search styles" })).toHaveCount(0);
+  const blowout = gallery.getByRole("button", { name: "Voluminous Blowout" });
+  for (let step = 0; step < 8 && (await blowout.count()) === 0; step += 1) {
+    await gallery.getByRole("button", { name: "Show more" }).click();
+  }
+  await expect(blowout.locator("img")).toHaveAttribute("src", /voluminous-blowout\.jpg/);
 });
 
 test("the queue page asks people to join, with a wait", async ({ page }) => {

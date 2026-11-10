@@ -1009,17 +1009,19 @@ export function TryOnApp({
       apply();
     }, { threshold: 0.25 });
     previewObs.observe(node);
-    const footer = document.querySelector("[data-legal-footer]");
-    const footerObs = footer
-      ? new IntersectionObserver(([entry]) => {
-        footerNear = entry.isIntersecting;
-        apply();
-      }, { rootMargin: "0px 0px 140px 0px", threshold: 0 })
-      : null;
-    if (footer && footerObs) footerObs.observe(footer);
+    const foot = document.querySelector("[data-page-foot]");
+    const readFoot = () => {
+      const top = foot?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+      footerNear = top < window.innerHeight - 4;
+      apply();
+    };
+    readFoot();
+    window.addEventListener("scroll", readFoot, { passive: true });
+    window.addEventListener("resize", readFoot);
     return () => {
       previewObs.disconnect();
-      footerObs?.disconnect();
+      window.removeEventListener("scroll", readFoot);
+      window.removeEventListener("resize", readFoot);
     };
   }, [section, tool, lockedBrowse]);
 
@@ -1280,20 +1282,6 @@ export function TryOnApp({
       {poseDebug && poseNote && (error || showResult) && <PoseReadout debug={poseNote} />}
       {notice && <p className="mt-3 text-center text-sm" role="status">{notice}</p>}
 
-      {!showResult && !busy && tool === "brows" && (
-        <div className="mt-4 grid gap-3">
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Brow thickness">
-            {BROW_THICKNESS.map((item) => (
-              <button key={item.id} className="chip" type="button" aria-pressed={browThickness === item.id} onClick={() => setBrowThickness(item.id)}>{item.label}</button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Brow colour">
-            {BROW_COLOURS.map((item) => (
-              <button key={item.id} className="chip" type="button" aria-pressed={browColour === item.id} onClick={() => setBrowColour(item.id)}>{item.label}</button>
-            ))}
-          </div>
-        </div>
-      )}
       {!showResult && !busy && error && (tool === "nails" ? handShot : faceShot) && chosenNow() && (
         <button className="btn mt-4 w-full" type="button" onClick={() => { const chosen = chosenNow(); if (chosen) void preview(chosen); }}>{t(lang, "retry")}</button>
       )}
@@ -1371,6 +1359,8 @@ export function TryOnApp({
                 if (style) selectLook({ id: style.id, name: style.name, serviceKeys: style.serviceKeys, tool: "style" });
               }}
               onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+              onSave={saveCurrentStyle}
+              saveNote={savedFlash ? "Saved on this phone. Tap Saved looks to see it." : undefined}
             />
             {filtersOpen ? (
               <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-4 sm:place-items-center" role="dialog" aria-label="Filters">
@@ -1425,10 +1415,27 @@ export function TryOnApp({
             }))}
             onSelect={(id) => pickShade(id)}
             onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+            onSave={saveCurrentStyle}
+            saveNote={savedFlash ? "Saved on this phone. Tap Saved looks to see it." : undefined}
           />
         )}
 
         {tool === "brows" && (
+          <>
+          {!showResult && !busy && tool === "brows" ? (
+            <div className="mb-3 grid gap-3" data-brow-options="yes">
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Brow thickness">
+                {BROW_THICKNESS.map((item) => (
+                  <button key={item.id} className="chip" type="button" aria-pressed={browThickness === item.id} onClick={() => setBrowThickness(item.id)}>{item.label}</button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Brow colour">
+                {BROW_COLOURS.map((item) => (
+                  <button key={item.id} className="chip" type="button" aria-pressed={browColour === item.id} onClick={() => setBrowColour(item.id)}>{item.label}</button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <LookPicker
             key="brows"
             label="brows"
@@ -1447,7 +1454,10 @@ export function TryOnApp({
               if (brow) selectLook({ id: brow.id, name: brow.name, serviceKeys: brow.serviceKeys, tool: "brows" });
             }}
             onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+            onSave={saveCurrentStyle}
+            saveNote={savedFlash ? "Saved on this phone. Tap Saved looks to see it." : undefined}
           />
+          </>
         )}
 
         {tool === "beard" && (
@@ -1468,6 +1478,8 @@ export function TryOnApp({
               if (beard) selectLook({ id: beard.id, name: beard.name, serviceKeys: beard.serviceKeys, tool: "beard" });
             }}
             onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+            onSave={saveCurrentStyle}
+            saveNote={savedFlash ? "Saved on this phone. Tap Saved looks to see it." : undefined}
           />
         )}
 
@@ -1489,12 +1501,15 @@ export function TryOnApp({
               if (nail) selectLook({ id: nail.id, name: nail.name, serviceKeys: nail.serviceKeys, tool: "nails" });
             }}
             onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+            onSave={saveCurrentStyle}
+            saveNote={savedFlash ? "Saved on this phone. Tap Saved looks to see it." : undefined}
           />
         )}
       </section>
       </div>
       </div>
       </>}
+      <div data-page-foot="yes">
       {demoHint && <p className="mt-8 text-center text-xs text-muted">Demo preview</p>}
       {config.poweredBy && (
         <p className="mt-10 flex items-center justify-center gap-2 text-xs text-muted">
@@ -1504,6 +1519,7 @@ export function TryOnApp({
       )}
       <p className="mt-6 text-center text-xs text-muted"><a href="/login">Salon login</a></p>
       <LegalFooter className="mt-auto px-0 pb-2" />
+      </div>
       </div>
     </div>
   );
