@@ -220,9 +220,9 @@ test("owner: change a lead, add a service, open QR, and use More", async ({ page
 
   await signIn(page, OWNER.email, OWNER.password);
   await page.goto("/admin/leads");
-  const row = page.locator("tbody tr").filter({ hasText: "Matrix Lead" }).first();
-  await expect(row.getByText(/IST/)).toBeVisible();
+  const row = page.locator("article, tbody tr").filter({ hasText: "Matrix Lead" }).first();
   await expect(row.getByText("Soft Bob")).toBeVisible();
+  await expect(row.getByText("No phone shared")).toBeVisible();
   await row.getByRole("button", { name: /Status New/ }).click();
   await expect(row.getByRole("button", { name: /Status Contacted/ })).toBeVisible();
 

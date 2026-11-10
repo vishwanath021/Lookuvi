@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { kolkataClock } from "@/lib/queue/hours";
+import { formatClock } from "@/lib/queue/schedule";
 
 const SLUG = "live-hours-salon";
 
@@ -36,7 +37,8 @@ test("a live join is refused outside the salon's India hours while the desk is o
   test.skip(testInfo.project.name !== "desktop", "One browser is enough for the hours gate.");
   const hours = closedPair();
   await page.goto(`/s/${SLUG}/queue`);
-  await expect(page.getByText(`from ${hours.open} to ${hours.close} India time`)).toBeVisible();
+  await expect(page.getByText(`from ${formatClock(hours.open)} to ${formatClock(hours.close)} India time`)).toBeVisible();
+  await expect(page.getByText(/Closed now/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Join the queue" })).toBeDisabled();
   const res = await request.post("/api/v1/queue", {
     data: { slug: SLUG, name: "Late Night", phone: "9876503301", consent: true },

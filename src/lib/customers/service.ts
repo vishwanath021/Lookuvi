@@ -107,21 +107,79 @@ async function applyImportedVisit(tenantId: string, phone: string, name: string,
   });
 }
 
-export async function adjustCustomerPoints(tenantId: string, customerId: string, delta: number, reason: string, staffId = "") {
+function visitDateLabel(at: Date | null) {
+  if (!at) return "no visit yet";
+  return new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" }).format(at);
+}
+
+export async function pointsHistory(tenantId: string, customerId: string) {
+  const row = await prisma.customer.findFirst({ where: { id: customerId, tenantId }, select: { phone: true } });
+  if (!row) return [];
+  const rows = await prisma.loyaltyLedger.findMany({
+    where: { tenantId, phone: row.phone },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+  });
+  return rows.map((entry) => ({
+    id: entry.id,
+    delta: entry.delta,
+    kind: entry.kind,
+    reason: entry.reason,
+    at: entry.createdAt.toISOString(),
+    label: new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(entry.createdAt),
+  }));
+}
+
+export async function adjustCustomerPoints(
+  tenantId: string,
+  customerId: string,
+  input: { delta?: number; amount?: number; mode?: "add" | "correct"; reason: string },
+  staffId = "",
+) {
   const row = await prisma.customer.findFirst({ where: { id: customerId, tenantId } });
   if (!row) return { ok: false as const, message: "That customer was not found." };
+  let delta = input.delta ?? 0;
+  let kind: "adjust" | "correct" = delta < 0 ? "correct" : "adjust";
+  if (input.mode) {
+    const amount = input.amount ?? 0;
+    if (!Number.isInteger(amount) || amount < 1) return { ok: false as const, message: "Enter a whole number of points, at least 1." };
+    delta = input.mode === "correct" ? -amount : amount;
+    kind = input.mode === "correct" ? "correct" : "adjust";
+  }
+  if (!Number.isInteger(delta) || delta === 0) return { ok: false as const, message: "Enter a whole number of points, at least 1." };
   try {
-    const result = await changePoints({ tenantId, phone: row.phone, delta, kind: "adjust", reason, staffId });
-    return { ok: true as const, message: `Balance is ${result.balance}.`, balance: result.balance };
+    const result = await changePoints({ tenantId, phone: row.phone, delta, kind, reason: input.reason, staffId });
+    return {
+      ok: true as const,
+      message: `Balance is ${result.balance}.`,
+      balance: result.balance,
+      history: await pointsHistory(tenantId, customerId),
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "That did not work.";
     return { ok: false as const, message };
   }
 }
 
-export async function addCustomer(tenantId: string, phoneInput: string, name: string) {
+export async function addCustomer(tenantId: string, phoneInput: string, name: string, updateName = false) {
   const phone = indianMobile(phoneInput);
   if (!phone) return { ok: false as const, message: "Enter a 10-digit Indian mobile number." };
+  const existing = await prisma.customer.findUnique({ where: { tenantId_phone: { tenantId, phone } } });
+  if (existing && !updateName) {
+    const who = existing.name.trim() || "No name";
+    return {
+      ok: false as const,
+      exists: true as const,
+      id: existing.id,
+      message: `Already a customer: ${who}, last visit ${visitDateLabel(existing.lastVisitAt)}.`,
+    };
+  }
+  if (existing) {
+    const clean = name.trim().slice(0, 80);
+    if (!clean) return { ok: false as const, message: "Enter the name to save." };
+    await prisma.customer.update({ where: { id: existing.id }, data: { name: clean } });
+    return { ok: true as const, message: "Name updated.", id: existing.id };
+  }
   const row = await rememberCustomer({ tenantId, phone, name });
   return { ok: true as const, message: "Saved.", id: row?.id || "" };
 }
@@ -134,9 +192,16 @@ export async function importCustomers(tenantId: string, text: string, now = new 
     else await rememberCustomer({ tenantId, phone: row.phone, name: row.name });
   }
   const saved = parsed.rows.length;
-  const skipped = parsed.invalid ? ` Skipped ${parsed.invalid} that are not Indian mobiles.` : "";
-  const dates = parsed.datesIgnored ? ` Ignored ${parsed.datesIgnored} dates.` : "";
-  return { ok: true as const, message: `Saved ${saved} numbers.${skipped}${dates}`, saved, invalid: parsed.invalid, datesIgnored: parsed.datesIgnored };
+  const examples = parsed.skipped.map((skip) => `Line ${skip.line}: ${skip.reason} (${skip.value})`).join(" ");
+  const dates = parsed.datesIgnored ? ` Ignored ${parsed.datesIgnored} dates that are in the future.` : "";
+  const detail = examples ? ` ${examples}` : "";
+  return {
+    ok: true as const,
+    message: `Added ${saved}. Skipped ${parsed.invalid}.${dates}${detail}`,
+    saved,
+    invalid: parsed.invalid,
+    datesIgnored: parsed.datesIgnored,
+  };
 }
 
 export async function listCustomers(tenantId: string, q: string) {

@@ -6,6 +6,7 @@ import {
   deskOptOut,
   importCustomers,
   listCustomers,
+  pointsHistory,
   resumeReminders,
   returnStats,
   saveReminderSettings,
@@ -16,7 +17,7 @@ import { customerActionNeedsOwner } from "@/lib/desk-role";
 import { requireMembership, requireOwner } from "@/lib/session";
 
 const schema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("add"), phone: z.string().max(20), name: z.string().max(80).optional() }),
+  z.object({ action: z.literal("add"), phone: z.string().max(20), name: z.string().max(80).optional(), updateName: z.boolean().optional() }),
   z.object({ action: z.literal("import"), text: z.string().max(40_000) }),
   z.object({ action: z.literal("stop"), id: z.string().min(1).max(40) }),
   z.object({ action: z.literal("resume"), id: z.string().min(1).max(40) }),
@@ -31,8 +32,10 @@ const schema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("adjust"),
     id: z.string().min(1).max(40),
-    delta: z.number().int().min(-100).max(100),
     reason: z.string().trim().min(1).max(120),
+    mode: z.enum(["add", "correct"]).optional(),
+    amount: z.number().int().min(1).max(100).optional(),
+    delta: z.number().int().min(-100).max(100).optional(),
   }),
 ]);
 
@@ -46,7 +49,10 @@ async function member() {
 export async function GET(req: Request) {
   const access = await member();
   if (access instanceof NextResponse) return access;
-  const q = new URL(req.url).searchParams.get("q") || "";
+  const url = new URL(req.url);
+  const historyId = url.searchParams.get("history") || "";
+  if (historyId) return NextResponse.json({ history: await pointsHistory(access.tenant.id, historyId) });
+  const q = url.searchParams.get("q") || "";
   const [customers, stats, lapsed] = await Promise.all([
     listCustomers(access.tenant.id, q),
     returnStats(access.tenant.id),
@@ -76,7 +82,7 @@ export async function POST(req: Request) {
     if ("error" in owner && owner.error) return owner.error;
   }
   if (body.action === "add") {
-    const result = await addCustomer(tenantId, body.phone, body.name || "");
+    const result = await addCustomer(tenantId, body.phone, body.name || "", Boolean(body.updateName));
     return NextResponse.json(result, { status: result.ok ? 200 : 400 });
   }
   if (body.action === "import") {
@@ -84,7 +90,7 @@ export async function POST(req: Request) {
     return NextResponse.json(result, { status: result.ok ? 200 : 400 });
   }
   if (body.action === "adjust") {
-    const result = await adjustCustomerPoints(tenantId, body.id, body.delta, body.reason, access.session.user.id);
+    const result = await adjustCustomerPoints(tenantId, body.id, body, access.session.user.id);
     return NextResponse.json(result, { status: result.ok ? 200 : 400 });
   }
   if (body.action === "stop") return NextResponse.json(await deskOptOut(tenantId, body.id));

@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "INVALID", message: "Enter the code from the message." }, { status: 400 });
   const phone = normalizePhone(parsed.data.phone);
   const tenant = await prisma.tenant.findUnique({ where: { slug: parsed.data.slug } });
-  if (!tenant || !phone) return NextResponse.json({ error: "TENANT" }, { status: 404 });
+  if (!tenant || !phone) return NextResponse.json({ error: "NOT_FOUND", message: "We could not find that salon." }, { status: 404 });
   const challenge = await prisma.otpChallenge.findFirst({ where: { tenantId: tenant.id, phone }, orderBy: { createdAt: "desc" } });
   if (!challenge || challenge.expiresAt.getTime() < Date.now() || challenge.attempts >= 5) {
     return NextResponse.json({ error: "OTP", message: "That code has expired. Request a new one." }, { status: 400 });

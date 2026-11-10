@@ -13,6 +13,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "INVALID" }, { status: 400 });
   const result = await prisma.lead.updateMany({ where: { id, tenantId: access.tenant.id }, data: { status: parsed.data.status } });
-  if (!result.count) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  if (!result.count) return NextResponse.json({ error: "NOT_FOUND", message: "That lead is not on this salon." }, { status: 404 });
   return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const access = await requireMembership();
+  if ("error" in access && access.error) return access.error;
+  if (!("tenant" in access)) return NextResponse.json({ error: "NO_TENANT" }, { status: 403 });
+  const { id } = await ctx.params;
+  const result = await prisma.lead.deleteMany({ where: { id, tenantId: access.tenant.id } });
+  if (!result.count) return NextResponse.json({ error: "NOT_FOUND", message: "That lead is not on this salon." }, { status: 404 });
+  return NextResponse.json({ ok: true, message: "Lead deleted." });
 }

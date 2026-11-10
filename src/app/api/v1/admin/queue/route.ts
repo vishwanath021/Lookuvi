@@ -35,7 +35,8 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("tries"), id: z.string().min(1), extra: z.number() }),
   z.object({
     action: z.literal("walkin"),
-    name: z.string().optional().transform((value) => (value ?? "").trim().slice(0, 80)),
+    name: z.string().trim().min(1, "Enter the guest's name.").max(80),
+    // Phone stays optional. A walk-in who will not share a number is still seated.
     phone: z.string().optional().transform((value) => (value ?? "").trim().slice(0, 20)),
     serviceId: z.string().max(40).optional(),
   }),
@@ -86,7 +87,10 @@ export async function POST(req: Request) {
   const tenant = access.tenant;
   const staffId = access.session.user.id;
   const parsed = schema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return noStore(NextResponse.json({ error: "INVALID", message: "That update was not understood." }, { status: 400 }));
+  if (!parsed.success) {
+    const issue = parsed.error.issues.find((item) => item.message && item.message !== "Invalid input");
+    return noStore(NextResponse.json({ error: "INVALID", message: issue?.message || "That update was not understood." }, { status: 400 }));
+  }
   const body = parsed.data;
   try {
     if (queueActionNeedsOwner(body.action)) {

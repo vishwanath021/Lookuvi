@@ -34,9 +34,9 @@ export default async function SalonWelcome({ params }: { params: Promise<{ slug:
       <p className="text-xs uppercase tracking-[0.2em] text-muted">Welcome</p>
       <h1 className="page-title mt-2">{tenant.name}</h1>
       {tenant.address ? <p className="mt-2 text-sm text-muted">{tenant.address}</p> : null}
-      <div className="mt-6 grid gap-3">
-        {tenant.productQueue ? <Link className="btn w-full text-lg" href={`/s/${tenant.slug}/queue`}>{t(tenant.defaultLang, queueEntryKey(queueMode))}</Link> : null}
-        {tenant.productTryOn || tenant.productBridal || tenant.productGroom || tenant.productMakeupStudio ? <Link className="btn secondary w-full text-lg" href={`/s/${tenant.slug}`}>Try a look</Link> : null}
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        {tenant.productQueue ? <Link className="btn min-h-12 w-full flex-1 text-lg" href={`/s/${tenant.slug}/queue`}>{t(tenant.defaultLang, queueEntryKey(queueMode))}</Link> : null}
+        {tenant.productTryOn || tenant.productBridal || tenant.productGroom || tenant.productMakeupStudio ? <Link className="btn secondary min-h-12 w-full flex-1 text-lg" href={`/s/${tenant.slug}`}>Try a look</Link> : null}
       </div>
     </main>
   );

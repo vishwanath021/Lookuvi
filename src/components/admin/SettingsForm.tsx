@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Notice } from "@/components/ui/Notice";
 import { ImportCustomers } from "@/components/admin/ImportCustomers";
 import { WeekHoursEditor } from "@/components/admin/WeekHoursEditor";
 import type { ToolId } from "@/lib/tools";
@@ -76,6 +77,8 @@ export function SettingsForm({
     rewards: initial.rewards ?? [],
   });
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"success" | "error">("success");
+  const [saving, setSaving] = useState("");
   const [host, setHost] = useState("");
   const [domainNote, setDomainNote] = useState("");
   const [staffEmail, setStaffEmail] = useState("");
@@ -113,18 +116,29 @@ export function SettingsForm({
       bitmap.close();
       const url = canvas.toDataURL("image/jpeg", 0.8);
       if (url.length > 180_000) {
+        setMessageTone("error");
         setMessage("Logo is too large. Use a smaller image.");
         return;
       }
       set("logoUrl", url);
       setMessage("");
     } catch {
+      setMessageTone("error");
       setMessage("That logo could not be read. Use a PNG or JPEG.");
     }
   }
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    const sectionName = section || "details";
+    setSaving(sectionName);
+    setMessage("");
+    if (!Number.isInteger(form.loyaltyPointsPerVisit) || form.loyaltyPointsPerVisit < 0 || form.loyaltyPointsPerVisit > 50) {
+      setMessageTone("error");
+      setMessage("Points per visit must be a whole number from 0 to 50.");
+      setSaving("");
+      return;
+    }
     const { anonDailyCap, memberDailyCap, monthlyTryAllowance, visitTryLimit, productBridal, productGroom, productMakeupStudio, ...rest } = form;
     void anonDailyCap;
     void memberDailyCap;
@@ -144,7 +158,9 @@ export function SettingsForm({
       }),
     });
     const data = await res.json();
-    setMessage(res.ok ? "Settings saved." : data.message || "Could not save");
+    setMessageTone(res.ok ? "success" : "error");
+    setMessage(res.ok ? "Saved" : data.message || "Could not save");
+    setSaving("");
   }
 
   async function addDomain(verify: boolean) {
@@ -165,7 +181,8 @@ export function SettingsForm({
       body: JSON.stringify({ email: staffEmail, name: staffName, password: staffPassword }),
     });
     const data = await res.json().catch(() => ({}));
-    setMessage(res.ok ? "Staff added to this salon." : data.message || "Could not add staff");
+    setMessageTone(res.ok ? "success" : "error");
+    setMessage(res.ok ? "Saved" : data.message || "Could not add staff");
     if (res.ok && data.userId) {
       setTeam((current) => current.some((member) => member.userId === data.userId)
         ? current
@@ -181,11 +198,13 @@ export function SettingsForm({
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      setMessageTone("error");
       setMessage(data.message || "Could not remove that person");
       return;
     }
     setTeam((current) => current.filter((member) => member.userId !== userId));
-    setMessage("Removed from this salon.");
+    setMessageTone("success");
+    setMessage("Saved");
   }
 
   const sections = [
@@ -269,10 +288,11 @@ export function SettingsForm({
               <button className="btn secondary" type="button" onClick={() => void addDomain(false)}>Save host</button>
               <button className="btn secondary" type="button" onClick={() => void addDomain(true)}>Check DNS</button>
             </div>
-            {domainNote && <p className="text-sm" role="status">{domainNote}</p>}
+            {domainNote && <Notice tone={/not |could not|fail/i.test(domainNote) ? "error" : "info"}>{domainNote}</Notice>}
           </div>
         ) : null}
-        <button className="btn" type="submit">Save</button>
+        <button className="btn" type="submit" disabled={saving === section}>{saving === section ? "Saving…" : "Save"}</button>
+        {message && section ? <Notice tone={messageTone}>{message}</Notice> : null}
       </form>
         ) : null}
         {section === "hours" ? (
@@ -284,7 +304,8 @@ export function SettingsForm({
           weeklyHours={form.weeklyHours}
           onChange={(next) => setForm((current) => ({ ...current, ...next }))}
         />
-        <button className="btn" type="submit">Save</button>
+        <button className="btn" type="submit" disabled={saving === section}>{saving === section ? "Saving…" : "Save"}</button>
+        {message && section ? <Notice tone={messageTone}>{message}</Notice> : null}
       </form>
         ) : null}
         {section === "whatsapp" ? (
@@ -293,7 +314,8 @@ export function SettingsForm({
         <label className="text-sm">WhatsApp number<input className="field mt-1" aria-label="WhatsApp" value={form.whatsapp} onChange={(event) => set("whatsapp", event.target.value)} /></label>
         <Switch label="Almost your turn message" checked={form.whatsappAlmostOn} onChange={(next) => set("whatsappAlmostOn", next)} />
         <Switch label="Joined message for walk-ins" hint="Walk-ins added by staff. Guests who join from home still get the joined message. Booking confirmed stays on." checked={form.whatsappWalkInJoined} onChange={(next) => set("whatsappWalkInJoined", next)} />
-        <button className="btn" type="submit">Save</button>
+        <button className="btn" type="submit" disabled={saving === section}>{saving === section ? "Saving…" : "Save"}</button>
+        {message && section ? <Notice tone={messageTone}>{message}</Notice> : null}
       </form>
         ) : null}
         {section === "loyalty" ? (
@@ -302,7 +324,7 @@ export function SettingsForm({
         <Switch label="Loyalty" checked={form.loyaltyOn} onChange={(next) => set("loyaltyOn", next)} />
         <fieldset className="grid gap-2 text-sm">
           <label>Points per visit
-            <input className="field narrow mt-1" type="number" min={0} max={50} aria-label="Points per visit" value={form.loyaltyPointsPerVisit} onChange={(event) => set("loyaltyPointsPerVisit", Number(event.target.value))} />
+            <input className="field narrow mt-1" inputMode="numeric" aria-invalid={form.loyaltyPointsPerVisit < 0 || form.loyaltyPointsPerVisit > 50} aria-label="Points per visit" value={String(form.loyaltyPointsPerVisit)} onChange={(event) => set("loyaltyPointsPerVisit", Number(event.target.value.replace(/\D/g, "") || "0"))} />
           </label>
           <p className="text-xs text-muted">Staff tap Finish and the guest earns this many points. There is no bill amount yet.</p>
           {form.rewards.map((reward, index) => (
@@ -314,7 +336,7 @@ export function SettingsForm({
                 }} />
               </label>
               <label>Points
-                <input className="field mt-1" type="number" min={1} max={9999} aria-label={`Reward ${index + 1} points`} value={reward.cost} onChange={(event) => {
+                <input className="field mt-1" inputMode="numeric" aria-invalid={reward.cost < 1 || reward.cost > 9999} aria-label={`Reward ${index + 1} points`} value={String(reward.cost)} onChange={(event) => {
                   const rewards = form.rewards.map((item, itemIndex) => itemIndex === index ? { ...item, cost: Number(event.target.value) } : item);
                   set("rewards", rewards);
                 }} />
@@ -325,7 +347,8 @@ export function SettingsForm({
             <button className="btn secondary w-fit" type="button" onClick={() => set("rewards", [...form.rewards, { name: "", cost: 10 }])}>Add reward</button>
           ) : null}
         </fieldset>
-        <button className="btn" type="submit">Save</button>
+        <button className="btn" type="submit" disabled={saving === section}>{saving === section ? "Saving…" : "Save"}</button>
+        {message && section ? <Notice tone={messageTone}>{message}</Notice> : null}
       </form>
         ) : null}
         {section === "look" ? (
@@ -353,7 +376,8 @@ export function SettingsForm({
             <Switch label="Use 1 try-on for a new suggestion" hint="Repeat clicks on the same photo stay free." checked={form.hairSuggestUsesCredits} onChange={(next) => set("hairSuggestUsesCredits", next)} />
           </>
         ) : null}
-        <button className="btn" type="submit">Save</button>
+        <button className="btn" type="submit" disabled={saving === section}>{saving === section ? "Saving…" : "Save"}</button>
+        {message && section ? <Notice tone={messageTone}>{message}</Notice> : null}
       </form>
         ) : null}
         {section === "import" ? <ImportCustomers /> : null}
@@ -386,10 +410,10 @@ export function SettingsForm({
         <input className="field" placeholder="Name" value={staffName} onChange={(event) => setStaffName(event.target.value)} required aria-label="Staff name" />
         <input className="field" type="password" placeholder="Password, at least 12 characters" value={staffPassword} onChange={(event) => setStaffPassword(event.target.value)} required minLength={12} aria-label="Staff password" />
         <button className="btn" type="submit">Create staff login</button>
+        {message ? <Notice tone={messageTone}>{message}</Notice> : null}
       </form>
       </section>
         ) : null}
-        {message ? <p className="text-sm" role="status">{message}</p> : null}
       </div>
     </div>
   );

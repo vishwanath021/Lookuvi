@@ -47,40 +47,113 @@ export function istNoon(iso: string) {
 }
 
 export type ImportRow = { phone: string; name: string; visitedOn: string };
+export type ImportSkip = { line: number; value: string; reason: string };
+
+export function classifyImportFile(bytes: Uint8Array) {
+  if (bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b) return "spreadsheet" as const;
+  if (bytes.length >= 4 && bytes[0] === 0x00 && bytes[1] === 0x00) return "unknown" as const;
+  const head = new TextDecoder("utf-8", { fatal: false }).decode(bytes.slice(0, 80)).toLowerCase();
+  if (head.includes("<html") || head.includes("<!doctype")) return "spreadsheet" as const;
+  return "text" as const;
+}
+
+export function decodeImportText(bytes: Uint8Array) {
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder("utf-16le").decode(bytes.slice(2));
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder("utf-16be").decode(bytes.slice(2));
+  let text = new TextDecoder("utf-8").decode(bytes);
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function splitCells(line: string) {
+  const cells: string[] = [];
+  let current = "";
+  let quoted = false;
+  const source = line.includes("\t") && !line.includes(",") ? line.replace(/\t/g, ",") : line;
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source[i];
+    if (char === "\"") {
+      quoted = !quoted;
+      continue;
+    }
+    if (char === "," && !quoted) {
+      cells.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  cells.push(current.trim());
+  return cells.map((cell) => cell.replace(/^\uFEFF/, ""));
+}
+
+function expandNumber(part: string) {
+  const compact = part.replace(/[\s-]/g, "");
+  if (/^\d+(\.\d+)?e[+-]\d+$/i.test(compact)) {
+    const value = Number(compact);
+    if (Number.isFinite(value) && value < 1e15) return String(Math.round(value));
+  }
+  return part;
+}
+
+function headerMap(cells: string[]) {
+  const labels = cells.map((cell) => cell.toLowerCase().replace(/[^a-z]/g, ""));
+  const phone = labels.findIndex((label) => label.includes("phone") || label.includes("mobile") || label === "number" || label === "mobilenumber");
+  const name = labels.findIndex((label) => label === "name" || label.includes("customer") || label === "guest");
+  if (phone < 0 && name < 0) return null;
+  if (cells.some((cell) => indianMobile(expandNumber(cell)))) return null;
+  return { phone, name };
+}
 
 export function parseCustomerImport(text: string, today = kolkataDayKey()) {
-  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (lines.length > 500) return { rows: [] as ImportRow[], invalid: 0, datesIgnored: 0, tooLong: true };
+  const lines = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").map((line) => line.trim()).filter(Boolean);
+  if (lines.length > 500) return { rows: [] as ImportRow[], invalid: 0, datesIgnored: 0, tooLong: true, skipped: [] as ImportSkip[] };
   const byPhone = new Map<string, ImportRow>();
   let invalid = 0;
   let datesIgnored = 0;
-  for (const line of lines) {
-    const parts = line.split(",").map((part) => part.trim()).filter(Boolean);
+  const skipped: ImportSkip[] = [];
+  const columns = headerMap(splitCells(lines[0] || ""));
+  const start = columns ? 1 : 0;
+  for (let index = start; index < lines.length; index += 1) {
+    const cells = splitCells(lines[index]).map(expandNumber);
     let phone = "";
     let visitedOn = "";
     const names: string[] = [];
     let badDate = false;
-    for (const part of parts) {
-      const mobile = indianMobile(part);
-      if (!phone && mobile) {
-        phone = mobile;
-        continue;
+    if (columns) {
+      if (columns.phone >= 0) phone = indianMobile(cells[columns.phone] || "");
+      if (columns.name >= 0) names.push(cells[columns.name] || "");
+      for (let cell = 0; cell < cells.length; cell += 1) {
+        if (cell === columns.phone || cell === columns.name) continue;
+        if (DAY.test(cells[cell] || "")) {
+          if (validVisitDate(cells[cell], today)) visitedOn = cells[cell];
+          else badDate = true;
+        }
       }
-      if (DAY.test(part)) {
-        if (validVisitDate(part, today)) visitedOn = part;
-        else badDate = true;
-        continue;
+    } else {
+      for (const part of cells.filter(Boolean)) {
+        const mobile = indianMobile(part);
+        if (!phone && mobile) {
+          phone = mobile;
+          continue;
+        }
+        if (DAY.test(part)) {
+          if (validVisitDate(part, today)) visitedOn = part;
+          else badDate = true;
+          continue;
+        }
+        names.push(part);
       }
-      names.push(part);
     }
     if (!phone) {
       invalid += 1;
+      if (skipped.length < 3) skipped.push({ line: index + 1, value: lines[index].slice(0, 80), reason: "No Indian mobile number on this row." });
       continue;
     }
     if (badDate) datesIgnored += 1;
-    byPhone.set(phone, { phone, name: names.join(" ").slice(0, 80), visitedOn });
+    byPhone.set(phone, { phone, name: names.join(" ").trim().slice(0, 80), visitedOn });
   }
-  return { rows: [...byPhone.values()], invalid, datesIgnored, tooLong: false };
+  return { rows: [...byPhone.values()], invalid, datesIgnored, tooLong: false, skipped };
 }
 
 export function customerFilter(tenantId: string, q: string) {

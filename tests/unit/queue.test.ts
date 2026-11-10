@@ -10,7 +10,7 @@ import { kolkataDayKey } from "@/lib/queue/day";
 import { peopleAhead, waitMinutes } from "@/lib/queue/estimate";
 import { displayedWait, waitSample } from "@/lib/queue/wait-display";
 import { indianMobile } from "@/lib/queue/phone";
-import { QUEUE_DEVICE_JOINS_PER_HOUR, QUEUE_IP_JOINS_PER_HOUR, QUEUE_PHONE_JOINS_PER_HOUR, QueueError, addWalkIn, callNext, confirmRequest, ensureQueueState, existingTokenMessage, finishEntry, guestTicket, guestVisit, joinQueue, publicBoard, purgeOldQueueEntries, saveQueueSettings, returnToLine, setQueueOpen, startEntry, sweepAlerts } from "@/lib/queue/service";
+import { QUEUE_DEVICE_JOINS_PER_HOUR, QUEUE_IP_JOINS_PER_HOUR, QUEUE_PHONE_JOINS_PER_HOUR, QueueError, addWalkIn, callNext, confirmRequest, deskSnapshot, ensureQueueState, existingTokenMessage, finishEntry, guestTicket, guestVisit, joinQueue, publicBoard, purgeOldQueueEntries, saveQueueSettings, returnToLine, setQueueOpen, startEntry, sweepAlerts } from "@/lib/queue/service";
 import { resetRateLimits, sharedRateLimit } from "@/lib/ratelimit";
 import { loadSalons } from "@/lib/super/directory";
 
@@ -168,6 +168,19 @@ describe("queue joins", () => {
     await addWalkIn(tenant.id, { name: "Quiet", phone: "9876500199" }, send);
     expect(send.mock.calls).toHaveLength(0);
     await expect(addWalkIn(tenant.id, { name: "Bad", phone: "12345" }, send)).rejects.toMatchObject({ code: "PHONE" });
+  });
+
+  it("keeps a saved alert lead and rejects a walk-in with no name", async () => {
+    const { tenant } = await salon();
+    await saveQueueSettings(tenant.id, { units: 1, avgMinutes: 20, alertLeadMin: 17, mode: "LIVE", unitLabel: "chair" });
+    expect((await deskSnapshot(tenant.id)).state.alertLeadMin).toBe(17);
+    expect((await prisma.queueState.findUniqueOrThrow({ where: { tenantId: tenant.id } })).alertLeadMin).toBe(17);
+    await expect(addWalkIn(tenant.id, { name: " " }, send)).rejects.toMatchObject({ code: "NAME" });
+    const desk = await addWalkIn(tenant.id, { name: "No phone" }, send);
+    const card = desk.waiting.find((row) => row.name === "No phone");
+    expect(card?.phone).toBe("");
+    expect(card?.callUrl).toBe("");
+    expect(card?.whatsappUrl).toBe("");
   });
 
   it("refuses a closed queue, a missing consent tick, a bad phone, and a salon without the product", async () => {

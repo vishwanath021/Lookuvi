@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Notice } from "@/components/ui/Notice";
 import {
   DAY_LABELS,
   WEEK_HOURS_INVALID,
   compileSessions,
   effectiveWeek,
   emptyWeek,
+  formatClock,
+  hoursAfterClosedToggle,
   isUniform,
   serializeWeek,
+  sessionSpanWarning,
   suggestedWeek,
   SUGGESTED_CLOSE,
   SUGGESTED_OPEN,
@@ -131,7 +135,7 @@ export function WeekHoursEditor({
           <DayRow key={day.id} name={day.name} day={day.id} sessions={week[day.id]} onCommit={pushWeek} week={week} />
         ))}
       </div>
-      {error ? <p className="text-sm text-red-700" role="status">{error}</p> : null}
+      {error ? <Notice tone="error">{error}</Notice> : null}
     </fieldset>
   );
 }
@@ -161,9 +165,15 @@ function DayRow({
   const [close, setClose] = useState(close0);
   const [open2, setOpen2] = useState(open1);
   const [close2, setClose2] = useState(close1);
+  const [closedOn, setClosedOn] = useState(sessions.length === 0);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!open0 && !close0 && !open1 && !close1) {
+      setClosedOn(true);
+      return;
+    }
+    setClosedOn(false);
     setOpen(open0);
     setClose(close0);
     setOpen2(open1);
@@ -180,59 +190,57 @@ function DayRow({
     onCommit({ ...week, [day]: compiled.sessions });
   }
 
-  const closed = open === "" && close === "" && open2 === "" && close2 === "";
-
   function setClosed(next: boolean) {
-    if (next) {
-      setOpen("");
-      setClose("");
-      setOpen2("");
-      setClose2("");
-      setError("");
-      onCommit({ ...week, [day]: [] });
-      return;
-    }
-    setOpen(SUGGESTED_OPEN);
-    setClose(SUGGESTED_CLOSE);
-    setOpen2("");
-    setClose2("");
-    setError("");
-    onCommit({ ...week, [day]: [{ open: SUGGESTED_OPEN, close: SUGGESTED_CLOSE }] });
+    const kept = hoursAfterClosedToggle({ open, close, open2, close2 }, next);
+    setClosedOn(next);
+    setOpen(kept.open);
+    setClose(kept.close);
+    setOpen2(kept.open2);
+    setClose2(kept.close2);
+    setError(next ? "" : sessionSpanWarning(kept.open, kept.close));
+    onCommit({ ...week, [day]: kept.sessions });
   }
+
+  const spanWarning = closedOn ? "" : sessionSpanWarning(open, close);
 
   return (
     <div className="hours-day">
       <p className="hours-day-name font-medium">{name}</p>
       <label className="hours-field">
         <span className="hours-field-label">Opens</span>
-        <input className="field" type="time" aria-label={`${name} opens`} value={open} onChange={(event) => { setOpen(event.target.value); commit(event.target.value, close, open2, close2); }} />
+        <input className="field" type="time" aria-label={`${name} opens`} value={open} disabled={closedOn} onChange={(event) => { setOpen(event.target.value); commit(event.target.value, close, open2, close2); }} />
+        {open ? <span className="text-xs text-muted">{formatClock(open)}</span> : null}
       </label>
       <label className="hours-field">
         <span className="hours-field-label">Closes</span>
-        <input className="field" type="time" aria-label={`${name} closes`} value={close} onChange={(event) => { setClose(event.target.value); commit(open, event.target.value, open2, close2); }} />
+        <input className="field" type="time" aria-label={`${name} closes`} value={close} disabled={closedOn} onChange={(event) => { setClose(event.target.value); commit(open, event.target.value, open2, close2); }} />
+        {close ? <span className="text-xs text-muted">{formatClock(close)}</span> : null}
       </label>
       <label className="hours-field">
         <span className="hours-field-label">Opens again</span>
-        <input className="field" type="time" aria-label={`${name} second opens`} value={open2} onChange={(event) => { setOpen2(event.target.value); commit(open, close, event.target.value, close2); }} />
+        <input className="field" type="time" aria-label={`${name} second opens`} value={open2} disabled={closedOn} onChange={(event) => { setOpen2(event.target.value); commit(open, close, event.target.value, close2); }} />
+        {open2 ? <span className="text-xs text-muted">{formatClock(open2)}</span> : null}
       </label>
       <label className="hours-field">
         <span className="hours-field-label">Closes</span>
-        <input className="field" type="time" aria-label={`${name} second closes`} value={close2} onChange={(event) => { setClose2(event.target.value); commit(open, close, open2, event.target.value); }} />
+        <input className="field" type="time" aria-label={`${name} second closes`} value={close2} disabled={closedOn} onChange={(event) => { setClose2(event.target.value); commit(open, close, open2, event.target.value); }} />
+        {close2 ? <span className="text-xs text-muted">{formatClock(close2)}</span> : null}
       </label>
       <div className="hours-closed">
         <span className="hours-closed-label text-sm">Closed</span>
         <button
-          className={`relative h-11 w-16 shrink-0 rounded-full border border-line ${closed ? "bg-[var(--brand)]" : "bg-sand"}`}
+          className={`relative h-11 w-16 shrink-0 rounded-full border border-line ${closedOn ? "bg-[var(--brand)]" : "bg-sand"}`}
           type="button"
           role="switch"
           aria-label={`${name} closed`}
-          aria-checked={closed}
-          onClick={() => setClosed(!closed)}
+          aria-checked={closedOn}
+          onClick={() => setClosed(!closedOn)}
         >
-          <span className={`absolute top-1 h-9 w-9 rounded-full bg-white shadow ${closed ? "left-6" : "left-1"}`} />
+          <span className={`absolute top-1 h-9 w-9 rounded-full bg-white shadow ${closedOn ? "left-6" : "left-1"}`} />
         </button>
       </div>
-      {error ? <p className="text-xs text-red-700">{error}</p> : null}
+      {spanWarning ? <Notice tone="warning">{spanWarning}</Notice> : null}
+      {error ? <Notice tone="error">{error}</Notice> : null}
     </div>
   );
 }

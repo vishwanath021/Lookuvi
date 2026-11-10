@@ -10,6 +10,7 @@ import { guestSessionId } from "@/lib/guest-session";
 import { kolkataDayKey } from "@/lib/queue/day";
 import { parseVisitMemory, rememberVisit, serializeVisitMemory, visitMemoryKey, type VisitMemory } from "@/lib/queue/visit-memory";
 import { serviceChoiceLabel } from "@/lib/service-label";
+import { Notice } from "@/components/ui/Notice";
 
 type Board = {
   name: string;
@@ -141,7 +142,9 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
     <div>
       <div data-queue-open={board.open ? "yes" : "no"} data-queue-mode={board.mode}>
         {request ? <p className="mt-2 text-sm">{t(lang, "queueRequestNote")}</p> : hoursClosed ? (
-          <p className="mt-2 text-sm" role="status">{board.hoursMessage}</p>
+          <div className="mt-2">
+            <Notice tone="warning">{[board.nextOpen ? `Closed now · opens ${board.nextOpen}` : "Closed now", board.hoursMessage].filter(Boolean).join(". ")}</Notice>
+          </div>
         ) : board.open ? (
           <QueueWait serverWait={board.waitMin} ahead={board.ahead} lang={lang} phrase="join" />
         ) : <p className="mt-2 text-sm">{t(lang, "queueClosed")}</p>}

@@ -169,8 +169,8 @@ export async function sendBroadcast(tenantId: string, text: string, send: Sender
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant) return { ok: false as const, message: "Salon not found.", sent: 0, held: 0 };
   const ready = outreachReady(env, "offer");
-  if (ready === "OFF") return { ok: true as const, message: "WhatsApp is not connected, so nothing was sent.", sent: 0, held: 0 };
-  if (ready === "TEMPLATE") return { ok: true as const, message: "The offer template is missing, so nothing was sent.", sent: 0, held: 0 };
+  if (ready === "OFF") return { ok: false as const, message: "WhatsApp is not connected yet. Nothing was sent.", sent: 0, held: 0 };
+  if (ready === "TEMPLATE") return { ok: false as const, message: "The offer template is missing, so nothing was sent.", sent: 0, held: 0 };
   const broadcast = await prisma.salonBroadcast.create({ data: { tenantId, text: offer } });
   const people = await prisma.customer.findMany({
     where: { tenantId, optedOutAt: null },
