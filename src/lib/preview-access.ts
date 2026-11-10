@@ -1,18 +1,16 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual, randomInt, createHash } from "node:crypto";
 
-export type PreviewTier = "anon" | "member" | "salon";
+export type PreviewTier = "anon" | "member";
 
 export const AI_PREVIEW_KINDS = ["STYLE", "BROWS", "BEARD", "NAILS", "COLOUR", "BRIDAL", "MEHENDI", "BRIDAL_OWN", "GROOM", "GROOM_OWN", "MAKEUP_STUDIO"] as const;
 
 export function capForTier(tier: PreviewTier, anonDailyCap: number, memberDailyCap: number) {
-  if (tier === "salon") return null;
   if (tier === "member") return Math.max(0, memberDailyCap);
   return Math.max(0, anonDailyCap);
 }
 
 export function actorKeyFor(tier: PreviewTier, ipHash: string, customerId?: string | null) {
   if (tier === "member" && customerId) return `member:${customerId}`;
-  if (tier === "salon") return `salon:${ipHash}`;
   return `anon:${ipHash}`;
 }
 

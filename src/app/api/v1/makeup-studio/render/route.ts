@@ -10,7 +10,7 @@ import { ImageError, sanitizeSelfie } from "@/lib/images";
 import { buildMakeupPrompt, clampLook, LIP_SHADES, MAKEUP_STUDIO_KIND, MAKEUP_STUDIO_TOOL, matchingPreset } from "@/lib/makeup-studio/core";
 import { LOOK_PRESETS } from "@/lib/makeup-studio/core/presets";
 import { ensurePhotoConsent } from "@/lib/photo-consent";
-import { AI_PREVIEW_KINDS, actorKeyFor, capForTier, hashIp, readGuestToken, verifySalonToken, type PreviewTier } from "@/lib/preview-access";
+import { AI_PREVIEW_KINDS, actorKeyFor, capForTier, hashIp, readGuestToken, type PreviewTier } from "@/lib/preview-access";
 import { prisma } from "@/lib/prisma";
 import { requestClientIp } from "@/lib/ratelimit";
 import { kolkataDayStart } from "@/lib/queue/day";
@@ -113,11 +113,11 @@ export async function POST(req: Request) {
   const ip = requestClientIp(req);
   const staffId = await staffUser(tenant.id);
   const bucket = staffId ? `staff:${staffId}` : ip;
-  const salonOk = verifySalonToken(String(form.get("salonToken") || ""), tenant.id, tenant.salonNonce);
+  void form.get("salonToken");
   const jar = await cookies();
   const guest = readGuestToken(jar.get("helix_guest")?.value);
   const member = guest && guest.tenantId === tenant.id ? guest : null;
-  const tier: PreviewTier = salonOk ? "salon" : member ? "member" : "anon";
+  const tier: PreviewTier = member ? "member" : "anon";
   const actorKey = actorKeyFor(tier, hashIp(ip), member?.customerId);
   const limit = staffId ? null : capForTier(tier, tenant.anonDailyCap, tenant.memberDailyCap);
   if (limit !== null) {

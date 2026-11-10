@@ -232,7 +232,7 @@ test("staff cannot change salon settings or open the platform admin", async ({ p
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL(/\/admin/);
   await page.goto("/admin/settings");
-  await expect(page.getByText(/Brand and billing stay with the owner/i)).toBeVisible();
+  await expect(page.getByText("Staff cannot change settings or prices.")).toBeVisible();
   const status = await page.evaluate(async () => {
     const res = await fetch("/api/v1/admin/settings", {
       method: "PUT",
@@ -262,12 +262,13 @@ test("an owner can replace the salon logo and restore the Lookuvi mark", async (
     await page.getByRole("button", { name: "Sign in" }).click();
     await page.waitForURL(/\/admin/);
     await page.goto("/admin/settings");
+    await page.getByRole("button", { name: "Look of your salon" }).click();
     await expect(page.getByText("Hairstyle preview")).toBeVisible();
     await expect(page.getByText("Live colour", { exact: true })).toBeVisible();
-    await page.getByText("Advanced", { exact: true }).click();
     await expect(page.getByText("Eyebrow mapping")).toBeVisible();
     await expect(page.getByText("Beard try-on")).toBeVisible();
     await expect(page.getByText("Nail try-on")).toBeVisible();
+    await page.getByRole("button", { name: "Salon details" }).click();
     await page.getByLabel("Salon logo").setInputFiles("public/brand/lookuvi-app-icon.png");
     await expect(page.locator("form img")).toBeVisible();
     await page.getByRole("button", { name: "Save", exact: true }).click();
@@ -276,6 +277,7 @@ test("an owner can replace the salon logo and restore the Lookuvi mark", async (
     await expect(page.locator("header img")).toHaveAttribute("src", /^data:image\/jpeg/);
     await expect(page.getByText("Demo preview")).toHaveCount(0);
     await page.goto("/admin/settings");
+    await page.getByRole("button", { name: "Salon details" }).click();
     await page.getByRole("button", { name: "Use Lookuvi mark" }).click();
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByText("Settings saved.")).toBeVisible();

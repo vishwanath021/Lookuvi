@@ -227,10 +227,9 @@ describe("beard and nail catalogues", () => {
 });
 
 describe("preview caps and guidance", () => {
-  it("gives salon mode no cap and keeps member above anonymous", () => {
+  it("keeps a signed-in guest above an anonymous guest", () => {
     expect(capForTier("anon", 8, 30)).toBe(8);
     expect(capForTier("member", 8, 30)).toBe(30);
-    expect(capForTier("salon", 8, 30)).toBeNull();
     expect(capForTier("anon", 0, 30)).toBe(0);
   });
 

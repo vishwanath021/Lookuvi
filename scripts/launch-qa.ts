@@ -2270,14 +2270,13 @@ async function main() {
   });
   await check({
     id: "O7-01", functionality: "O7", priority: "P1", area: "owner",
-    title: "Rotating the salon link changes the token",
+    title: "Salon mode is gone and the old rotate route is not there",
     given: "The owner is signed in",
-    when: "POST /api/v1/admin/salon-token twice",
-    then: "The two URLs differ",
+    when: "POST /api/v1/admin/salon-token",
+    then: "The route is not found",
   }, async () => {
-    const first = await call(qaOwner, "/api/v1/admin/salon-token", { method: "POST" });
-    const second = await call(qaOwner, "/api/v1/admin/salon-token", { method: "POST" });
-    assert(jsonOf(first.json).url !== jsonOf(second.json).url, "token did not rotate");
+    const response = await call(qaOwner, "/api/v1/admin/salon-token", { method: "POST" });
+    assert(response.status === 404, `expected 404, got ${response.status}`);
   });
   await check({
     id: "S6-01", functionality: "S6", priority: "P1", area: "staff",

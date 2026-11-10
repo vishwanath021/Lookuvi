@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { planById } from "@/data/plans";
-import { ensureBridalPackages } from "@/lib/bridal-packages";
 import { isLocale, LOCALES } from "@/data/i18n";
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/session";
@@ -40,17 +39,10 @@ const schema = z.object({
   hairPickerOn: z.boolean().optional(),
   hairSuggestOn: z.boolean().optional(),
   hairSuggestUsesCredits: z.boolean().optional(),
-  anonDailyCap: z.number().int().min(0).max(500).optional(),
-  memberDailyCap: z.number().int().min(0).max(500).optional(),
   requireLoginToBook: z.boolean().optional(),
-  productBridal: z.boolean().optional(),
-  productGroom: z.boolean().optional(),
-  productMakeupStudio: z.boolean().optional(),
-  visitTryLimit: z.number().int().min(1).max(20).optional(),
   tryOnsAtSalon: z.boolean().optional(),
   whatsappAlmostOn: z.boolean().optional(),
   whatsappWalkInJoined: z.boolean().optional(),
-  monthlyTryAllowance: z.number().int().min(0).max(5000).optional(),
   gstin: z.string().max(20).optional().nullable(),
   openTime: z.string().max(8).optional(),
   closeTime: z.string().max(8).optional(),
@@ -113,12 +105,9 @@ export async function PUT(req: Request) {
     if (!toolEnabled(id)) delete rest[field as keyof typeof rest];
   }
   if (!access.tenant.productTryOn) {
-    for (const field of ["toolColour", "toolStyle", "toolBrows", "toolBeard", "toolNails", "hairPickerOn", "hairSuggestOn", "hairSuggestUsesCredits", "anonDailyCap", "memberDailyCap", "monthlyTryAllowance", "requireLoginToBook"] as const) {
+    for (const field of ["toolColour", "toolStyle", "toolBrows", "toolBeard", "toolNails", "hairPickerOn", "hairSuggestOn", "hairSuggestUsesCredits", "requireLoginToBook"] as const) {
       delete rest[field];
     }
-  }
-  if (data.productBridal === true && !access.tenant.productBridal) {
-    await ensureBridalPackages(access.tenant.id);
   }
   let hoursPatch: { openTime: string; closeTime: string; weeklyHours: string; hoursOverride?: string; hoursOverrideUntil?: null } | undefined;
   if (data.weeklyHours !== undefined || data.openTime !== undefined || data.closeTime !== undefined) {

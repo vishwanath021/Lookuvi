@@ -14,7 +14,7 @@ import { CreditError, reserveCredits, settleCredits } from "@/lib/credits";
 import { ImageError, sanitizeSelfie } from "@/lib/images";
 import { logProviderCall } from "@/lib/logger";
 import { ensurePhotoConsent } from "@/lib/photo-consent";
-import { AI_PREVIEW_KINDS, actorKeyFor, capForTier, hashIp, readGuestToken, verifySalonToken, type PreviewTier } from "@/lib/preview-access";
+import { AI_PREVIEW_KINDS, actorKeyFor, capForTier, hashIp, readGuestToken, type PreviewTier } from "@/lib/preview-access";
 import { prisma } from "@/lib/prisma";
 import { requestClientIp } from "@/lib/ratelimit";
 import { deleteObject, putObject } from "@/lib/storage";
@@ -156,12 +156,11 @@ export async function POST(req: Request) {
 
   const ip = requestClientIp(req);
   const staffId = await signedInOwnerOrSuper(tenant.id);
-  const salonToken = String(form.get("salonToken") || "");
-  const salonOk = verifySalonToken(salonToken, tenant.id, tenant.salonNonce);
+  void form.get("salonToken");
   const jar = await cookies();
   const guest = readGuestToken(jar.get("helix_guest")?.value);
   const member = guest && guest.tenantId === tenant.id ? guest : null;
-  const tier: PreviewTier = salonOk ? "salon" : member ? "member" : "anon";
+  const tier: PreviewTier = member ? "member" : "anon";
   const actorKey = actorKeyFor(tier, hashIp(ip), member?.customerId);
   const limit = staffId ? null : capForTier(tier, tenant.anonDailyCap, tenant.memberDailyCap);
   if (limit !== null) {

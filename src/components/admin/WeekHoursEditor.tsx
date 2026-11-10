@@ -84,11 +84,8 @@ export function WeekHoursEditor({
 
   return (
     <fieldset className="grid gap-3 text-sm" data-hours-editor="yes">
-      <legend className="font-medium">Opening hours (India time)</legend>
-      <p className="text-xs text-muted">
-        Each day is closed, or has up to two sessions, for example 09:00–13:00 and 16:00–21:00.
-        Same every day copies the times below onto Monday–Sunday. Clear hours for 06:00–22:00 time requests and the desk switch.
-      </p>
+      <legend className="font-medium">Opening hours</legend>
+      <p className="text-xs text-muted">India time. Two sessions a day at most. Clear hours keeps the desk switch, with 06:00–22:00 for time requests.</p>
       <div className="grid grid-cols-2 gap-3">
         <label>Opens
           <input className="field mt-1" type="time" aria-label="Opens" value={sameOpen} onChange={(event) => onSame({ open: event.target.value })} />
@@ -121,7 +118,15 @@ export function WeekHoursEditor({
         </button>
       </div>
       {unsaved ? <p className="text-sm font-medium" data-hours-suggested="yes">Suggested — not saved yet. Every day {SUGGESTED_OPEN}–{SUGGESTED_CLOSE}. The live queue still uses the desk switch until you save.</p> : null}
-      <div className="grid gap-3">
+      <div className="grid gap-2">
+        <div className="hidden grid-cols-[5.5rem_repeat(4,minmax(0,1fr))_4.5rem] gap-2 text-xs font-medium text-muted sm:grid" aria-hidden="true">
+          <span>Day</span>
+          <span>Opens</span>
+          <span>Closes</span>
+          <span>Opens again</span>
+          <span>Closes</span>
+          <span>Closed</span>
+        </div>
         {DAY_LABELS.map((day) => (
           <DayRow key={day.id} name={day.name} day={day.id} sessions={week[day.id]} onCommit={pushWeek} week={week} />
         ))}
@@ -178,50 +183,38 @@ function DayRow({
   const closed = open === "" && close === "" && open2 === "" && close2 === "";
 
   return (
-    <div className="grid gap-2 border-b border-line pb-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-medium">{name}</p>
-        <label className="flex min-h-11 items-center gap-2">
-          <input
-            type="checkbox"
-            aria-label={`${name} closed`}
-            checked={closed}
-            onChange={(event) => {
-              if (event.target.checked) {
-                setOpen("");
-                setClose("");
-                setOpen2("");
-                setClose2("");
-                setError("");
-                onCommit({ ...week, [day]: [] });
-                return;
-              }
-              setOpen(SUGGESTED_OPEN);
-              setClose(SUGGESTED_CLOSE);
+    <div className="grid grid-cols-2 gap-2 border-b border-line pb-3 sm:grid-cols-[5.5rem_repeat(4,minmax(0,1fr))_4.5rem] sm:items-center sm:border-0 sm:pb-0">
+      <p className="col-span-2 font-medium sm:col-span-1">{name}</p>
+      <input className="field" type="time" aria-label={`${name} opens`} value={open} onChange={(event) => { setOpen(event.target.value); commit(event.target.value, close, open2, close2); }} />
+      <input className="field" type="time" aria-label={`${name} closes`} value={close} onChange={(event) => { setClose(event.target.value); commit(open, event.target.value, open2, close2); }} />
+      <input className="field" type="time" aria-label={`${name} second opens`} value={open2} onChange={(event) => { setOpen2(event.target.value); commit(open, close, event.target.value, close2); }} />
+      <input className="field" type="time" aria-label={`${name} second closes`} value={close2} onChange={(event) => { setClose2(event.target.value); commit(open, close, open2, event.target.value); }} />
+      <label className="col-span-2 flex min-h-11 items-center gap-2 sm:col-span-1 sm:justify-center">
+        <input
+          type="checkbox"
+          aria-label={`${name} closed`}
+          checked={closed}
+          onChange={(event) => {
+            if (event.target.checked) {
+              setOpen("");
+              setClose("");
               setOpen2("");
               setClose2("");
               setError("");
-              onCommit({ ...week, [day]: [{ open: SUGGESTED_OPEN, close: SUGGESTED_CLOSE }] });
-            }}
-          />
-          Closed
-        </label>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-xs">Opens
-          <input className="field mt-1" type="time" aria-label={`${name} opens`} value={open} onChange={(event) => { setOpen(event.target.value); commit(event.target.value, close, open2, close2); }} />
-        </label>
-        <label className="text-xs">Closes
-          <input className="field mt-1" type="time" aria-label={`${name} closes`} value={close} onChange={(event) => { setClose(event.target.value); commit(open, event.target.value, open2, close2); }} />
-        </label>
-        <label className="text-xs">Second opens
-          <input className="field mt-1" type="time" aria-label={`${name} second opens`} value={open2} onChange={(event) => { setOpen2(event.target.value); commit(open, close, event.target.value, close2); }} />
-        </label>
-        <label className="text-xs">Second closes
-          <input className="field mt-1" type="time" aria-label={`${name} second closes`} value={close2} onChange={(event) => { setClose2(event.target.value); commit(open, close, open2, event.target.value); }} />
-        </label>
-      </div>
-      {error ? <p className="text-xs text-red-700">{error}</p> : null}
+              onCommit({ ...week, [day]: [] });
+              return;
+            }
+            setOpen(SUGGESTED_OPEN);
+            setClose(SUGGESTED_CLOSE);
+            setOpen2("");
+            setClose2("");
+            setError("");
+            onCommit({ ...week, [day]: [{ open: SUGGESTED_OPEN, close: SUGGESTED_CLOSE }] });
+          }}
+        />
+        <span className="sm:sr-only">Closed</span>
+      </label>
+      {error ? <p className="col-span-2 text-xs text-red-700 sm:col-span-6">{error}</p> : null}
     </div>
   );
 }

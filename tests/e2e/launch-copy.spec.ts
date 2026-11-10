@@ -47,7 +47,8 @@ test("visit-code help is on settings and the ninth join names the hourly cap", a
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL(/\/admin/);
   await page.goto("/admin/settings");
-  await expect(page.getByText("Guest short code from the try-on limit screen")).toBeVisible();
+  await expect(page.getByText("Guest short code from the try-on limit screen")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Import customers" })).toBeVisible();
 
   const deviceId = "copy-salon-device-1";
   for (let i = 0; i < 8; i += 1) {

@@ -52,6 +52,7 @@ test("owner hours limit request joins and clearing them restores 06:00–22:00",
 
   await page.goto("/admin/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await page.getByRole("button", { name: "Opening hours" }).click();
   await page.getByRole("textbox", { name: "Opens", exact: true }).fill("10:00");
   await page.getByRole("textbox", { name: "Closes", exact: true }).fill("18:00");
   await page.getByRole("button", { name: "Save", exact: true }).click();
@@ -80,6 +81,7 @@ test("owner hours limit request joins and clearing them restores 06:00–22:00",
   await expect(page.locator("[data-status='REQUESTED'][data-ready='yes']")).toBeVisible();
 
   await page.goto("/admin/settings");
+  await page.getByRole("button", { name: "Opening hours" }).click();
   await page.getByRole("button", { name: "Clear hours" }).click();
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Settings saved.")).toBeVisible();

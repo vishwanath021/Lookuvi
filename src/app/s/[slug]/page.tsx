@@ -7,7 +7,6 @@ import { TryOnUnavailable } from "@/components/guest/TryOnUnavailable";
 import { AtSalonProvider } from "@/components/guest/AtSalonNote";
 import { TryOnApp } from "@/components/tryon/TryOnApp";
 import { prisma } from "@/lib/prisma";
-import { verifySalonToken } from "@/lib/preview-access";
 import { loadTenantByHost, loadTenantBySlug, toSalonConfig } from "@/lib/salon";
 import { isBlockedStatus } from "@/lib/salon-status";
 
@@ -42,7 +41,6 @@ export default async function SalonPage({
     return <TryOnUnavailable name={tenant.name} />;
   }
   const config = await toSalonConfig(tenant);
-  const salonMode = verifySalonToken(query.salon || "", tenant.id, tenant.salonNonce);
   const session = await auth();
   return (
     <AtSalonProvider slug={tenant.slug} lang={config.defaultLang}>
@@ -51,8 +49,7 @@ export default async function SalonPage({
       initialTool={query.tool}
       initialStyleId={query.style}
       initialShadeId={query.shade}
-      salonToken={salonMode ? query.salon : undefined}
-      salonMode={salonMode}
+      salonMode={false}
       poseDebug={Boolean(session?.user?.isSuperAdmin)}
       showQueue={tenant.productQueue}
       queueMode={tenant.productQueue ? (await prisma.queueState.findUnique({ where: { tenantId: tenant.id }, select: { mode: true } }))?.mode : "LIVE"}

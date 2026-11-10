@@ -9,7 +9,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Sheet } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toaster";
-import { WeekHoursEditor } from "@/components/admin/WeekHoursEditor";
 import { formatIst } from "@/lib/display";
 
 function applySalonPatch(row: SalonRecord, body: Record<string, unknown>): SalonRecord {
@@ -24,33 +23,17 @@ function applySalonPatch(row: SalonRecord, body: Record<string, unknown>): Salon
     ...(typeof body.openTime === "string" ? { openTime: body.openTime } : {}),
     ...(typeof body.closeTime === "string" ? { closeTime: body.closeTime } : {}),
     ...(typeof body.weeklyHours === "string" ? { weeklyHours: body.weeklyHours } : {}),
+    ...(typeof body.anonDailyCap === "number" ? { anonDailyCap: body.anonDailyCap } : {}),
+    ...(typeof body.memberDailyCap === "number" ? { memberDailyCap: body.memberDailyCap } : {}),
+    ...(typeof body.monthlyTryAllowance === "number" ? { monthlyTryAllowance: body.monthlyTryAllowance } : {}),
+    ...(typeof body.visitTryLimit === "number" ? { visitTryLimit: body.visitTryLimit } : {}),
+    ...(typeof body.teamLogins === "boolean" ? { teamLogins: body.teamLogins } : {}),
   };
 }
 
 function when(value: string | null) {
   if (!value) return "—";
   return formatIst(value, false);
-}
-
-function SalonHoursForm({
-  salon,
-  busy,
-  onSave,
-}: {
-  salon: SalonRecord;
-  busy: boolean;
-  onSave: (hours: { openTime: string; closeTime: string; weeklyHours: string }) => void;
-}) {
-  const [hours, setHours] = useState({ openTime: salon.openTime, closeTime: salon.closeTime, weeklyHours: salon.weeklyHours || "" });
-  useEffect(() => {
-    setHours({ openTime: salon.openTime, closeTime: salon.closeTime, weeklyHours: salon.weeklyHours || "" });
-  }, [salon.id, salon.openTime, salon.closeTime, salon.weeklyHours]);
-  return (
-    <form className="mt-4 grid gap-3" onSubmit={(event) => { event.preventDefault(); onSave(hours); }}>
-      <WeekHoursEditor openTime={hours.openTime} closeTime={hours.closeTime} weeklyHours={hours.weeklyHours} onChange={setHours} />
-      <button className="btn secondary w-fit" type="submit" disabled={busy}>{busy ? "Saving…" : "Save hours"}</button>
-    </form>
-  );
 }
 
 function slugFromName(value: string) {
@@ -356,21 +339,37 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
                 </label>
                 <button className="btn w-fit" type="submit" disabled={busy}>{busy ? "Saving…" : "Save name"}</button>
               </form>
-              <SalonHoursForm key={`${selected.id}-hours`} salon={selected} busy={busy} onSave={(hours) => void update(selected.id, hours)} />
-              <dl className="mt-4 grid gap-2 text-sm">
-                <div><dt className="text-muted">Link</dt><dd><a className="underline" href={`/s/${selected.slug}`}>{selected.slug}</a></dd></div>
-                <div><dt className="text-muted">Owner</dt><dd>{selected.ownerName || "—"}{selected.ownerEmail ? ` · ${selected.ownerEmail}` : ""}</dd></div>
-                <div><dt className="text-muted">Web address</dt><dd>{selected.host || "None verified"}<span className="block text-xs text-muted">The salon’s own site, after DNS is checked. Until then, guests use the Lookuvi link.</span></dd></div>
-                <div><dt className="text-muted">Created</dt><dd>{when(selected.createdAt)}</dd></div>
-                <div><dt className="text-muted">Trial ends</dt><dd>{when(selected.trialEndsAt)}</dd></div>
-              </dl>
+              <div className="mt-4 grid gap-3 text-sm">
+                <div>
+                  <h3 className="font-semibold">Lookuvi link</h3>
+                  <p><a className="underline" href={`/s/${selected.slug}`}>{selected.slug}</a></p>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Owner</h3>
+                  <p>{selected.ownerName || "No owner yet"}{selected.ownerEmail ? ` · ${selected.ownerEmail}` : ""}</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Salon web address</h3>
+                  <p>Guests use the Lookuvi link until this salon&apos;s own domain is connected and checked.</p>
+                  <p>{selected.host || "Not connected yet"}</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Created</h3>
+                  <p>{when(selected.createdAt)}</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Trial ends</h3>
+                  <p>{when(selected.trialEndsAt)}</p>
+                </div>
+              </div>
             </TabsContent>
             <TabsContent value="plan">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="neutral">{selected.planName}</Badge>
                 <Badge tone={statusTone(selected.status)}>{selected.status}</Badge>
               </div>
-              <p className="mt-3 text-sm">{selected.credits} try-ons left. {selected.planName} lists {PLANS[selected.plan as PlanId]?.credits ?? ""} included when a payment is marked paid. That list is not the balance. Adjust try-ons adds or removes the balance for this salon.</p>
+              <h3 className="mt-3 text-sm font-semibold">Try-ons left</h3>
+              <p className="text-sm">{selected.credits} try-ons left. {selected.planName} lists {PLANS[selected.plan as PlanId]?.credits ?? ""} included when a payment is marked paid. That list is not the balance. Adjust try-ons adds or removes the balance for this salon.</p>
               <fieldset className="mt-4 grid gap-2">
                 <legend className="text-sm font-medium">Products</legend>
                 <label className="flex min-h-11 items-center gap-2 text-sm">
@@ -418,7 +417,56 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
                   Makeup studio
                   <span className="block text-xs text-muted">Guests can try photo makeup on one picture. Off by default.</span>
                 </label>
+                <label className="flex min-h-11 items-center justify-between gap-3 text-sm">
+                  <span>
+                    Team logins
+                    <span className="block text-xs text-muted">Lets the owner create staff logins. Each shop is its own salon.</span>
+                  </span>
+                  <button
+                    className={`relative h-11 w-16 shrink-0 rounded-full border border-line ${selected.teamLogins ? "bg-[var(--brand)]" : "bg-sand"}`}
+                    type="button"
+                    role="switch"
+                    aria-checked={selected.teamLogins}
+                    aria-label="Team logins"
+                    onClick={() => void update(selected.id, { teamLogins: !selected.teamLogins })}
+                  >
+                    <span className={`absolute top-1 h-9 w-9 rounded-full bg-white shadow ${selected.teamLogins ? "left-6" : "left-1"}`} />
+                  </button>
+                </label>
               </fieldset>
+              <form
+                className="mt-4 grid gap-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const data = new FormData(event.currentTarget);
+                  void update(selected.id, {
+                    anonDailyCap: Number(data.get("anonDailyCap")),
+                    memberDailyCap: Number(data.get("memberDailyCap")),
+                    monthlyTryAllowance: Number(data.get("monthlyTryAllowance")),
+                    visitTryLimit: Number(data.get("visitTryLimit")),
+                  });
+                }}
+              >
+                <h3 className="text-sm font-semibold">Try-on limits</h3>
+                <p className="text-sm">These limits already apply. Saving a new number does not reset anyone&apos;s count.</p>
+                <label className="text-sm">Free try-ons per visit
+                  <input className="field mt-1" name="visitTryLimit" type="number" min={1} max={20} defaultValue={selected.visitTryLimit} aria-label="Free try-ons per visit" />
+                  <span className="mt-1 block text-xs text-muted">How many free previews a guest gets after they arrive.</span>
+                </label>
+                <label className="text-sm">Anonymous daily previews
+                  <input className="field mt-1" name="anonDailyCap" type="number" min={0} max={500} defaultValue={selected.anonDailyCap} aria-label="Anonymous daily previews" />
+                  <span className="mt-1 block text-xs text-muted">Guests who are not signed in.</span>
+                </label>
+                <label className="text-sm">Signed-in daily previews
+                  <input className="field mt-1" name="memberDailyCap" type="number" min={0} max={500} defaultValue={selected.memberDailyCap} aria-label="Signed-in daily previews" />
+                  <span className="mt-1 block text-xs text-muted">Each signed-in customer, per day.</span>
+                </label>
+                <label className="text-sm">Monthly try-ons
+                  <input className="field mt-1" name="monthlyTryAllowance" type="number" min={0} max={5000} defaultValue={selected.monthlyTryAllowance} aria-label="Monthly try-ons" />
+                  <span className="mt-1 block text-xs text-muted">Hard stop for the salon this month, including staff. 0 means no AI previews for that group.</span>
+                </label>
+                <button className="btn secondary w-fit" type="submit" disabled={busy}>Save limits</button>
+              </form>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button className="btn secondary" type="button" onClick={() => openPlan(selected)}>Change plan</button>
                 <button className="btn secondary" type="button" onClick={() => openPay(selected)}>Mark paid</button>

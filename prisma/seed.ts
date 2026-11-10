@@ -38,6 +38,7 @@ async function main() {
       memberDailyCap: 30,
       requireLoginToBook: false,
       tryOnsAtSalon: false,
+      teamLogins: true,
     },
     create: {
       slug,
@@ -59,6 +60,7 @@ async function main() {
       dailyCap: PLANS.PRO.credits,
       removeBranding: false,
       onboardingDone: true,
+      teamLogins: true,
       showMen: true,
       showWomen: true,
       showKids: true,

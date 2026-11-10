@@ -241,7 +241,7 @@ test("owner: change a lead, add a service, open QR, and use More", async ({ page
 
   const nav = await openNav(page);
   await nav.locator("summary", { hasText: "More" }).click();
-  for (const label of ["Services", "Settings", "Team", "Billing", "Security"]) {
+  for (const label of ["Services", "Settings", "Billing", "Security"]) {
     await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
   }
 

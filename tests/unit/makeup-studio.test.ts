@@ -95,7 +95,11 @@ describe("makeup studio looks", () => {
       members: [],
       selfId: "owner",
     }));
-    expect(settings).toContain("aria-label=\"Makeup studio\"");
+    expect(settings).toContain("Look of your salon");
+    expect(settings).not.toContain("aria-label=\"Makeup studio\"");
+    const plan = readFileSync("src/components/admin/SalonsBoard.tsx", "utf8");
+    expect(plan).toContain("aria-label=\"Team logins\"");
+    expect(plan).toContain("Makeup studio");
     const schema = readFileSync("prisma/schema.prisma", "utf8");
     expect(schema).toContain("productMakeupStudio Boolean   @default(false)");
     const sql = readFileSync("prisma/migrations/20261026000000_makeup_studio/migration.sql", "utf8");

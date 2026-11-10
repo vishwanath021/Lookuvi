@@ -5,8 +5,6 @@ import { gstEnabled } from "@/lib/pricing";
 import { planById } from "@/data/plans";
 import { ownerFeatures } from "@/lib/features";
 import { prisma } from "@/lib/prisma";
-import { signSalonToken } from "@/lib/preview-access";
-import { salonGuestOrigin } from "@/lib/public-url";
 import { pageTenant } from "@/lib/session";
 import { enabledTools } from "@/lib/tools";
 
@@ -23,8 +21,6 @@ export default async function SettingsPage() {
     orderBy: [{ role: "asc" }, { id: "asc" }],
   });
   const rewards = await prisma.loyaltyReward.findMany({ where: { tenantId: tenant.id }, orderBy: [{ sort: "asc" }, { name: "asc" }] });
-  const origin = await salonGuestOrigin(tenant.id, tenant.slug);
-  const salonModeUrl = tenant.salonNonce ? `${origin}/?salon=${signSalonToken(tenant.id, tenant.salonNonce)}` : "";
   return (
     <main className="max-w-3xl">
       <SettingsFocus
@@ -42,17 +38,8 @@ export default async function SettingsPage() {
       <>
       <h1 className="mb-4 page-title">Settings</h1>
       <p className="mb-4 text-sm">Guests choose a service from your own list when they join the queue. <a className="underline" href="/admin/services">Edit services</a></p>
-      <div className="mb-4">
-        <ReminderSettingsCard
-          initial={{
-            reminderDays: tenant.reminderDays,
-            reminderTemplate: tenant.reminderTemplate,
-            reminderMethod: tenant.reminderMethod,
-          }}
-        />
-      </div>
       <SettingsForm
-        salonModeUrl={salonModeUrl}
+        teamLogins={tenant.teamLogins}
         selfId={membership.userId}
         members={members.map((row) => ({ userId: row.user.id, name: row.user.name, email: row.user.email, role: row.role }))}
         canRemoveBranding={planById(tenant.plan).removeBranding}
