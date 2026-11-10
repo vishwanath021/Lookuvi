@@ -280,7 +280,50 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
       ) : null}
 
       {live ? (
-        <div className={wide ? "mt-4 grid grid-cols-[260px_minmax(0,1fr)] items-start gap-6" : "mt-4"}>
+        <div className="mt-4 grid gap-6">
+          <section aria-label="Waiting">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted">{t(lang, "queueWaiting")}</h2>
+            {desk.waiting.length === 0 ? <p className="mt-2 text-sm text-muted">{stale ? "Waiting list could not be loaded." : t(lang, "queueNobody")}</p> : null}
+            {wide ? (
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="text-xs uppercase tracking-[0.12em] text-muted">
+                      <th className="py-2 pr-2 font-medium">Token</th>
+                      <th className="py-2 pr-2 font-medium">Name</th>
+                      <th className="py-2 pr-2 font-medium">Wait</th>
+                      <th className="py-2 pr-2 font-medium">Status</th>
+                      <th className="py-2 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {desk.waiting.map((card) => (
+                      <Fragment key={card.id}>
+                        <tr className="border-t border-line align-middle" data-queue-row={card.token}>
+                          <td className="py-2 pr-2 text-base font-semibold" data-queue-token={card.token}>{tokenLabel(card.token)}</td>
+                          <td className="max-w-36 truncate py-2 pr-2">{card.name}</td>
+                          <td className="whitespace-nowrap py-2 pr-2">{t(lang, "queueMinShort", { min: card.waitMin })}</td>
+                          <td className="py-2 pr-2"><StatusPills card={card} lang={lang} /></td>
+                          <td className="py-2">
+                            <div className="flex flex-wrap items-center gap-1">
+                              <RowActions card={card} busy={busy} lang={lang} onArrive={() => void act({ action: "arrived", id: card.id })} onMore={(event) => openMore(card, event)} />
+                              {card.wantsTries && card.arrived ? <TryChips compact busy={busy} onAdd={(extra) => addTries(card.id, extra)} onDismiss={() => void act({ action: "dismiss", id: card.id })} /> : null}
+                            </div>
+                          </td>
+                        </tr>
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="mt-2 grid gap-2">
+                {desk.waiting.map((card) => (
+                  <WaitingRow key={card.id} card={card} busy={busy} lang={lang} onArrive={() => void act({ action: "arrived", id: card.id })} onAdd={(extra) => addTries(card.id, extra)} onDismiss={() => void act({ action: "dismiss", id: card.id })} onMore={(event) => openMore(card, event)} />
+                ))}
+              </div>
+            )}
+          </section>
           <section aria-label="Chairs">
             <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted">Chairs</h2>
             <div className={wide ? "mt-2 grid gap-2" : "mt-2 flex flex-wrap gap-2"}>
@@ -324,50 +367,6 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
                 </article>
               ))}
             </div>
-          </section>
-
-          <section className={wide ? "" : "mt-4"} aria-label="Waiting">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted">{t(lang, "queueWaiting")}</h2>
-            {desk.waiting.length === 0 ? <p className="mt-2 text-sm text-muted">{stale ? "Waiting list could not be loaded." : t(lang, "queueNobody")}</p> : null}
-            {wide ? (
-              <div className="mt-2 overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="text-xs uppercase tracking-[0.12em] text-muted">
-                      <th className="py-2 pr-2 font-medium">Token</th>
-                      <th className="py-2 pr-2 font-medium">Name</th>
-                      <th className="py-2 pr-2 font-medium">Wait</th>
-                      <th className="py-2 pr-2 font-medium">Status</th>
-                      <th className="py-2 font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {desk.waiting.map((card) => (
-                      <Fragment key={card.id}>
-                        <tr className="border-t border-line align-middle" data-queue-row={card.token}>
-                          <td className="py-2 pr-2 text-base font-semibold" data-queue-token={card.token}>{tokenLabel(card.token)}</td>
-                          <td className="max-w-36 truncate py-2 pr-2">{card.name}</td>
-                          <td className="whitespace-nowrap py-2 pr-2">{t(lang, "queueMinShort", { min: card.waitMin })}</td>
-                          <td className="py-2 pr-2"><StatusPills card={card} lang={lang} /></td>
-                          <td className="py-2">
-                            <div className="flex flex-wrap items-center gap-1">
-                              <RowActions card={card} busy={busy} lang={lang} onArrive={() => void act({ action: "arrived", id: card.id })} onMore={(event) => openMore(card, event)} />
-                              {card.wantsTries && card.arrived ? <TryChips compact busy={busy} onAdd={(extra) => addTries(card.id, extra)} onDismiss={() => void act({ action: "dismiss", id: card.id })} /> : null}
-                            </div>
-                          </td>
-                        </tr>
-                      </Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="mt-2 grid gap-2">
-                {desk.waiting.map((card) => (
-                  <WaitingRow key={card.id} card={card} busy={busy} lang={lang} onArrive={() => void act({ action: "arrived", id: card.id })} onAdd={(extra) => addTries(card.id, extra)} onDismiss={() => void act({ action: "dismiss", id: card.id })} onMore={(event) => openMore(card, event)} />
-                ))}
-              </div>
-            )}
           </section>
         </div>
       ) : null}
@@ -538,6 +537,22 @@ function StatusPills({ card, lang }: { card: Card; lang: string }) {
   );
 }
 
+function WhatsAppIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="#128C7E">
+      <path d="M12 3a9 9 0 0 0-7.8 13.4L3 21l4.7-1.2A9 9 0 1 0 12 3zm5 12.2c-.2.6-1.2 1.1-1.7 1.2-.4.1-.9.2-2.6-.6-2.2-.9-3.6-3.1-3.7-3.2-.1-.2-1-1.3-1-2.5s.6-1.8.9-2c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .5.4.2.6.7 1.8.7 1.9.1.2 0 .3-.1.5l-.3.4c-.1.1-.2.2-.1.4.2.3.7 1.1 1.5 1.8 1 .8 1.8 1.1 2.1 1.2.2.1.4.1.5-.1l.4-.5c.1-.2.3-.2.5-.1.2.1 1.4.7 1.6.8.2.1.4.2.4.3.1.2 0 .8-.2 1.3z" />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 3.5h3l1.2 3.2-1.8 1.1a12 12 0 0 0 5.8 5.8l1.1-1.8 3.2 1.2v3A1.5 1.5 0 0 1 18 17.5 15 15 0 0 1 6.5 6 1.5 1.5 0 0 1 7 3.5z" />
+    </svg>
+  );
+}
+
 function WaitingRow({ card, busy, lang, onArrive, onAdd, onDismiss, onMore }: {
   card: Card;
   busy: boolean;
@@ -560,6 +575,8 @@ function WaitingRow({ card, busy, lang, onArrive, onAdd, onDismiss, onMore }: {
         ) : (
           <button className="btn min-h-11 px-3" type="button" data-arrived="yes" disabled={busy} onClick={onArrive}>Arrived</button>
         )}
+        {card.whatsappUrl ? <a className="btn secondary inline-flex h-11 w-11 items-center justify-center px-0" href={card.whatsappUrl} target="_blank" rel="noreferrer" aria-label="WhatsApp"><WhatsAppIcon /></a> : null}
+        {card.callUrl ? <a className="btn secondary inline-flex h-11 w-11 items-center justify-center px-0" href={card.callUrl} aria-label="Call"><PhoneIcon /></a> : null}
         <button className="btn secondary min-h-11 min-w-11 px-0" type="button" aria-label="More actions" onClick={(event) => onMore(event)}>⋯</button>
       </div>
       <p className="mt-1 text-xs text-muted">{t(lang, "queueMinShort", { min: card.waitMin })}{card.serviceName ? ` · ${card.serviceName}` : ""}</p>
@@ -583,8 +600,8 @@ function RowActions({ card, busy, lang, onArrive, onMore }: {
       ) : (
         <button className="btn min-h-11 px-3" type="button" data-arrived="yes" disabled={busy} onClick={onArrive}>{t(lang, "queueArrived")}</button>
       )}
-      {card.whatsappUrl ? <a className="btn secondary inline-flex min-h-11 min-w-11 items-center justify-center px-2" href={card.whatsappUrl} target="_blank" rel="noreferrer" aria-label="WhatsApp">WA</a> : null}
-      {card.callUrl ? <a className="btn secondary inline-flex min-h-11 min-w-11 items-center justify-center px-2" href={card.callUrl} aria-label="Call">Call</a> : null}
+      {card.whatsappUrl ? <a className="btn secondary inline-flex h-11 w-11 items-center justify-center px-0" href={card.whatsappUrl} target="_blank" rel="noreferrer" aria-label="WhatsApp"><WhatsAppIcon /></a> : null}
+      {card.callUrl ? <a className="btn secondary inline-flex h-11 w-11 items-center justify-center px-0" href={card.callUrl} aria-label="Call"><PhoneIcon /></a> : null}
       <button className="btn secondary min-h-11 min-w-11 px-0" type="button" aria-label="More actions" onClick={(event) => onMore(event)}>⋯</button>
     </div>
   );

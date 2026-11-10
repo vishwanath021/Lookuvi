@@ -61,7 +61,7 @@ describe("makeup studio looks", () => {
     expect(hidden).not.toContain("aria-label=\"Makeup\"");
     const shown = renderToStaticMarkup(createElement(TryOnApp, { config: salon, showEveryday: true, showBridal: false, showGroom: false, showMakeup: true }));
     expect(shown).toContain("aria-label=\"Makeup\"");
-    expect(shown).toContain("Photo makeup");
+    expect(shown).toContain(">Makeup<");
     const settings = renderToStaticMarkup(createElement(SettingsForm, {
       initial: {
         name: "Demo",

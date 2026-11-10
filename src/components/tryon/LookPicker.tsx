@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { LOOK_CATEGORIES, LOOK_PAGE, filterLooks } from "@/lib/look-picker";
+import { SavedMarks } from "@/components/tryon/SavedMarks";
+import { LOOK_PAGE, filterLooks } from "@/lib/look-picker";
 
 export type LookPick = {
   id: string;
@@ -9,62 +10,58 @@ export type LookPick = {
   tags: string[];
   preview: ReactNode;
   meta?: string;
+  /** Present on a saved look so the tick and cross sit on the photo. */
+  mark?: { removed: boolean; onKeep: () => void; onDrop: () => void };
 };
 
 export function LookPicker({
   label,
   items,
   selectedId,
+  category = "all",
   disabled,
   tryDisabled,
+  savedOn = false,
+  saveLabel = "Save this look",
+  unsaveLabel = "Unsave",
+  keepLabel = "Save this look",
+  dropLabel = "Remove this look",
   onSelect,
   onTry,
-  onFilters,
   onSave,
   saveNote,
 }: {
   label: string;
   items: LookPick[];
   selectedId: string;
+  category?: string;
   disabled?: boolean;
   tryDisabled?: boolean;
+  savedOn?: boolean;
+  saveLabel?: string;
+  unsaveLabel?: string;
+  keepLabel?: string;
+  dropLabel?: string;
   onSelect: (id: string) => void;
   onTry: () => void;
-  onFilters?: () => void;
   onSave?: () => void;
   saveNote?: string;
 }) {
-  const [category, setCategory] = useState("all");
   const [shown, setShown] = useState(LOOK_PAGE);
   useEffect(() => {
     setShown(LOOK_PAGE);
   }, [category, label]);
-  const chips = LOOK_CATEGORIES.filter((item) => item.id === "all" || item.id === "saved" || items.some((row) => row.tags.includes(item.id)));
   const filtered = filterLooks(items, category, "");
   const visible = filtered.slice(0, shown);
   const selected = items.find((item) => item.id === selectedId);
   return (
     <div data-picker="yes">
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-        {onFilters ? (
-          <button className="btn secondary grid h-11 w-11 shrink-0 place-items-center px-0" type="button" aria-label="Filters" onClick={onFilters}>
-            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-              <path d="M2 4h14M4 9h10M7 14h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-          </button>
-        ) : null}
-        <div className="chip-scroll min-w-0 lg:flex-1" role="group" aria-label={`${label} categories`}>
-          {chips.map((item) => (
-            <button key={item.id} className="chip shrink-0" type="button" aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </div>
       {onSave ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button className="btn secondary min-h-11" type="button" disabled={disabled || !selected} onClick={onSave}>Save this look</button>
-          <p className="text-sm text-muted">{saveNote || "Saved looks stay on this phone. Tap Saved looks to open them."}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button className="btn secondary min-h-11" type="button" aria-pressed={savedOn} disabled={disabled || !selected} onClick={onSave}>
+            {savedOn ? unsaveLabel : saveLabel}
+          </button>
+          {saveNote ? <p className="text-sm text-muted">{saveNote}</p> : null}
         </div>
       ) : null}
       {visible.length === 0 ? <p className="mt-3 text-sm text-muted">{category === "saved" ? "Nothing saved yet. Pick a look, then tap Save this look." : "No matches."}</p> : null}
@@ -72,19 +69,32 @@ export function LookPicker({
         {visible.map((item) => {
           const on = item.id === selectedId;
           return (
-            <button
+            <div
               key={item.id}
-              type="button"
-              aria-pressed={on}
-              className={`relative overflow-hidden rounded-[14px] border bg-white text-left shadow-sm ${on ? "border-[var(--brand)] ring-2 ring-[var(--brand)]" : "border-line"}`}
-              disabled={disabled}
-              onClick={() => onSelect(item.id)}
+              className={`relative overflow-hidden rounded-[14px] border bg-white text-left shadow-sm ${on ? "border-[var(--brand)] ring-2 ring-[var(--brand)]" : "border-line"}${item.mark?.removed ? " is-removed" : ""}`}
             >
-              {on ? <span className="check" aria-hidden="true">✓</span> : null}
-              {item.preview}
-              <span className="block px-2 py-2 text-center text-sm font-medium leading-tight">{item.name}</span>
-              {item.meta ? <span className="block px-2 pb-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted">{item.meta}</span> : null}
-            </button>
+              <button
+                type="button"
+                aria-pressed={on}
+                className="block w-full text-left"
+                disabled={disabled}
+                onClick={() => onSelect(item.id)}
+              >
+                {on && !item.mark ? <span className="check" aria-hidden="true">✓</span> : null}
+                {item.preview}
+                <span className="block px-2 py-2 text-center text-sm font-medium leading-tight">{item.name}</span>
+                {item.meta ? <span className="block px-2 pb-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted">{item.meta}</span> : null}
+              </button>
+              {item.mark ? (
+                <SavedMarks
+                  removed={item.mark.removed}
+                  keepLabel={keepLabel}
+                  dropLabel={dropLabel}
+                  onKeep={item.mark.onKeep}
+                  onDrop={item.mark.onDrop}
+                />
+              ) : null}
+            </div>
           );
         })}
       </div>
@@ -93,7 +103,7 @@ export function LookPicker({
       ) : null}
       <div className="try-cta">
         <button className="btn w-full min-h-11" type="button" disabled={disabled || tryDisabled || !selected} onClick={onTry}>
-          {selected ? `Try this look` : "Try this look"}
+          Try this look
         </button>
       </div>
     </div>

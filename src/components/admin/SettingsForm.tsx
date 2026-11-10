@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { ImportCustomers } from "@/components/admin/ImportCustomers";
 import { SalonModeCard } from "@/components/admin/SalonModeCard";
-import { VisitUnlock } from "@/components/admin/VisitUnlock";
 import { WeekHoursEditor } from "@/components/admin/WeekHoursEditor";
 import type { ToolId } from "@/lib/tools";
 
@@ -346,7 +346,7 @@ export function SettingsForm({
       </form>
       </section>
       {message && <p className="text-sm" role="status">{message}</p>}
-      <VisitUnlock show={form.productBridal || form.productGroom || form.productMakeupStudio} />
+      <ImportCustomers />
     </div>
   );
 }

@@ -270,7 +270,7 @@ export async function publicBoard(slug: string) {
   const services = await prisma.service.findMany({
     where: { tenantId: tenant.id, active: true },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, durationMin: true },
+    select: { id: true, name: true, durationMin: true, priceInr: true },
   });
   const live = state.mode === "LIVE";
   const wait = live ? timing(entries, null, state.avgMinutes, state.units) : { ahead: 0, waitMin: 0 };
@@ -291,7 +291,7 @@ export async function publicBoard(slug: string) {
     lang: tenant.defaultLang,
     hoursOpen: view.hoursOpen,
     hoursClose: view.hoursClose,
-    services: services.map((service) => ({ id: service.id, name: service.name, minutes: serviceMinutes(service.durationMin, state.avgMinutes) })),
+    services: services.map((service) => ({ id: service.id, name: service.name, minutes: serviceMinutes(service.durationMin, state.avgMinutes), priceInr: service.priceInr })),
   };
 }
 

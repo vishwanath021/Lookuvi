@@ -15,6 +15,16 @@ export function addSavedPick(list: SavedPick[], pick: SavedPick) {
   return next.slice(0, MAX_SAVED);
 }
 
+export function savedPickOn(list: SavedPick[], pick: { tool: string; id: string }) {
+  return list.some((item) => item.tool === pick.tool && item.id === pick.id);
+}
+
+/** Save when it is new, unsave when it is already kept. */
+export function toggleSavedPick(list: SavedPick[], pick: SavedPick) {
+  if (savedPickOn(list, pick)) return list.filter((item) => !(item.tool === pick.tool && item.id === pick.id));
+  return addSavedPick(list, pick);
+}
+
 export function readSavedPicks(raw: string | null): SavedPick[] {
   if (!raw) return [];
   try {

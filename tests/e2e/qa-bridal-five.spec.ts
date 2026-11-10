@@ -178,8 +178,11 @@ test("CSP, crop, zoom, booking, and the regression paths", async ({ page }, test
   expect(ratio).toBeLessThan(0.78);
 
   await page.getByRole("button", { name: "Retake" }).click();
-  const agree = page.getByRole("button", { name: "I agree, start" });
-  if (await agree.isVisible().catch(() => false)) await agree.click();
+  const consent = page.getByRole("dialog", { name: "Before we use a photo" });
+  if (await consent.isVisible().catch(() => false)) {
+    await page.getByRole("checkbox", { name: /18 or older/ }).check();
+    await page.getByRole("button", { name: /I agree/ }).click();
+  }
   await expect(page.locator("[data-studio='live']")).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Take photo" }).click();
   await expect(page.locator("[data-studio='live']")).toHaveCount(0, { timeout: 20_000 });
@@ -207,7 +210,7 @@ test("CSP, crop, zoom, booking, and the regression paths", async ({ page }, test
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Bridal", exact: true })).toBeVisible();
+  await expect(page.locator("[data-bridal='flow']")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sleek low bun" })).toBeVisible();
   await page.getByRole("button", { name: "Haldi", exact: true }).click();
   await expect(page.getByRole("button", { name: "Pellikuthuru Haldi" })).toBeVisible();

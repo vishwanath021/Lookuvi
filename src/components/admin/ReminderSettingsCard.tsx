@@ -6,8 +6,11 @@ import { DEFAULT_REMINDER_TEMPLATE, MAX_REMINDER_TEMPLATE } from "@/lib/visit-re
 
 export function ReminderSettingsCard({
   initial,
+  messageOnly = false,
 }: {
   initial: { reminderDays: number; reminderTemplate: string; reminderMethod: string };
+  /** Due for a visit opens the message only. The rest of this card stays on Settings. */
+  messageOnly?: boolean;
 }) {
   const [days, setDays] = useState(initial.reminderDays);
   const [template, setTemplate] = useState(initial.reminderTemplate.trim() || DEFAULT_REMINDER_TEMPLATE);
@@ -22,7 +25,9 @@ export function ReminderSettingsCard({
     const res = await fetch("/api/v1/admin/settings", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ reminderDays: days, reminderTemplate: template, reminderMethod: method === "AUTO" ? "MANUAL" : method }),
+      body: JSON.stringify(messageOnly
+        ? { reminderTemplate: template }
+        : { reminderDays: days, reminderTemplate: template, reminderMethod: method === "AUTO" ? "MANUAL" : method }),
     });
     const data = await res.json().catch(() => ({}));
     setMessage(res.ok ? "Saved." : data.message || "Could not save.");
@@ -30,23 +35,27 @@ export function ReminderSettingsCard({
   }
 
   return (
-    <form id="reminders" className="card grid gap-4 p-4" data-reminder-settings="yes" onSubmit={save}>
-      <h2 className="font-serif text-2xl">Reminders</h2>
-      <ReminderMethodChoice value={method} onChange={setMethod} />
-      <label className="text-base">
-        Days since their last visit
-        <input
-          className="field mt-1"
-          type="number"
-          min={28}
-          max={42}
-          required
-          aria-label="Days since their last visit"
-          value={days}
-          onChange={(event) => setDays(Number(event.target.value))}
-        />
-      </label>
-      <p className="text-base">42 days is about 6 weeks. Anyone quiet for that long shows on Due for a visit.</p>
+    <form id="reminders" className="card grid gap-4 p-4" data-reminder-settings="yes" data-message-only={messageOnly ? "yes" : "no"} onSubmit={save}>
+      <h2 className="font-serif text-2xl">{messageOnly ? "Reminder message" : "Reminders"}</h2>
+      {messageOnly ? null : <ReminderMethodChoice value={method} onChange={setMethod} />}
+      {messageOnly ? null : (
+        <>
+          <label className="text-base">
+            Days since their last visit
+            <input
+              className="field mt-1"
+              type="number"
+              min={28}
+              max={42}
+              required
+              aria-label="Days since their last visit"
+              value={days}
+              onChange={(event) => setDays(Number(event.target.value))}
+            />
+          </label>
+          <p className="text-base">42 days is about 6 weeks. Anyone quiet for that long shows on Due for a visit.</p>
+        </>
+      )}
       <label className="text-base">
         Message
         <textarea

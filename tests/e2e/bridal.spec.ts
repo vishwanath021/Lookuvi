@@ -50,7 +50,7 @@ test("guest can pick an event and a look, refine it, try mehendi, save, compare,
   await page.goto("/s/demo");
   await shot(page, "01-entry");
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Bridal", exact: true })).toBeVisible();
+  await expect(page.locator("[data-bridal='flow']")).toBeVisible();
   const looks = page.getByRole("list", { name: "Bridal looks" });
   await expect(looks.getByRole("listitem").first()).toContainText("Telugu Muhurtham Classic");
   await expect(looks.getByRole("listitem").nth(1)).toContainText("Telangana Gadwal Bride");
@@ -110,8 +110,9 @@ test("guest can pick an event and a look, refine it, try mehendi, save, compare,
   await page.getByRole("button", { name: "Save this look" }).click();
 
   await expect(page.getByRole("tab", { name: "My looks" })).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("button", { name: "Compare" }).first().click();
-  await page.getByRole("button", { name: "Compare" }).first().click();
+  const compare = page.getByRole("button", { name: "Compare" });
+  await compare.nth(1).click();
+  await compare.nth(0).click();
   await expect(page.getByRole("heading", { name: "Side by side" })).toBeVisible();
   await shot(page, "07-compare");
   const share = page.waitForEvent("popup");
@@ -205,9 +206,7 @@ test("a new catalogue style generates before the salon has a menu row", async ({
   await page.goto("/s/demo");
   await page.locator("input[data-photo='gallery']").setInputFiles("public/samples/portrait.jpg");
   const gallery = page.getByRole("region", { name: "Styles" });
-  await page.getByRole("button", { name: "Filters" }).click();
   await page.getByRole("button", { name: "Women", exact: true }).click();
-  await page.getByRole("button", { name: "Close" }).click();
   await gallery.getByRole("button", { name: "Wolf Cut" }).click();
   await page.getByRole("button", { name: "Try this look" }).click();
   await expect(page.getByText("That style is not on this salon's menu.")).toHaveCount(0);

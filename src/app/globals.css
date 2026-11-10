@@ -396,8 +396,9 @@ textarea { min-height: 48px; }
   top: 4.5rem;
   z-index: 24;
   display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
-  overflow-x: auto;
+  overflow: visible;
   margin: 0;
   padding: 0.45rem 0;
   background: #f3f0f8;
@@ -1120,8 +1121,8 @@ textarea { min-height: 48px; }
     mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 1.75rem), transparent);
   }
   .look-grid button { scroll-margin-bottom: 6.5rem; }
-  [data-scroll="salon"] { padding-bottom: calc(7.25rem + env(safe-area-inset-bottom)); }
-  [data-scroll="salon"][data-mini="yes"] { padding-bottom: calc(7.25rem + env(safe-area-inset-bottom)); }
+  [data-scroll="salon"] { padding-bottom: calc(10.5rem + env(safe-area-inset-bottom)); }
+  [data-scroll="salon"][data-mini="yes"] { padding-bottom: calc(10.5rem + env(safe-area-inset-bottom)); }
 }
 .chip-scroll::-webkit-scrollbar { display: none; }
 .try-cta {
@@ -1158,8 +1159,8 @@ textarea { min-height: 48px; }
   }
   .try-preview { position: sticky; top: 4.5rem; align-self: start; padding-top: 0; }
   .try-shot { width: 100%; }
-  .try-picks { max-height: calc(100dvh - 7.5rem); overflow: auto; overscroll-behavior: contain; padding-right: 0.25rem; }
-  .try-picks > .step-rail { top: 0; z-index: 6; box-shadow: none; }
+  .try-picks { overflow: visible; max-height: none; }
+  .try-picks > .step-rail { top: 4.5rem; z-index: 6; box-shadow: none; }
   .bridal-intro {
     position: sticky;
     top: 4.25rem;
@@ -1170,14 +1171,14 @@ textarea { min-height: 48px; }
   .try-mini { display: none; }
 }
 @media (max-width: 1023px) {
-  .try-mini { top: auto; bottom: 4.75rem; }
+  .try-mini { top: auto; bottom: calc(8.25rem + env(safe-area-inset-bottom)); }
   .try-cta {
     position: fixed;
     right: 0;
-    bottom: 0;
+    bottom: calc(3.25rem + env(safe-area-inset-bottom));
     left: 0;
     margin: 0;
-    padding: 0.75rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom));
+    padding: 0.75rem 0.75rem;
     border-top: 1px solid var(--line);
     background: var(--bg);
   }
@@ -1301,6 +1302,85 @@ textarea { min-height: 48px; }
   box-shadow: 0 0 0 2px var(--brand), 0 8px 20px rgba(62, 48, 75, 0.12);
 }
 .card.guest-tab-active .text-muted { color: var(--on-brand); opacity: 0.85; }
+
+.guest-shell {
+  width: 100%;
+  padding: 0 0.75rem calc(4.75rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 640px) {
+  .guest-shell { padding-right: 1rem; padding-left: 1rem; }
+}
+.guest-bar-bleed { margin-right: -0.75rem; margin-left: -0.75rem; }
+@media (min-width: 640px) {
+  .guest-bar-bleed { margin-right: -1rem; margin-left: -1rem; }
+}
+.guest-nav {
+  position: fixed;
+  z-index: 40;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+  background: #fff;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.guest-nav a {
+  display: flex;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.2rem;
+  color: var(--muted, #6d6474);
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.15;
+  text-align: center;
+}
+.guest-nav a[aria-current="page"] {
+  color: var(--brand);
+  box-shadow: inset 0 -2px 0 var(--brand);
+}
+.mode-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.mode-tabs button {
+  min-height: 44px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted, #6d6474);
+  font-weight: 650;
+}
+.mode-tabs button[aria-pressed="true"] {
+  color: var(--ink, #1b1224);
+  border-bottom-color: var(--brand);
+}
+.saved-marks { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.look-mark {
+  pointer-events: auto;
+  position: absolute;
+  top: 0.35rem;
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.94);
+  color: #3e304b;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.look-mark.tick { left: 0.35rem; }
+.look-mark.cross { right: 0.35rem; }
+.look-mark.tick.is-on { background: var(--brand); color: #fff; border-color: var(--brand); }
+.look-mark.cross.is-on { background: #9b2335; color: #fff; border-color: #9b2335; }
+.is-removed img { opacity: 0.45; }
 
 /* While a look is generating the pickers are disabled; show it. */
 .picks-locked button:disabled { opacity: 0.45; cursor: wait; filter: grayscale(0.4); }

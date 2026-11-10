@@ -12,6 +12,7 @@ import { LiveStudio } from "@/components/tryon/LiveStudio";
 import { LookResultActions, PhotoActions, ResultZoom } from "@/components/tryon/LookResultActions";
 import { CropPhotoButton } from "@/components/tryon/PhotoCrop";
 import { LargeFrame, LiveTray, MakeupSwatches, SelectionSummary, StepCard, StepRail, TryBar, scrollToStep } from "@/components/tryon/LookStepper";
+import { SavedMarks } from "@/components/tryon/SavedMarks";
 import { useVisitTries } from "@/components/tryon/useVisitTries";
 import { MakeupStage } from "@/components/tryon/MakeupStage";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
@@ -196,6 +197,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   const [error, setError] = useState("");
   const [result, setResult] = useState<LookResult | null>(() => resultFromStored(config.slug));
   const [saved, setSaved] = useState<SavedLook[]>([]);
+  const [gone, setGone] = useState<SavedLook[]>([]);
   const [compare, setCompare] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [eventDate, setEventDate] = useState("");
@@ -387,8 +389,21 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
     }
   }
 
+  function currentSaved() {
+    if (!result) return undefined;
+    return saved.find((item) => item.lookId === result.lookId && item.kind === result.kind);
+  }
+
   async function saveCurrent() {
     if (!result) return;
+    const existing = currentSaved();
+    if (existing) {
+      const next = saved.filter((item) => item.id !== existing.id);
+      setSaved(next);
+      writeSaved(config.slug, next);
+      setGone((current) => [existing, ...current.filter((item) => item.id !== existing.id)]);
+      return;
+    }
     const after = result.after.startsWith("data:") ? result.after : await blobUrlToData(result.after).catch(() => result.after);
     const before = result.before.startsWith("data:") ? result.before : await blobUrlToData(result.before).catch(() => result.before);
     const next: SavedLook = {
@@ -401,10 +416,25 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
       share: result.share,
       kind: result.kind,
     };
-    const trimmed = [next, ...saved.filter((item) => item.id !== next.id)].slice(0, MAX_SAVED);
+    const trimmed = [next, ...saved.filter((item) => item.lookId !== next.lookId || item.kind !== next.kind)].slice(0, MAX_SAVED);
     setSaved(trimmed);
     writeSaved(config.slug, trimmed);
+    setGone((current) => current.filter((item) => item.lookId !== next.lookId || item.kind !== next.kind));
     setPanel("saved");
+  }
+
+  function restoreLook(look: SavedLook) {
+    const trimmed = [look, ...saved.filter((item) => item.id !== look.id)].slice(0, MAX_SAVED);
+    setSaved(trimmed);
+    writeSaved(config.slug, trimmed);
+    setGone((current) => current.filter((item) => item.id !== look.id));
+  }
+
+  function removeLook(look: SavedLook) {
+    const next = saved.filter((item) => item.id !== look.id);
+    setSaved(next);
+    writeSaved(config.slug, next);
+    setGone((current) => [look, ...current.filter((item) => item.id !== look.id)]);
   }
 
   function toggleCompare(id: string) {
@@ -682,10 +712,6 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   return (
     <div data-bridal="flow" data-busy={busy ? "yes" : "no"}>
       <ConsentSheet open={consent.open} lang={config.defaultLang || "en"} onAgree={(ageGate) => void consent.agree(ageGate)} onClose={consent.close} />
-      <div className="bridal-intro">
-        <h2 className="page-title">Bridal</h2>
-        <p className="mt-1 text-sm text-muted">Hair, makeup, and jewellery in one look. Then mehendi, and a trial with the salon.</p>
-      </div>
       <div className="seg mt-4" role="tablist" aria-label="Bridal">
         {(["looks", "own", "mehendi", "saved"] as const).map((item) => (
           <button key={item} className="seg-btn" type="button" role="tab" aria-selected={panel === item} onClick={() => setPanel(item)}>
@@ -829,6 +855,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               onAnother={() => scrollToStep("bridal-steps")}
               onClick={() => { if (face) void generate("look", face); }}
               onSave={result?.kind === "look" && !busy ? () => void saveCurrent() : undefined}
+              saveLabel={currentSaved()?.kind === "look" ? "Unsave" : "Save this look"}
             />
           </section>
         </div>
@@ -899,6 +926,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
               onAnother={() => scrollToStep("bridal-mehendi")}
               onClick={() => { if (hand) void generate("mehendi", hand); }}
               onSave={result?.kind === "mehendi" && !busy ? () => void saveCurrent() : undefined}
+              saveLabel={currentSaved()?.kind === "mehendi" ? "Unsave" : "Save this look"}
             />
           </section>
         </div>
@@ -910,18 +938,23 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
         <div className="mt-4 grid gap-4">
           {saved.length === 0 ? <p className="text-sm">Save a look to compare it and send it to your family.</p> : null}
           <ul className="grid gap-3">
-            {saved.map((look) => {
+            {[...saved.map((look) => ({ look, removed: false })), ...gone.filter((look) => !saved.some((item) => item.id === look.id)).map((look) => ({ look, removed: true }))].map(({ look, removed }) => {
               const compareOn = compareControl(compare.includes(look.id));
               return (
-              <li key={look.id} className="card grid grid-cols-[88px_1fr] gap-3 p-3">
-                <img src={look.after} alt="" className="h-28 w-full rounded-lg object-cover" />
+              <li key={look.id} className="card grid gap-3 p-3 sm:grid-cols-[9rem_1fr]">
+                <div className={`relative ${removed ? "is-removed" : ""}`}>
+                  <img src={look.after} alt="" className="aspect-[3/4] w-full rounded-lg object-cover" />
+                  <SavedMarks removed={removed} keepLabel="Save this look" dropLabel="Remove this look" onKeep={() => restoreLook(look)} onDrop={() => removeLook(look)} />
+                </div>
                 <div>
                   <p className="font-medium leading-snug">{look.name}</p>
                   <p className="text-xs text-muted">{bridalEventById(look.eventId)?.label}</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button className={compareOn.className} type="button" aria-pressed={compareOn.pressed} data-compare={compareOn.pressed ? "open" : "closed"} onClick={() => toggleCompare(look.id)}>{compareOn.label}</button>
-                    <button className="btn secondary" type="button" onClick={() => share(look)}>Share with family</button>
-                  </div>
+                  {removed ? null : (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button className={compareOn.className} type="button" aria-pressed={compareOn.pressed} data-compare={compareOn.pressed ? "open" : "closed"} onClick={() => toggleCompare(look.id)}>{compareOn.label}</button>
+                      <button className="btn secondary" type="button" onClick={() => share(look)}>Share with family</button>
+                    </div>
+                  )}
                 </div>
               </li>
               );
@@ -988,7 +1021,7 @@ function PhotoGrid({ step, label, hint, group, styles, style, onStyle, items, va
       {hint ? <p className="text-sm text-muted">{hint}</p> : null}
       <input className="field" type="search" aria-label={`Search ${group}`} placeholder={`Search ${group.toLowerCase()}`} value={query} onChange={(event) => { setQuery(event.target.value); setShown(12); }} />
       {pills.length > 0 && (
-        <div className="chip-scroll" role="group" aria-label={`${group} style`}>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={`${group} style`}>
           {pills.map((item) => (
             <button key={item.id} className="chip shrink-0" type="button" aria-pressed={style === item.id} onClick={() => { onStyle(item.id); setShown(12); }}>{item.label}</button>
           ))}

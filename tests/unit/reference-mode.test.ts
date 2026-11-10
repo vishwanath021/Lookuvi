@@ -367,7 +367,8 @@ describe("salon reference switch", () => {
     expect(guest).not.toContain("Reference mode");
     expect(guest).not.toContain("Hair-only composite");
     expect(guest).not.toContain("Hair texture");
-    expect(guest).toContain("See your next look.");
+    expect(guest).not.toContain("See your next look.");
+    expect(guest).toContain("Try on");
     expect(guest).toContain("Live styling");
     const guestSource = readFileSync("src/components/tryon/TryOnApp.tsx", "utf8");
     expect(guestSource).toContain('t(lang, "retry")');

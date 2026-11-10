@@ -5,7 +5,8 @@ import { flushSync } from "react-dom";
 import { isPlatformLogo, LookuviMark } from "@/components/brand/LookuviMark";
 import { BeforeAfter } from "@/components/tryon/BeforeAfter";
 import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
-import { addSavedPick, readSavedPicks, savedPicksKey, showLockedBrowse, type SavedPick } from "@/lib/at-salon-browse";
+import { GuestNav } from "@/components/guest/GuestNav";
+import { addSavedPick, readSavedPicks, savedPickOn, savedPicksKey, showLockedBrowse, type SavedPick } from "@/lib/at-salon-browse";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
@@ -23,7 +24,7 @@ import { StyleCard } from "@/components/tryon/StyleCard";
 import { BROW_COLOURS, BROW_THICKNESS, browsForAudience, type BrowColour, type BrowThickness } from "@/data/brows";
 import { guestPageLocale, t } from "@/data/i18n";
 import { styleHasPhoto } from "@/data/style-photos";
-import { lookTagsForStyle } from "@/lib/look-picker";
+import { LOOK_FILTERS, lookTagsForStyle } from "@/lib/look-picker";
 import { orderStylesForPicker, suggestStyles, type HairReading } from "@/lib/hair-suitability";
 import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
 import { alignGeneratedPhoto } from "@/lib/face/align-client";
@@ -31,8 +32,8 @@ import { detectFaceLandmarks } from "@/lib/face/detect-client";
 import type { PlacementDebug } from "@/lib/face/pose";
 import { classifySkinPhoto } from "@/lib/hand-photo";
 import type { SalonConfig } from "@/lib/salon";
-import { guestSectionCopy, guestSections, type GuestSection } from "@/lib/guest-sections";
-import { queueEntryKey, salonActionItems } from "@/lib/salon-actions";
+import { guestSections, type GuestSection } from "@/lib/guest-sections";
+import { guestJoinHref } from "@/lib/guest-nav";
 import { downloadLookFile, lookDownloadName } from "@/lib/look-result";
 import { normalizeWhatsAppPhone } from "@/lib/whatsapp";
 import { GUEST_PREVIEW_FAILED, postGuestGenerate } from "@/lib/guest-preview";
@@ -183,7 +184,6 @@ export function TryOnApp({
   initialShadeId,
   salonToken,
   salonMode = false,
-  demoHint = false,
   poseDebug = false,
   showQueue = false,
   queueMode = "LIVE",
@@ -199,7 +199,6 @@ export function TryOnApp({
   initialShadeId?: string;
   salonToken?: string;
   salonMode?: boolean;
-  demoHint?: boolean;
   /** Signed-in super-admin only. Guests never receive the numbers. */
   poseDebug?: boolean;
   showQueue?: boolean;
@@ -241,6 +240,8 @@ export function TryOnApp({
   const [pickedDensity, setPickedDensity] = useState("");
   const [pickedTexture, setPickedTexture] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [lookFilter, setLookFilter] = useState("all");
+  const [droppedPicks, setDroppedPicks] = useState<SavedPick[]>([]);
   const [hairReading, setHairReading] = useState<HairReading | null>(null);
   const [suggestNote, setSuggestNote] = useState("");
   const [suggestCost, setSuggestCost] = useState("");
@@ -989,8 +990,8 @@ export function TryOnApp({
     { id: "beard", label: "Beard", name: t(lang, "beardChip"), on: config.toolBeard, icon: "beard" },
   ];
   const visibleTools = tools.filter((item) => item.on);
-  const actionItems = salonActionItems({ phone: Boolean(phone), showQueue, bridalOn, groomOn });
-  const showActionStrip = showQueue && actionItems.length > 0;
+  const joinHref = guestJoinHref({ slug: config.slug, showQueue, bookHref });
+  const audiences = (["women", "men", "kids"] as const).filter((item) => (item === "women" ? config.showWomen : item === "men" ? config.showMen : config.showKids));
 
   const platformLogo = isPlatformLogo(config.logoUrl);
   const salonLocked = showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon);
@@ -1025,12 +1026,8 @@ export function TryOnApp({
     };
   }, [section, tool, lockedBrowse]);
 
-  function saveCurrentStyle() {
-    const chosen = chosenNow();
-    if (!chosen) return;
-    const next = addSavedPick(savedPicks, { tool: chosen.tool, id: chosen.id, name: chosen.name });
+  function writePicks(next: SavedPick[]) {
     setSavedPicks(next);
-    setSavedFlash(true);
     try {
       localStorage.setItem(savedPicksKey(config.slug), JSON.stringify(next));
     } catch {
@@ -1038,9 +1035,50 @@ export function TryOnApp({
     }
   }
 
+  function keepPick(pick: SavedPick) {
+    setDroppedPicks((current) => current.filter((item) => !(item.tool === pick.tool && item.id === pick.id)));
+    writePicks(addSavedPick(savedPicks, pick));
+    setSavedFlash(true);
+  }
+
+  function dropPick(pick: SavedPick) {
+    setDroppedPicks((current) => [pick, ...current.filter((item) => !(item.tool === pick.tool && item.id === pick.id))].slice(0, 12));
+    writePicks(savedPicks.filter((item) => !(item.tool === pick.tool && item.id === pick.id)));
+    setSavedFlash(true);
+  }
+
+  function toggleCurrentStyle() {
+    const chosen = chosenNow();
+    if (!chosen) return;
+    const pick = { tool: chosen.tool, id: chosen.id, name: chosen.name };
+    if (savedPickOn(savedPicks, pick)) dropPick(pick);
+    else keepPick(pick);
+  }
+
+  function markFor(pick: SavedPick) {
+    if (lookFilter !== "saved") return undefined;
+    const saved = savedPickOn(savedPicks, pick);
+    const removed = !saved && droppedPicks.some((item) => item.tool === pick.tool && item.id === pick.id);
+    if (!saved && !removed) return undefined;
+    return { removed, onKeep: () => keepPick(pick), onDrop: () => dropPick(pick) };
+  }
+
+  const chosenLive = chosenNow();
+  const chosenSaved = Boolean(chosenLive && savedPickOn(savedPicks, chosenLive));
+  const saveNote = savedFlash ? (chosenSaved ? t(lang, "atSalonSaved") : t(lang, "savedRemoved")) : undefined;
+  const saveLabels = {
+    savedOn: chosenSaved,
+    saveLabel: t(lang, "saveThisLook"),
+    unsaveLabel: t(lang, "unsaveThisLook"),
+    keepLabel: t(lang, "saveThisLook"),
+    dropLabel: t(lang, "removeLook"),
+    saveNote,
+    onSave: toggleCurrentStyle,
+  };
+
   return (
-    <div data-salon-mode={salonMode ? "yes" : "no"} className={embed ? "flex min-h-dvh flex-col" : "mx-auto flex min-h-dvh max-w-6xl flex-col px-4"}>
-      <header className={`salon-bar header-metal sticky top-0 z-30 px-4 ${embed ? "" : "-mx-4"}`}>
+    <div data-salon-mode={salonMode ? "yes" : "no"} data-queue-mode={queueMode} className={embed ? "flex min-h-dvh flex-col" : "guest-shell flex min-h-dvh w-full flex-col"}>
+      <header className={`salon-bar header-metal sticky top-0 z-30 px-4 ${embed ? "" : "guest-bar-bleed"}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white">
@@ -1052,7 +1090,7 @@ export function TryOnApp({
             </span>
             <h1 className="min-w-0 flex-1 break-words text-lg leading-tight sm:text-xl">{config.name}</h1>
           </div>
-          {phone && !showActionStrip ? (
+          {phone ? (
             <div className="flex gap-2">
               <a className="btn bar-book flex-1 whitespace-nowrap sm:flex-none" href={bookHref} target="_blank" rel="noreferrer">{t(lang, "bookNow")}</a>
               <a className="btn bar-chat flex-1 whitespace-nowrap sm:flex-none" href={chatHref} target="_blank" rel="noreferrer">
@@ -1060,36 +1098,21 @@ export function TryOnApp({
                 {t(lang, "whatsappBtn")}
               </a>
             </div>
-          ) : !phone ? (
+          ) : (
             <p className="max-w-xs text-sm leading-snug">{t(lang, "whatsappMissing")}</p>
-          ) : null}
+          )}
         </div>
       </header>
-      {showActionStrip ? (
-        <SalonActions
-          embed={embed}
-          items={actionItems}
-          bookHref={bookHref}
-          chatHref={chatHref}
-          queueHref={`/s/${config.slug}/queue`}
-          bookLabel={t(lang, "bookNow")}
-          chatLabel={t(lang, "whatsappBtn")}
-          queueLabel={t(lang, queueEntryKey(queueMode))}
-        />
-      ) : null}
       <ConsentSheet open={consent.open} lang={lang} onAgree={(ageGate) => { track("consent_accepted", { lang }); void consent.agree(ageGate); }} onClose={consent.close} />
       <div data-scroll="salon" data-mini={miniPreview ? "yes" : "no"} className="flex flex-1 flex-col pt-6">
-      {sections.length > 1 ? (
-        <div className={`mb-4 grid items-start gap-3 ${sections.length > 3 ? "grid-cols-2 sm:grid-cols-4" : sections.length > 2 ? "grid-cols-3" : "grid-cols-2"}`} data-guest-tabs="yes">
+      {sections.length > 0 ? (
+        <div className="mode-tabs mb-4" data-guest-tabs="yes" role="group" aria-label="Look">
           {sections.map((item) => {
-            const copy = guestSectionCopy(item);
+            const label = t(lang, item === "everyday" ? "sectionEveryday" : item === "bridal" ? "sectionBridal" : item === "groom" ? "sectionGroom" : "sectionMakeup");
             return (
-            <div key={item}>
-              <button type="button" className={`card min-h-24 w-full p-3 text-left transition-colors ${section === item ? "guest-tab-active" : "opacity-80"}`} aria-pressed={section === item} data-active={section === item ? "yes" : "no"} aria-label={copy.label} disabled={busy && section !== item} onClick={() => setSection(item)}>
-                <span className="block text-xs text-muted" aria-hidden="true">{copy.hint}</span>
-                <span className="block font-serif text-2xl leading-tight" aria-hidden="true">{copy.label}</span>
+              <button key={item} type="button" aria-label={label} aria-pressed={section === item} data-active={section === item ? "yes" : "no"} disabled={busy && section !== item} onClick={() => setSection(item)}>
+                {label}
               </button>
-            </div>
             );
           })}
         </div>
@@ -1101,7 +1124,6 @@ export function TryOnApp({
       {makeupOn && !MakeupPane ? <p className="mt-2 text-sm text-muted">Opening makeup…</p> : null}
       {makeupOn && MakeupPane ? <MakeupPane config={config} /> : null}
       {bridalOn || groomOn || makeupOn ? null : <>
-      <h2 className="mb-2 hidden font-serif text-2xl leading-tight lg:block">{t(lang, "pageTitle")}</h2>
       <AtSalonNote lang={lang} />
 
       <div className="try-desk mt-4">
@@ -1109,7 +1131,7 @@ export function TryOnApp({
       {lockedBrowse ? (
         <section ref={frameRef} className="card p-4" aria-label="Photo" data-browse-locked="yes">
           <p className="text-sm">{t(lang, "atSalonLocked")}</p>
-          <button className="btn secondary mt-3 min-h-11" type="button" disabled={!chosenNow()} onClick={saveCurrentStyle}>{t(lang, "saveLook")}</button>
+          <button className="btn secondary mt-3 min-h-11" type="button" aria-pressed={chosenSaved} disabled={!chosenNow()} onClick={toggleCurrentStyle}>{chosenSaved ? t(lang, "unsaveThisLook") : t(lang, "saveThisLook")}</button>
           {savedFlash ? <p className="mt-2 text-sm" role="status">{t(lang, "atSalonSaved")}</p> : null}
           {savedPicks.length > 0 ? <p className="mt-2 text-sm">Saved: {savedPicks.map((item) => item.name).join(", ")}</p> : null}
         </section>
@@ -1335,6 +1357,24 @@ export function TryOnApp({
       </div>
       </div>
       )}
+      <div className="mt-3 flex items-center gap-2">
+        {audiences.length > 1 ? (
+          <div className="seg min-w-0 flex-1" role="group" aria-label={t(lang, "audienceLabel")}>
+            {audiences.map((item) => (
+              <button key={item} className="seg-btn" type="button" aria-pressed={gender === item} onClick={() => chooseGender(item)}>
+                {t(lang, item)}
+              </button>
+            ))}
+          </div>
+        ) : <div className="min-w-0 flex-1" />}
+        {tool === "style" ? (
+          <button className="btn secondary grid h-11 w-11 shrink-0 place-items-center px-0" type="button" aria-label={t(lang, "filterTitle")} onClick={() => setFiltersOpen(true)}>
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+              <path d="M2 4h14M4 9h10M7 14h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
+        ) : null}
+      </div>
       <section ref={gridRef} className="mt-3" data-style-grid="yes" aria-label={tool === "style" ? t(lang, "styles") : tool === "colour" ? t(lang, "shades") : tool === "brows" ? t(lang, "brows") : tool === "beard" ? t(lang, "beards") : t(lang, "nails")}>
         {tool === "style" && (
           <>
@@ -1344,35 +1384,55 @@ export function TryOnApp({
             <LookPicker
               key={`style-${gender}`}
               label="styles"
+              category={lookFilter}
               selectedId={styleId}
               disabled={busy}
               tryDisabled={salonLocked}
-              onFilters={() => setFiltersOpen(true)}
-              items={shownStyles.map((style) => ({
-                id: style.id,
-                name: style.name,
-                tags: lookTagsForStyle(style, savedPicks.some((item) => item.tool === "style" && item.id === style.id)),
-                preview: <StyleCard id={style.id} name={style.name} />,
-              }))}
+              {...saveLabels}
+              items={[
+                ...shownStyles.map((style) => {
+                  const pick = { tool: "style", id: style.id, name: style.name };
+                  return {
+                    id: style.id,
+                    name: style.name,
+                    tags: lookTagsForStyle(style, savedPickOn(savedPicks, pick)),
+                    preview: <StyleCard id={style.id} name={style.name} />,
+                    mark: markFor(pick),
+                  };
+                }),
+                ...droppedPicks.flatMap((pick) => {
+                  if (lookFilter !== "saved" || pick.tool !== "style" || savedPickOn(savedPicks, pick)) return [];
+                  if (shownStyles.some((style) => style.id === pick.id)) return [];
+                  const style = config.styles.find((item) => item.id === pick.id && item.gender === gender);
+                  if (!style) return [];
+                  return [{
+                    id: style.id,
+                    name: style.name,
+                    tags: ["saved"],
+                    preview: <StyleCard id={style.id} name={style.name} />,
+                    mark: markFor(pick),
+                  }];
+                }),
+              ]}
               onSelect={(id) => {
-                const style = shownStyles.find((item) => item.id === id);
+                const style = shownStyles.find((item) => item.id === id) || config.styles.find((item) => item.id === id);
                 if (style) selectLook({ id: style.id, name: style.name, serviceKeys: style.serviceKeys, tool: "style" });
               }}
               onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
-              onSave={saveCurrentStyle}
-              saveNote={savedFlash ? "Saved on this phone. Tap Saved looks to see it." : undefined}
             />
             {filtersOpen ? (
-              <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-4 sm:place-items-center" role="dialog" aria-label="Filters">
+              <div className="fixed inset-0 z-[60] grid place-items-end bg-black/40 p-4 sm:place-items-center" role="dialog" aria-label={t(lang, "filterTitle")}>
                 <div className="card max-h-[85dvh] w-full max-w-md overflow-y-auto p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-serif text-xl">Filters</h3>
-                    <button className="btn ghost min-h-11" type="button" onClick={() => setFiltersOpen(false)}>Close</button>
+                    <h3 className="font-serif text-xl">{t(lang, "filterTitle")}</h3>
+                    <button className="btn ghost min-h-11" type="button" onClick={() => setFiltersOpen(false)}>{t(lang, "filterClose")}</button>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Style audience">
-                    {config.showWomen && <button className="chip" type="button" aria-pressed={gender === "women"} onClick={() => chooseGender("women")}>{t(lang, "women")}</button>}
-                    {config.showMen && <button className="chip" type="button" aria-pressed={gender === "men"} onClick={() => chooseGender("men")}>{t(lang, "men")}</button>}
-                    {config.showKids && <button className="chip" type="button" aria-pressed={gender === "kids"} onClick={() => chooseGender("kids")}>{t(lang, "kids")}</button>}
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t(lang, "filterTitle")}>
+                    {LOOK_FILTERS.map((item) => (
+                      <button key={item.id} className="chip" type="button" aria-pressed={lookFilter === item.id} onClick={() => setLookFilter((current) => current === item.id ? "all" : item.id)}>
+                        {t(lang, item.labelKey)}
+                      </button>
+                    ))}
                   </div>
                   <div className="mt-3">
                     <HairTypePicker
@@ -1393,7 +1453,7 @@ export function TryOnApp({
                       onPick={(card) => selectLook({ id: card.id, name: card.name, serviceKeys: card.serviceKeys, tool: "style" })}
                     />
                   </div>
-                  <button className="btn secondary mt-4 min-h-11" type="button" onClick={() => { setPickedDensity(""); setPickedTexture(""); }}>Clear filters</button>
+                  <button className="btn secondary mt-4 min-h-11" type="button" onClick={() => { setLookFilter("all"); setPickedDensity(""); setPickedTexture(""); }}>{t(lang, "filterClear")}</button>
                 </div>
               </div>
             ) : null}
@@ -1414,9 +1474,8 @@ export function TryOnApp({
               preview: <span className="block h-16 w-full" style={{ background: item.hex }} />,
             }))}
             onSelect={(id) => pickShade(id)}
-            onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
-            onSave={saveCurrentStyle}
-            saveNote={savedFlash ? "Saved on this phone. Tap Saved looks to see it." : undefined}
+              onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+              {...saveLabels}
           />
         )}
 
@@ -1453,9 +1512,8 @@ export function TryOnApp({
               const brow = browList.find((item) => item.id === id);
               if (brow) selectLook({ id: brow.id, name: brow.name, serviceKeys: brow.serviceKeys, tool: "brows" });
             }}
-            onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
-            onSave={saveCurrentStyle}
-            saveNote={savedFlash ? "Saved on this phone. Tap Saved looks to see it." : undefined}
+              onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+              {...saveLabels}
           />
           </>
         )}
@@ -1477,9 +1535,8 @@ export function TryOnApp({
               const beard = config.beards.find((item) => item.id === id);
               if (beard) selectLook({ id: beard.id, name: beard.name, serviceKeys: beard.serviceKeys, tool: "beard" });
             }}
-            onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
-            onSave={saveCurrentStyle}
-            saveNote={savedFlash ? "Saved on this phone. Tap Saved looks to see it." : undefined}
+              onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+              {...saveLabels}
           />
         )}
 
@@ -1500,9 +1557,8 @@ export function TryOnApp({
               const nail = config.nails.find((item) => item.id === id);
               if (nail) selectLook({ id: nail.id, name: nail.name, serviceKeys: nail.serviceKeys, tool: "nails" });
             }}
-            onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
-            onSave={saveCurrentStyle}
-            saveNote={savedFlash ? "Saved on this phone. Tap Saved looks to see it." : undefined}
+              onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
+              {...saveLabels}
           />
         )}
       </section>
@@ -1510,58 +1566,10 @@ export function TryOnApp({
       </div>
       </>}
       <div data-page-foot="yes">
-      {demoHint && <p className="mt-8 text-center text-xs text-muted">Demo preview</p>}
-      {config.poweredBy && (
-        <p className="mt-10 flex items-center justify-center gap-2 text-xs text-muted">
-          <LookuviMark className="h-5 w-5" />
-          Powered by Lookuvi
-        </p>
-      )}
-      <p className="mt-6 text-center text-xs text-muted"><a href="/login">Salon login</a></p>
       <LegalFooter className="mt-auto px-0 pb-2" />
       </div>
       </div>
-    </div>
-  );
-}
-
-function SalonActions({
-  embed,
-  items,
-  bookHref,
-  chatHref,
-  queueHref,
-  bookLabel,
-  chatLabel,
-  queueLabel,
-}: {
-  embed: boolean;
-  items: Array<"book" | "queue" | "chat">;
-  bookHref: string;
-  chatHref: string;
-  queueHref: string;
-  bookLabel: string;
-  chatLabel: string;
-  queueLabel: string;
-}) {
-  const cols = items.length >= 3 ? "grid-cols-3" : items.length === 2 ? "grid-cols-2" : "grid-cols-1";
-  const width = items.length === 1 ? "sm:max-w-xs" : "sm:max-w-xl";
-  return (
-    <div data-salon-actions="yes" className={`salon-actions grid w-full ${cols} ${width} gap-2 py-3 ${embed ? "px-4" : ""}`}>
-      {items.map((item) => {
-        if (item === "book") {
-          return <a key={item} className="btn h-full w-full" href={bookHref} target="_blank" rel="noreferrer">{bookLabel}</a>;
-        }
-        if (item === "queue") {
-          return <a key={item} className="btn h-full w-full" href={queueHref}>{queueLabel}</a>;
-        }
-        return (
-          <a key={item} className="btn h-full w-full" href={chatHref} target="_blank" rel="noreferrer">
-            <WhatsAppGlyph />
-            {chatLabel}
-          </a>
-        );
-      })}
+      {embed ? null : <GuestNav slug={config.slug} lang={lang} joinHref={joinHref} current="try" />}
     </div>
   );
 }

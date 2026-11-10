@@ -9,15 +9,18 @@ describe("guest layout", () => {
   it("keeps the legal footer after the salon choice, not above it", () => {
     const footer = app.indexOf("<LegalFooter");
     const choice = app.indexOf("data-guest-tabs");
-    const login = app.indexOf("Salon login");
     expect(footer).toBeGreaterThan(choice);
-    expect(footer).toBeGreaterThan(login);
+    expect(app).not.toContain("Salon login");
+    expect(app).not.toContain("Demo preview");
+    expect(app).not.toContain("Powered by Lookuvi");
+    expect(app).toContain("<GuestNav");
   });
 
-  it("pins the bridal step bar to the top of the scrolling panel and highlights the current step", () => {
+  it("pins the bridal step bar under the header on the page scroll", () => {
     expect(bridal).toContain("current={activeStep}");
     expect(bridal).not.toContain('current="bridal-event"');
-    expect(css).toContain(".try-picks > .step-rail { top: 0;");
+    expect(css).toContain(".try-picks > .step-rail { top: 4.5rem;");
+    expect(css).not.toMatch(/\.try-picks \{[^}]*overflow:\s*auto/);
     expect(css).toMatch(/\.step-rail \{[^}]*background: #f3f0f8;/s);
   });
 

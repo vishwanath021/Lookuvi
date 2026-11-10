@@ -11,18 +11,6 @@ export function SettingsFocus({ reminder, rest }: { reminder: ReactNode; rest: R
     window.addEventListener("hashchange", read);
     return () => window.removeEventListener("hashchange", read);
   }, []);
-  if (hash === "#reminders") {
-    return (
-      <div>
-        {reminder}
-        <p className="mt-4 text-sm"><a className="underline" href="/admin/settings">All settings</a></p>
-      </div>
-    );
-  }
-  return (
-    <>
-      {reminder}
-      {rest}
-    </>
-  );
+  if (hash === "#reminders") return <>{reminder}</>;
+  return <>{rest}</>;
 }
