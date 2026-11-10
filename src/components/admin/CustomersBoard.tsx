@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { WhatsAppIcon } from "@/components/icons/ContactIcons";
 
 type Customer = {
   id: string;
@@ -303,11 +304,11 @@ function RowActions({
   return (
     <div className="flex shrink-0 items-center gap-1">
       {owner ? (
-        <button className="btn secondary h-11 w-11 shrink-0 p-0" type="button" aria-label={`Remind ${row.name || row.phoneLabel} on WhatsApp`} disabled={busy || blocked} onClick={() => onAct({ action: "comeback", ids: [row.id] })}>
+        <button className="btn secondary queue-icon" type="button" aria-label={`Remind ${row.name || row.phoneLabel} on WhatsApp`} disabled={busy || blocked} onClick={() => onAct({ action: "comeback", ids: [row.id] })}>
           <WhatsAppIcon />
         </button>
       ) : null}
-      <button className="btn secondary h-11 w-11 shrink-0 p-0" type="button" aria-label={`Points for ${row.name || row.phoneLabel}`} onClick={onAdjust}>⋯</button>
+      <button className="btn secondary queue-icon" type="button" aria-label={`Points for ${row.name || row.phoneLabel}`} onClick={onAdjust}>⋯</button>
     </div>
   );
 }
@@ -361,14 +362,6 @@ function AdjustSheet({
         <button className="btn ghost" type="button" onClick={onClose}>Close</button>
       </div>
     </div>
-  );
-}
-
-function WhatsAppIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="#128C7E">
-      <path d="M12 3a9 9 0 0 0-7.8 13.4L3 21l4.7-1.2A9 9 0 1 0 12 3zm5 12.2c-.2.6-1.2 1.1-1.7 1.2-.4.1-.9.2-2.6-.6-2.2-.9-3.6-3.1-3.7-3.2-.1-.2-1-1.3-1-2.5s.6-1.8.9-2c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .5.4.2.6.7 1.8.7 1.9.1.2 0 .3-.1.5l-.3.4c-.1.1-.2.2-.1.4.2.3.7 1.1 1.5 1.8 1 .8 1.8 1.1 2.1 1.2.2.1.4.1.5-.1l.4-.5c.1-.2.3-.2.5-.1.2.1 1.4.7 1.6.8.2.1.4.2.4.3.1.2 0 .8-.2 1.3z" />
-    </svg>
   );
 }
 
