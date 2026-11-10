@@ -14,6 +14,7 @@ describe("style thumbnails", () => {
     expect(card).toContain('loading="lazy"');
     expect(card).toContain("/thumbs/");
     const app = readFileSync("src/components/tryon/TryOnApp.tsx", "utf8");
-    expect(app).toContain('!showResult && !busy && tool === "brows"');
+    expect(app).toContain('label="brows"');
+    expect(app).not.toContain("data-brow-options");
   });
 });

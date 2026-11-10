@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as generate } from "@/app/api/v1/tryon/generate/route";
+import { POST as suggest } from "@/app/api/v1/tryon/suggest/route";
 import { auth } from "@/auth";
 import { deskUserId } from "@/lib/at-salon-gate";
 import { t } from "@/data/i18n";
@@ -248,5 +249,14 @@ describe("at-salon try-ons", () => {
     expect(res.status).toBe(403);
     expect((await res.json()).error).toBe("NOT_AT_SALON");
     expect(await prisma.tryOn.count({ where: { tenantId: tenant.id } })).toBe(0);
+    const suggestForm = new FormData();
+    suggestForm.set("slug", tenant.slug);
+    suggestForm.set("sessionId", "session-route-12345678");
+    suggestForm.set("gender", "women");
+    suggestForm.set("photo", new File([Uint8Array.from([1, 2, 3])], "selfie.jpg", { type: "image/jpeg" }));
+    await prisma.tenant.update({ where: { id: tenant.id }, data: { hairSuggestOn: true, toolStyle: true } });
+    const suggested = await suggest(new Request("http://localhost/api/v1/tryon/suggest", { method: "POST", body: suggestForm }));
+    expect(suggested.status).toBe(403);
+    expect((await suggested.json()).error).toBe("NOT_AT_SALON");
   });
 });

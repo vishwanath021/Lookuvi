@@ -50,21 +50,9 @@ test("brow cards are distinct diagrams and chips do not generate", async ({ page
   const narrow = await region.getByRole("button", { name: "Soft Arch" }).boundingBox();
   expect(narrow?.width ?? 0).toBeGreaterThanOrEqual(44);
 
+  await expect(page.getByRole("group", { name: "Brow thickness" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Brow colour" })).toHaveCount(0);
   await region.getByRole("button", { name: "Soft Arch" }).click();
-  const thickness = page.getByRole("group", { name: "Brow thickness" });
-  const colour = page.getByRole("group", { name: "Brow colour" });
-  for (const label of ["Thin", "Natural", "Bold"]) {
-    const chip = thickness.getByRole("button", { name: label, exact: true });
-    const box = await chip.boundingBox();
-    expect(box?.height ?? 0, label).toBeGreaterThanOrEqual(44);
-    await chip.click();
-  }
-  for (const label of ["Natural", "Soft brown", "Dark"]) {
-    const chip = colour.getByRole("button", { name: label, exact: true });
-    const box = await chip.boundingBox();
-    expect(box?.height ?? 0, label).toBeGreaterThanOrEqual(44);
-    await chip.click();
-  }
   expect(posts).toEqual([]);
   await expect(page.getByRole("button", { name: "Try this look" })).toBeVisible();
   await page.getByRole("button", { name: "Try this look" }).click();
