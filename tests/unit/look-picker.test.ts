@@ -3,7 +3,7 @@ import { filterLooks, lookTagsForStyle } from "@/lib/look-picker";
 
 describe("look picker", () => {
   it("tags length, curls, trending, and saved styles", () => {
-    expect(lookTagsForStyle({ id: "soft-bob", name: "Soft Bob", lengthCategory: "medium", texture: ["straight"] }, false)).toEqual(["medium", "trending"]);
+    expect(lookTagsForStyle({ id: "soft-bob", name: "Soft Bob", lengthCategory: "medium", texture: ["straight"] }, false)).toEqual(["medium", "straight", "trending"]);
     expect(lookTagsForStyle({ id: "shag", name: "Shag", lengthCategory: "medium", texture: ["curly"] }, true)).toEqual(["medium", "curly", "saved"]);
   });
 

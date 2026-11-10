@@ -47,6 +47,7 @@ describe("owner feature flags", () => {
       "Security",
     ]);
     expect(ownerNav({ ...off, onboardingDone: false }).map((link) => link.label)).toContain("Onboarding");
+    expect(ownerNav({ ...off, onboardingDone: true }).map((link) => link.label)).not.toContain("Onboarding");
   });
 
   it("shows queue only when that product is on, and hides try-on pages when it is off", () => {

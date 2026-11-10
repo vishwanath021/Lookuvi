@@ -16,7 +16,7 @@ test("bridal photo step, chips, one scrollbar, and live fps", async ({ page }, t
   await mkdir(OUT, { recursive: true });
   await page.goto("/s/demo");
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Bridal", exact: true })).toBeVisible();
+  await expect(page.locator("[data-bridal='flow']")).toBeVisible();
   await expect(page.getByRole("button", { name: "Bridal", exact: true })).toBeVisible();
   await expect(page.getByRole("group", { name: "Makeup style" })).toHaveCount(0);
   await expect(page.getByRole("group", { name: "Bridal looks style" })).toHaveCount(0);

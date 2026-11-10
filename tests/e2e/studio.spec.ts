@@ -164,7 +164,7 @@ test("bridal catalogue, selfie copy, and header stay put", async ({ page }) => {
   expect(await header.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(62, 48, 75)");
   await page.screenshot({ path: `${SHOTS}/375-everyday.png` });
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Bridal", exact: true })).toBeVisible();
+  await expect(page.locator("[data-bridal='flow']")).toBeVisible();
   await expect(page.locator("[data-photo-box='face']").getByText("Face the light. No sunglasses.")).toBeVisible();
   const slot = page.locator("[data-photo-box='face']");
   const liveMakeup = page.getByRole("button", { name: "Live capture", exact: true });

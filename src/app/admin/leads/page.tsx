@@ -32,7 +32,10 @@ export default async function LeadsPage() {
   return (
     <main>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="page-title">Leads</h1>
+        <div>
+          <h1 className="page-title">Leads</h1>
+          <p className="mt-1 text-sm text-muted">People who asked to book a look they tried.</p>
+        </div>
         {/* File download, not a client navigation. */}
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         {canExport ? <a className="btn" href="/api/v1/admin/leads/export">Download CSV</a> : <p className="text-sm text-muted">Lead export is included with Standard and Pro.</p>}

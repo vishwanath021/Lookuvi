@@ -6,7 +6,6 @@ import { SalonPaused } from "@/components/guest/SalonPaused";
 import { TryOnUnavailable } from "@/components/guest/TryOnUnavailable";
 import { AtSalonProvider } from "@/components/guest/AtSalonNote";
 import { TryOnApp } from "@/components/tryon/TryOnApp";
-import { usingDemoProvider } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { verifySalonToken } from "@/lib/preview-access";
 import { loadTenantByHost, loadTenantBySlug, toSalonConfig } from "@/lib/salon";
@@ -45,17 +44,6 @@ export default async function SalonPage({
   const config = await toSalonConfig(tenant);
   const salonMode = verifySalonToken(query.salon || "", tenant.id, tenant.salonNonce);
   const session = await auth();
-  let demoHint = false;
-  if (usingDemoProvider() && session?.user?.id) {
-    if (session.user.isSuperAdmin) demoHint = true;
-    else {
-      const owner = await prisma.membership.findFirst({
-        where: { userId: session.user.id, tenantId: tenant.id, role: "OWNER" },
-        select: { id: true },
-      });
-      demoHint = Boolean(owner);
-    }
-  }
   return (
     <AtSalonProvider slug={tenant.slug} lang={config.defaultLang}>
     <TryOnApp
@@ -65,7 +53,6 @@ export default async function SalonPage({
       initialShadeId={query.shade}
       salonToken={salonMode ? query.salon : undefined}
       salonMode={salonMode}
-      demoHint={demoHint}
       poseDebug={Boolean(session?.user?.isSuperAdmin)}
       showQueue={tenant.productQueue}
       queueMode={tenant.productQueue ? (await prisma.queueState.findUnique({ where: { tenantId: tenant.id }, select: { mode: true } }))?.mode : "LIVE"}

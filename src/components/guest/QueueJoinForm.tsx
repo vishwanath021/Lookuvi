@@ -9,6 +9,7 @@ import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import { kolkataDayKey } from "@/lib/queue/day";
 import { parseVisitMemory, rememberVisit, serializeVisitMemory, visitMemoryKey, type VisitMemory } from "@/lib/queue/visit-memory";
+import { serviceChoiceLabel } from "@/lib/service-label";
 
 type Board = {
   name: string;
@@ -25,7 +26,7 @@ type Board = {
   hoursMessage?: string;
   todayHours?: string;
   nextOpen?: string;
-  services: { id: string; name: string; minutes: number }[];
+  services: { id: string; name: string; minutes: number; priceInr: number }[];
 };
 
 export function QueueJoinForm({ initial }: { initial: Board }) {
@@ -176,7 +177,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
         <label className="text-sm">{t(lang, "queueService")}
           <select className="field mt-1" value={serviceId} onChange={(event) => setServiceId(event.target.value)}>
             <option value="">{t(lang, "queueNoService")}</option>
-            {board.services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+            {board.services.map((service) => <option key={service.id} value={service.id}>{serviceChoiceLabel(service)}</option>)}
           </select>
         </label>
         {request ? (

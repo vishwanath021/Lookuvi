@@ -274,7 +274,7 @@ test("an owner can replace the salon logo and restore the Lookuvi mark", async (
     await expect(page.getByText("Settings saved.")).toBeVisible();
     await page.goto("/s/demo");
     await expect(page.locator("header img")).toHaveAttribute("src", /^data:image\/jpeg/);
-    await expect(page.getByText("Demo preview")).toBeVisible();
+    await expect(page.getByText("Demo preview")).toHaveCount(0);
     await page.goto("/admin/settings");
     await page.getByRole("button", { name: "Use Lookuvi mark" }).click();
     await page.getByRole("button", { name: "Save", exact: true }).click();

@@ -69,8 +69,6 @@ export function CustomersBoard({
   const [form, setForm] = useState(settings);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
-  const [phone, setPhone] = useState("");
-  const [name, setName] = useState("");
   const [offer, setOffer] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -125,41 +123,6 @@ export function CustomersBoard({
         {whatsapp !== "ready" ? <p className="rounded-xl bg-[#f8efdc] px-3 py-2 text-sm" role="status">WhatsApp is not connected. Reminders are paused.</p> : null}
       </section>
 
-      <form
-        className="card grid gap-2 p-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void act({ action: "add", phone, name }).then((ok) => {
-            if (ok) {
-              setPhone("");
-              setName("");
-            }
-          });
-        }}
-      >
-        <h2 className="text-base font-semibold">Add customer</h2>
-        <div className="flex flex-wrap gap-2">
-          <input className="field min-w-0 flex-1" inputMode="tel" aria-label="Phone" placeholder="Phone" value={phone} onChange={(event) => setPhone(event.target.value)} required />
-          <input className="field min-w-0 flex-1" aria-label="Name" placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
-          <button className="btn" type="submit" disabled={busy}>Add</button>
-        </div>
-        <label className="text-sm">
-          CSV
-          <input
-            className="mt-1 block text-sm"
-            type="file"
-            accept=".csv,text/csv,text/plain"
-            aria-label="CSV upload"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (!file) return;
-              void file.text().then((text) => act({ action: "import", text }));
-              event.target.value = "";
-            }}
-          />
-        </label>
-      </form>
-
       {owner ? (
         <form
           className="card grid gap-2 p-4"
@@ -194,7 +157,10 @@ export function CustomersBoard({
           }}
         >
           <input className="field min-w-0 flex-1" maxLength={180} aria-label="Offer" value={offer} onChange={(event) => setOffer(event.target.value)} placeholder="Offer" />
-          <button className="btn" type="submit" disabled={busy}>Send offer</button>
+          <div className="grid gap-1">
+            <button className="btn" type="submit" disabled={busy}>Send this offer on WhatsApp to all customers</button>
+            <p className="text-sm text-muted">It goes to everyone in your customer list, until this month&apos;s WhatsApp limit is used.</p>
+          </div>
         </form>
       ) : null}
 
@@ -322,7 +288,6 @@ function NotBackYet({
       <div>
         <h2 className="text-base font-semibold">Not back yet</h2>
         <p className="mt-1 text-sm" data-lapsed-summary="yes">{lapsed.summary}</p>
-        <p className="text-sm text-muted">Two come-back messages per visit: one around 6 weeks, one at 2 months. Then it stops until the next visit. These three groups stay fixed so a customer is not messaged again after that. To change who shows on Due for a visit, set Days since their last visit in Reminders.</p>
       </div>
       {!ready ? (
         <p className="rounded-xl bg-[#f8efdc] px-3 py-2 text-sm" role="status">

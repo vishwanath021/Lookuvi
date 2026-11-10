@@ -20,8 +20,20 @@ export const LOOK_CATEGORIES = [
   { id: "medium", label: "Medium" },
   { id: "long", label: "Long" },
   { id: "curly", label: "Curly" },
+  { id: "straight", label: "Straight" },
   { id: "trending", label: "Trending" },
-  { id: "saved", label: "Saved looks" },
+  { id: "saved", label: "Saved" },
+] as const;
+
+/** Hair filters that live in the Filters popup, not on the try-on page. */
+export const LOOK_FILTERS = [
+  { id: "short", labelKey: "filterShort" },
+  { id: "medium", labelKey: "filterMedium" },
+  { id: "long", labelKey: "filterLong" },
+  { id: "curly", labelKey: "curly" },
+  { id: "straight", labelKey: "straight" },
+  { id: "trending", labelKey: "filterTrending" },
+  { id: "saved", labelKey: "filterSaved" },
 ] as const;
 
 export function lookTagsForStyle(
@@ -31,6 +43,7 @@ export function lookTagsForStyle(
   const tags = new Set<string>();
   if (style.lengthCategory) tags.add(style.lengthCategory);
   if (style.texture?.includes("curly") || style.referenceTexture === "curly" || /curl/i.test(style.name)) tags.add("curly");
+  if (style.texture?.includes("straight") || style.referenceTexture === "straight" || /straight/i.test(style.name)) tags.add("straight");
   if (TRENDING.has(style.id)) tags.add("trending");
   if (saved) tags.add("saved");
   return [...tags];

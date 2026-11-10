@@ -301,21 +301,18 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
         onCapture={(blob) => { void onFile(new File([blob], "selfie.jpg", { type: "image/jpeg" })); }}
       />
       <ConsentSheet open={consent.open} lang={config.defaultLang || "en"} onAgree={(ageGate) => void consent.agree(ageGate)} onClose={consent.close} />
-      <div className="md:grid md:grid-cols-[240px_minmax(0,1fr)_240px] md:items-start md:gap-4">
-        <div className="max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:max-h-[52dvh] max-md:overflow-y-auto max-md:rounded-t-2xl max-md:border max-md:border-line max-md:bg-white max-md:p-3 max-md:shadow-[0_-8px_24px_rgba(62,48,75,0.12)] md:contents">
-          <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-[var(--line)] md:hidden" />
-          <div className="md:sticky md:top-4 md:col-start-1 md:max-h-[calc(100dvh-2rem)] md:overflow-y-auto md:pr-1">
-            {controls}
-            <div className="mt-3 md:hidden">{actions}</div>
-          </div>
-          <div className="md:sticky md:top-4 md:col-start-3 md:row-start-1 md:max-h-[calc(100dvh-2rem)] md:overflow-y-auto">
-            {looks}
-          </div>
+      <div className="grid items-start gap-4 md:grid-cols-[240px_minmax(0,1fr)_240px]">
+        <div className="md:col-start-1 md:row-start-1">
+          {controls}
+          <div className="mt-3 md:hidden">{actions}</div>
         </div>
-        <div className="md:sticky md:top-4 md:col-start-2 md:row-start-1 md:self-start max-md:mb-[54dvh]">
+        <div className="md:col-start-3 md:row-start-1">
+          {looks}
+        </div>
+        <div className="max-md:order-first md:sticky md:top-4 md:col-start-2 md:row-start-1 md:self-start">
           {!photo ? (
             <div className="card grid min-h-64 place-items-center gap-3 p-6 text-center">
-              <p className="font-serif text-2xl">Makeup</p>
+              <p className="text-base font-medium">Add a photo to try makeup.</p>
               <div className="flex w-full max-w-xs gap-2">
                 <button className="btn secondary flex-1" type="button" onClick={() => uploadRef.current?.click()}>Upload</button>
                 <button className="btn flex-1" type="button" data-photo-action="camera" onClick={() => consent.gate(() => setCameraOpen(true))}>Take photo</button>

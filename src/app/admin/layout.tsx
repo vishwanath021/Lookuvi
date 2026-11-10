@@ -14,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     orderBy: { tenant: { name: "asc" } },
   });
   return (
-    <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 md:grid-cols-[240px_1fr] print:block print:max-w-none print:p-0">
+    <div className="grid w-full gap-6 px-3 py-6 md:grid-cols-[240px_minmax(0,1fr)] md:px-4 print:block print:max-w-none print:p-0">
       <AdminNav
         role={membership.role}
         name={tenant.name}

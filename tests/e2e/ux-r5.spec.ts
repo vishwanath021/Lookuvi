@@ -28,7 +28,7 @@ test("stepper, swatches, and no preview before Try now", async ({ page }, testIn
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/s/demo");
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Bridal", exact: true })).toBeVisible();
+  await expect(page.locator("[data-bridal='flow']")).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Bridal steps" })).toBeVisible();
   await expect(page.getByRole("button", { name: "1. The event" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Try now" })).toBeDisabled();
@@ -57,7 +57,7 @@ test("stepper, swatches, and no preview before Try now", async ({ page }, testIn
   await page.screenshot({ path: `${OUT}/bridal-1280.png` });
 
   await page.getByRole("button", { name: "Groom", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Groom", exact: true })).toBeVisible();
+  await expect(page.locator("[data-groom='flow']")).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Groom steps" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Try now" }).first()).toBeDisabled();
   await page.screenshot({ path: `${OUT}/groom-1280.png` });

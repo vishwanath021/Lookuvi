@@ -12,7 +12,7 @@ async function shot(page: Page, name: string) {
 async function openBridalResult(page: Page) {
   await page.goto("/s/demo");
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Bridal", exact: true })).toBeVisible();
+  await expect(page.locator("[data-bridal='flow']")).toBeVisible();
   const selfie = page.locator("#bridal-selfie");
   await selfie.locator("[data-photo='bridal']").setInputFiles(FACE);
   await expect(selfie.getByRole("img", { name: "Your selfie" })).toBeVisible();

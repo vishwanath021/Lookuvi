@@ -26,22 +26,31 @@ export default async function SettingsPage() {
   const origin = await salonGuestOrigin(tenant.id, tenant.slug);
   const salonModeUrl = tenant.salonNonce ? `${origin}/?salon=${signSalonToken(tenant.id, tenant.salonNonce)}` : "";
   return (
-    <main>
-      <h1 className="mb-4 page-title">Settings</h1>
-      <p className="mb-4 text-sm">Guests choose a service from your own list when they join the queue. <a className="underline" href="/admin/services">Edit services</a></p>
+    <main className="max-w-3xl">
       <SettingsFocus
         reminder={(
-          <div className="mb-4">
-            <ReminderSettingsCard
-              initial={{
-                reminderDays: tenant.reminderDays,
-                reminderTemplate: tenant.reminderTemplate,
-                reminderMethod: tenant.reminderMethod,
-              }}
-            />
-          </div>
+          <ReminderSettingsCard
+            messageOnly
+            initial={{
+              reminderDays: tenant.reminderDays,
+              reminderTemplate: tenant.reminderTemplate,
+              reminderMethod: tenant.reminderMethod,
+            }}
+          />
         )}
         rest={(
+      <>
+      <h1 className="mb-4 page-title">Settings</h1>
+      <p className="mb-4 text-sm">Guests choose a service from your own list when they join the queue. <a className="underline" href="/admin/services">Edit services</a></p>
+      <div className="mb-4">
+        <ReminderSettingsCard
+          initial={{
+            reminderDays: tenant.reminderDays,
+            reminderTemplate: tenant.reminderTemplate,
+            reminderMethod: tenant.reminderMethod,
+          }}
+        />
+      </div>
       <SettingsForm
         salonModeUrl={salonModeUrl}
         selfId={membership.userId}
@@ -89,6 +98,7 @@ export default async function SettingsPage() {
           rewards: rewards.map((reward) => ({ name: reward.name, cost: reward.cost })),
         }}
       />
+      </>
         )}
       />
     </main>

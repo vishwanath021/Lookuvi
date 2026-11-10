@@ -110,8 +110,11 @@ test("a photo is painted on the device and photoreal stays a sample", async ({ p
   }
 
   await page.getByRole("button", { name: /Photoreal/ }).click();
-  const agree = page.getByRole("button", { name: "I agree, start" });
-  if (await agree.isVisible().catch(() => false)) await agree.click();
+  const sheet = page.getByRole("dialog", { name: "Before we use a photo" });
+  if (await sheet.isVisible().catch(() => false)) {
+    await page.getByRole("checkbox", { name: /18 or older/ }).check();
+    await page.getByRole("button", { name: /I agree/ }).click();
+  }
   await expect(page.locator("[data-makeup-result='sample']")).toBeVisible({ timeout: 60_000 });
   if (project === "android") await shot(page, "photoreal-sample");
 
