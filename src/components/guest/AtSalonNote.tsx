@@ -108,11 +108,10 @@ export function AtSalonNote({ lang }: { lang: string }) {
   const state = useAtSalon();
   if (!state.required || !state.ready) return null;
   const locked = !state.unlocked;
+  if (locked && state.staffAdded <= 0 && !state.note) return null;
   return (
     <div className="mt-3 grid gap-2" data-at-salon={locked ? "locked" : state.remaining > 0 ? "unlocked" : "ask"}>
-      <p className="text-sm" role="status">
-        {locked ? t(lang, "atSalonLocked") : state.remaining > 0 ? unlockedLine(lang, state.remaining) : null}
-      </p>
+      {!locked && state.remaining > 0 ? <p className="text-sm" role="status">{unlockedLine(lang, state.remaining)}</p> : null}
       {state.staffAdded > 0 ? <p className="text-sm" role="status" data-staff-added="yes">{staffLine(lang, state.staffAdded)}</p> : null}
       {!locked && state.remaining <= 0 ? (
         <button className="btn w-full" type="button" data-ask-tries="yes" disabled={state.askWait} onClick={() => void state.ask()}>

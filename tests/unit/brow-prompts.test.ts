@@ -105,8 +105,11 @@ describe("brow prompts", () => {
 
   it("changes the prompt on Try and leaves chip clicks as state", async () => {
     const app = readFileSync("src/components/tryon/TryOnApp.tsx", "utf8");
-    expect(app).toContain("onClick={() => setBrowThickness(item.id)}");
-    expect(app).toContain("onClick={() => setBrowColour(item.id)}");
+    expect(app).not.toContain("data-brow-options");
+    expect(app).not.toContain("setBrowThickness(item.id)");
+    expect(app).not.toContain("setBrowColour(item.id)");
+    expect(app).toContain('const browThickness: BrowThickness = "natural"');
+    expect(app).toContain('const browColour: BrowColour = "natural"');
     expect(app).toContain('body.set("browThickness", browThickness)');
     expect(app).toContain('body.set("browColour", browColour)');
     expect(app).toContain("<BrowCard ");

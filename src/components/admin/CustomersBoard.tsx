@@ -255,7 +255,7 @@ function CustomerTable({
         <>
           <div className="grid md:hidden">
             {rows.map((row) => (
-              <CustomerCard key={row.id} row={row} pending={pending} owner={owner} onAct={onAct} onAdjust={() => setAdjust(row)} />
+              <CustomerCard key={row.id} row={row} onAdjust={() => setAdjust(row)} />
             ))}
           </div>
           <div className="hidden overflow-x-hidden rounded-[14px] border border-line bg-white md:block">
@@ -274,12 +274,15 @@ function CustomerTable({
                 {rows.map((row) => (
                   <tr key={row.id} className="border-t border-line" data-customer-phone={row.phone}>
                     <td className="truncate px-3 py-2 font-medium">{row.name || "No name"}</td>
-                    <td className="nums truncate px-3 py-2 font-normal">{row.phoneLabel}</td>
+                    <td className="px-3 py-2">
+                      <p className="nums truncate font-normal">{row.phoneLabel}</p>
+                      <ContactLinks phone={row.phone} compact />
+                    </td>
                     <td className="nums px-3 py-2 font-normal">{row.visitCount}</td>
                     <td className="nums truncate px-3 py-2 font-normal">{row.lastVisitLabel}</td>
                     <td className="nums px-3 py-2 font-normal" data-customer-points={row.points}>{row.points}</td>
                     <td className="px-3 py-2">
-                      <RowActions row={row} pending={pending} owner={owner} onAct={onAct} onAdjust={() => setAdjust(row)} />
+                      <RowActions row={row} onAdjust={() => setAdjust(row)} />
                     </td>
                   </tr>
                 ))}
@@ -310,15 +313,9 @@ function contactLinks(phone: string) {
 
 function CustomerCard({
   row,
-  pending,
-  owner,
-  onAct,
   onAdjust,
 }: {
   row: Customer;
-  pending: string;
-  owner: boolean;
-  onAct: (body: Record<string, unknown>, key: string) => Promise<{ ok?: boolean; balance?: number; history?: PointRow[]; message?: string }>;
   onAdjust: () => void;
 }) {
   return (
@@ -331,45 +328,33 @@ function CustomerCard({
         <p className="truncate text-xs text-muted">{row.phoneLabel} · {row.visitCount} {row.visitCount === 1 ? "visit" : "visits"} · {row.lastVisitLabel}</p>
         <ContactLinks phone={row.phone} />
       </div>
-      <RowActions row={row} pending={pending} owner={owner} onAct={onAct} onAdjust={onAdjust} />
+      <RowActions row={row} onAdjust={onAdjust} />
     </article>
   );
 }
 
-function ContactLinks({ phone }: { phone: string }) {
+function ContactLinks({ phone, compact = false }: { phone: string; compact?: boolean }) {
   const links = contactLinks(phone);
   if (!links) return <p className="text-xs text-muted">No phone</p>;
+  const size = compact ? "inline-flex items-center gap-1" : "inline-flex min-h-11 items-center gap-1";
   return (
-    <p className="mt-1 flex gap-2 text-xs">
-      <a className="inline-flex min-h-11 items-center gap-1" href={links.callUrl}><PhoneIcon /> Call</a>
-      <a className="inline-flex min-h-11 items-center gap-1" href={links.whatsappUrl} target="_blank" rel="noreferrer"><WhatsAppIcon /> WhatsApp</a>
+    <p className="mt-1 flex gap-3 text-xs">
+      <a className={size} href={links.callUrl}><PhoneIcon /> Call</a>
+      <a className={size} href={links.whatsappUrl} target="_blank" rel="noreferrer"><WhatsAppIcon /> WhatsApp</a>
     </p>
   );
 }
 
 function RowActions({
   row,
-  pending,
-  owner,
-  onAct,
   onAdjust,
 }: {
   row: Customer;
-  pending: string;
-  owner: boolean;
-  onAct: (body: Record<string, unknown>, key: string) => Promise<{ ok?: boolean }>;
   onAdjust: () => void;
 }) {
-  const blocked = row.stop || row.optedOut;
-  const key = `remind-${row.id}`;
   return (
     <div className="flex shrink-0 items-center gap-1">
-      {owner ? (
-        <button className="btn secondary queue-icon" type="button" aria-label={`Remind ${row.name || row.phoneLabel} on WhatsApp`} disabled={pending === key || blocked} onClick={() => void onAct({ action: "comeback", ids: [row.id] }, key)}>
-          <WhatsAppIcon />
-        </button>
-      ) : null}
-      <button className="btn secondary queue-icon" type="button" aria-label={`Points for ${row.name || row.phoneLabel}`} onClick={onAdjust}>⋯</button>
+      <button className="btn secondary queue-icon" type="button" aria-label={`Menu for ${row.name || row.phoneLabel}`} onClick={onAdjust}>⋯</button>
     </div>
   );
 }
@@ -422,7 +407,9 @@ function PointsEditor({
   const [saved, setSaved] = useState("");
   const [balance, setBalance] = useState(row.points);
   const [history, setHistory] = useState<PointRow[]>([]);
+  const [remindNote, setRemindNote] = useState("");
   const saving = pending === "adjust";
+  const reminding = pending === `remind-${row.id}`;
 
   useEffect(() => {
     let alive = true;
@@ -436,6 +423,23 @@ function PointsEditor({
     <>
       <h2 className="text-base font-semibold">{row.name || "No name"}</h2>
       <p className="nums text-sm font-normal" data-points-balance={balance}>Balance is {balance}.</p>
+      {owner ? (
+        <button
+          className="btn secondary"
+          type="button"
+          disabled={reminding || row.stop || row.optedOut}
+          onClick={() => {
+            setRemindNote("");
+            void onAct({ action: "comeback", ids: [row.id] }, `remind-${row.id}`).then((result) => {
+              setRemindNote(result?.message || "That did not work.");
+            });
+          }}
+        >
+          {reminding ? "Sending…" : "Remind on WhatsApp"}
+        </button>
+      ) : null}
+      {row.stop || row.optedOut ? <p className="text-sm text-muted">Reminders are off for this number.</p> : null}
+      {remindNote ? <Notice tone={/not connected|nothing was sent|not yet|wait/i.test(remindNote) ? "warning" : /did not|could not/i.test(remindNote) ? "error" : "success"}>{remindNote}</Notice> : null}
       {row.stop ? <Notice tone="warning">Replied STOP</Notice> : null}
       {!row.stop && row.canResume && !owner ? <p className="text-sm text-muted">Stopped at the desk</p> : null}
       {!row.stop && row.canResume && owner ? (

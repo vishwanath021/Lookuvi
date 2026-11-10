@@ -242,7 +242,7 @@ describe("mocked hair reading", () => {
     const refused = await suggestPost(new Request("http://localhost/api/v1/tryon/suggest", { method: "POST", body: form }));
     expect(refused.status).toBe(403);
     process.env.SUGGEST_MODEL = "gpt-4.1";
-    await prisma.tenant.update({ where: { id: tenantId }, data: { hairSuggestOn: true } });
+    await prisma.tenant.update({ where: { id: tenantId }, data: { hairSuggestOn: true, tryOnsAtSalon: false } });
     await prisma.consentLog.create({
       data: {
         tenantId,

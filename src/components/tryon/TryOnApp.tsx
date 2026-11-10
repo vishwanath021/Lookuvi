@@ -22,7 +22,7 @@ import { BrowCard } from "@/components/tryon/BrowCard";
 import { ColourStage } from "@/components/tryon/ColourStage";
 import { HairTypePicker } from "@/components/tryon/HairTypePicker";
 import { StyleCard } from "@/components/tryon/StyleCard";
-import { BROW_COLOURS, BROW_THICKNESS, browsForAudience, type BrowColour, type BrowThickness } from "@/data/brows";
+import { browsForAudience, type BrowColour, type BrowThickness } from "@/data/brows";
 import { guestPageLocale, t } from "@/data/i18n";
 import { styleHasPhoto } from "@/data/style-photos";
 import { LOOK_FILTERS, lookTagsForStyle } from "@/lib/look-picker";
@@ -234,8 +234,9 @@ export function TryOnApp({
   const [tool, setTool] = useState<TryTool>(firstTool(config, initialTool));
   const [gender, setGender] = useState<Audience>(config.showWomen ? "women" : config.showMen ? "men" : "kids");
   const [styleId, setStyleId] = useState("");
-  const [browThickness, setBrowThickness] = useState<BrowThickness>("natural");
-  const [browColour, setBrowColour] = useState<BrowColour>("natural");
+  const browThickness: BrowThickness = "natural";
+  const browColour: BrowColour = "natural";
+  const [unlockSheet, setUnlockSheet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [busyTool, setBusyTool] = useState<TryTool | null>(null);
   const [pickedDensity, setPickedDensity] = useState("");
@@ -735,6 +736,7 @@ export function TryOnApp({
   }
 
   async function suggestHair() {
+    if (showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon)) return;
     if (!faceShot) {
       needPhoto();
       return;
@@ -801,7 +803,10 @@ export function TryOnApp({
     setPicked((current) => ({ ...current, [chosen.tool]: chosen.id }));
     setTool(chosen.tool);
     setError("");
-    if (showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon)) return;
+    if (showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon)) {
+      if (generate) setUnlockSheet(true);
+      return;
+    }
     if (!shotRefFor(chosen.tool)) {
       pendingLook.current = chosen;
       setError(t(lang, chosen.tool === "nails" ? "uploadHand" : "addPhotoFirst"));
@@ -823,7 +828,10 @@ export function TryOnApp({
       frameRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
-    if (atSalon.required && !atSalon.unlocked) return;
+    if (atSalon.required && !atSalon.unlocked) {
+      setUnlockSheet(true);
+      return;
+    }
     if (previewLock.current) return;
     previewLock.current = true;
     pendingLook.current = null;
@@ -1129,15 +1137,6 @@ export function TryOnApp({
 
       <div className="try-desk mt-4">
       <div className="try-preview" ref={previewDockRef}>
-      {lockedBrowse ? (
-        <section ref={frameRef} className="card p-4" aria-label="Photo" data-browse-locked="yes">
-          <p className="text-sm">{t(lang, "atSalonLocked")}</p>
-          <button className="btn secondary mt-3 min-h-11" type="button" aria-pressed={chosenSaved} disabled={!chosenNow()} onClick={toggleCurrentStyle}>{chosenSaved ? t(lang, "unsaveThisLook") : t(lang, "saveThisLook")}</button>
-          {savedFlash ? <p className="mt-2 text-sm" role="status">{t(lang, "atSalonSaved")}</p> : null}
-          {savedPicks.length > 0 ? <p className="mt-2 text-sm">Saved: {savedPicks.map((item) => item.name).join(", ")}</p> : null}
-        </section>
-      ) : (
-      <>
       <section
         ref={frameRef}
         className={`try-shot ${generatingHere || showResult ? `ai-photo ${showResult ? "is-ready" : "is-working"}${freshGlow ? " is-fresh" : ""}` : "overflow-hidden rounded-[14px] border border-line bg-white shadow-lift"}`}
@@ -1323,13 +1322,11 @@ export function TryOnApp({
           <button className="btn secondary" type="button" onClick={() => resetForAnotherPhoto()}>{t(lang, "tryAnotherShort")}</button>
         </div>
       )}
-      </>
-      )}
       </div>
       {miniPreview ? (
         <div className="try-mini" data-mini-preview="yes">
           {(showResult && active) || activeShot ? <img src={showResult && active ? active.after : activeShot?.url} alt="" /> : null}
-          <p className="min-w-0 flex-1 truncate text-sm">{showResult && active ? active.styleName : activeShot ? "Your photo" : salonLocked ? t(lang, "atSalonLocked") : "Your preview"}</p>
+          <p className="min-w-0 flex-1 truncate text-sm">{showResult && active ? active.styleName : activeShot ? "Your photo" : "Your preview"}</p>
         </div>
       ) : null}
       <div className="try-picks">
@@ -1388,7 +1385,7 @@ export function TryOnApp({
               category={lookFilter}
               selectedId={styleId}
               disabled={busy}
-              tryDisabled={salonLocked}
+              tryDisabled={false}
               {...saveLabels}
               items={[
                 ...shownStyles.map((style) => {
@@ -1438,7 +1435,7 @@ export function TryOnApp({
                   <div className="mt-3">
                     <HairTypePicker
                       pickerOn={config.hairPickerOn}
-                      suggestOn={!lockedBrowse && config.hairSuggestOn}
+                      suggestOn={!salonLocked && config.hairSuggestOn}
                       usesCredits={config.hairSuggestUsesCredits}
                       density={pickedDensity}
                       texture={pickedTexture}
@@ -1467,7 +1464,7 @@ export function TryOnApp({
             label="shades"
             selectedId={shadeId}
             disabled={busy}
-            tryDisabled={salonLocked}
+            tryDisabled={false}
             items={config.shades.map((item) => ({
               id: item.id,
               name: item.name,
@@ -1482,26 +1479,12 @@ export function TryOnApp({
 
         {tool === "brows" && (
           <>
-          {!showResult && !busy && tool === "brows" ? (
-            <div className="mb-3 grid gap-3" data-brow-options="yes">
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Brow thickness">
-                {BROW_THICKNESS.map((item) => (
-                  <button key={item.id} className="chip" type="button" aria-pressed={browThickness === item.id} onClick={() => setBrowThickness(item.id)}>{item.label}</button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Brow colour">
-                {BROW_COLOURS.map((item) => (
-                  <button key={item.id} className="chip" type="button" aria-pressed={browColour === item.id} onClick={() => setBrowColour(item.id)}>{item.label}</button>
-                ))}
-              </div>
-            </div>
-          ) : null}
           <LookPicker
             key="brows"
             label="brows"
             selectedId={styleId}
             disabled={busy}
-            tryDisabled={salonLocked}
+            tryDisabled={false}
             items={browList.map((brow) => ({
               id: brow.id,
               name: brow.name,
@@ -1525,7 +1508,7 @@ export function TryOnApp({
             label="beards"
             selectedId={styleId}
             disabled={busy}
-            tryDisabled={salonLocked}
+            tryDisabled={false}
             items={config.beards.map((beard) => ({
               id: beard.id,
               name: beard.name,
@@ -1547,7 +1530,7 @@ export function TryOnApp({
             label="nails"
             selectedId={styleId}
             disabled={busy}
-            tryDisabled={salonLocked}
+            tryDisabled={false}
             items={config.nails.map((nail) => ({
               id: nail.id,
               name: nail.name,
@@ -1565,6 +1548,21 @@ export function TryOnApp({
       </section>
       </div>
       </div>
+      {unlockSheet ? (
+        <div className="fixed inset-0 z-50 grid items-end bg-black/40 p-3 sm:place-items-center" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setUnlockSheet(false); }}>
+          <div className="card grid w-full max-w-sm gap-3 overflow-hidden p-4" role="dialog" aria-label={t(lang, "atSalonDesireTitle")} data-unlock-sheet="yes">
+            <img src="/samples/portrait.jpg" alt="" className="h-40 w-full rounded-xl object-cover object-top" />
+            <h2 className="font-serif text-2xl leading-tight">{t(lang, "atSalonDesireTitle")}</h2>
+            <p className="text-sm leading-6 text-muted">{t(lang, "atSalonDesireBody")}</p>
+            <button className="btn min-h-11" type="button" disabled={!chosenNow()} onClick={toggleCurrentStyle}>{chosenSaved ? t(lang, "unsaveThisLook") : t(lang, "saveThisLook")}</button>
+            {showQueue ? (
+              <a className="btn secondary min-h-11 text-center" href={joinHref}>{t(lang, "atSalonJoin")}</a>
+            ) : (
+              <button className="btn secondary min-h-11" type="button" onClick={() => setUnlockSheet(false)}>{t(lang, "atSalonGotIt")}</button>
+            )}
+          </div>
+        </div>
+      ) : null}
       </>}
       <div data-page-foot="yes">
       <LegalFooter className="mt-auto px-0 pb-2" />
