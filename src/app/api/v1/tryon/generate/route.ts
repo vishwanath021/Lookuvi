@@ -19,7 +19,7 @@ import { classifySkinPhoto } from "@/lib/hand-photo";
 import { sanitizeSelfie, ImageError } from "@/lib/images";
 import { logPlacementRejection, poseGate, TRY_ANOTHER_PHOTO } from "@/lib/face/region";
 import { parseLandmarks, type PlacementDebug } from "@/lib/face/pose";
-import { AI_PREVIEW_KINDS, actorKeyFor, capForTier, hashIp, readGuestToken, verifySalonToken, type PreviewTier } from "@/lib/preview-access";
+import { AI_PREVIEW_KINDS, actorKeyFor, capForTier, hashIp, readGuestToken, type PreviewTier } from "@/lib/preview-access";
 import { ensurePhotoConsent } from "@/lib/photo-consent";
 import { prisma } from "@/lib/prisma";
 import { requestClientIp } from "@/lib/ratelimit";
@@ -152,12 +152,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "STYLE", message: "That style is not on this salon's menu." }, { status: 400 });
   }
 
-  const salonToken = String(form.get("salonToken") || "");
-  const salonOk = verifySalonToken(salonToken, tenant.id, tenant.salonNonce);
   const jar = await cookies();
   const guest = readGuestToken(jar.get("helix_guest")?.value);
   const member = guest && guest.tenantId === tenant.id ? guest : null;
-  const tier: PreviewTier = salonOk ? "salon" : member ? "member" : "anon";
+  const tier: PreviewTier = member ? "member" : "anon";
   const ipHash = hashIp(ip);
   const actorKey = actorKeyFor(tier, ipHash, member?.customerId);
   const limit = staffId ? null : capForTier(tier, tenant.anonDailyCap, tenant.memberDailyCap);

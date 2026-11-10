@@ -172,9 +172,13 @@ describe("groom screen and switches", () => {
       members: [],
       selfId: "owner",
     }));
-    expect(settings).toContain("aria-label=\"Bridal\"");
-    expect(settings).toContain("aria-label=\"Groom\"");
-    expect(settings).toContain("Off by default");
+    expect(settings).toContain("Look of your salon");
+    expect(settings).not.toContain("aria-label=\"Bridal\"");
+    expect(settings).not.toContain("aria-label=\"Groom\"");
+    const plan = readFileSync("src/components/admin/SalonsBoard.tsx", "utf8");
+    expect(plan).toContain("Bridal");
+    expect(plan).toContain("Groom");
+    expect(plan).toContain("Off by default");
     const sql = readFileSync("prisma/migrations/20261018000000_groom/migration.sql", "utf8");
     expect(sql).toContain(`"productGroom" BOOLEAN NOT NULL DEFAULT false`);
     const schema = readFileSync("prisma/schema.prisma", "utf8");

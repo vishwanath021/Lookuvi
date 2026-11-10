@@ -42,7 +42,6 @@ describe("owner feature flags", () => {
     expect(ownerNav(off).filter((link) => link.section === "more").map((link) => link.label)).toEqual([
       "Services",
       "Settings",
-      "Team",
       "Billing",
       "Security",
     ]);

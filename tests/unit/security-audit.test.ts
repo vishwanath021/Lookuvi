@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { chmod, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -116,8 +116,8 @@ describe("desk roles", () => {
     expect(customerActionNeedsOwner("add")).toBe(false);
     expect(queueActionNeedsOwner("redeem")).toBe(true);
     expect(queueActionNeedsOwner("done")).toBe(false);
-    const salon = readFileSync("src/app/api/v1/admin/salon-token/route.ts", "utf8");
-    expect(salon).toMatch(/export async function GET\(\) {\s*const access = await requireOwner\(\)/);
+    expect(existsSync("src/app/api/v1/admin/salon-token/route.ts")).toBe(false);
+    expect(existsSync("src/components/admin/SalonModeCard.tsx")).toBe(false);
     const customers = readFileSync("src/app/api/v1/admin/customers/route.ts", "utf8");
     expect(customers).toContain("customerActionNeedsOwner");
     const queue = readFileSync("src/app/api/v1/admin/queue/route.ts", "utf8");

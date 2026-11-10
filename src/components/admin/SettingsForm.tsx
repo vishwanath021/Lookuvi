@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ImportCustomers } from "@/components/admin/ImportCustomers";
-import { SalonModeCard } from "@/components/admin/SalonModeCard";
 import { WeekHoursEditor } from "@/components/admin/WeekHoursEditor";
 import type { ToolId } from "@/lib/tools";
 
@@ -15,7 +14,7 @@ export function SettingsForm({
   showTryOn = true,
   showDomain = false,
   showGst = false,
-  salonModeUrl = "",
+  teamLogins = false,
 }: {
   initial: {
     name: string;
@@ -61,7 +60,7 @@ export function SettingsForm({
   showTryOn?: boolean;
   showDomain?: boolean;
   showGst?: boolean;
-  salonModeUrl?: string;
+  teamLogins?: boolean;
 }) {
   const [form, setForm] = useState({
     ...initial,
@@ -83,6 +82,8 @@ export function SettingsForm({
   const [staffName, setStaffName] = useState("");
   const [staffPassword, setStaffPassword] = useState("");
   const [team, setTeam] = useState(members);
+  const [section, setSection] = useState<string | null>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
   const ownerCount = team.filter((member) => member.role === "OWNER").length;
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
@@ -115,11 +116,19 @@ export function SettingsForm({
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    const { anonDailyCap, memberDailyCap, monthlyTryAllowance, visitTryLimit, productBridal, productGroom, productMakeupStudio, ...rest } = form;
+    void anonDailyCap;
+    void memberDailyCap;
+    void monthlyTryAllowance;
+    void visitTryLimit;
+    void productBridal;
+    void productGroom;
+    void productMakeupStudio;
     const res = await fetch("/api/v1/admin/settings", {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        ...form,
+        ...rest,
         rewards: form.rewards
           .filter((reward) => reward.name.trim())
           .map((reward) => ({ name: reward.name.trim(), cost: Math.min(9999, Math.max(1, Math.round(Number(reward.cost)) || 1)) })),
@@ -170,21 +179,58 @@ export function SettingsForm({
     setMessage("Removed from this salon.");
   }
 
+  const sections = [
+    { id: "details", label: "Salon details" },
+    { id: "hours", label: "Opening hours" },
+    { id: "whatsapp", label: "WhatsApp" },
+    { id: "loyalty", label: "Loyalty" },
+    { id: "look", label: "Look of your salon" },
+    { id: "import", label: "Import customers" },
+    ...(teamLogins ? [{ id: "team", label: "Team" }] : []),
+  ];
+
+  function Switch({ label, hint, checked, disabled = false, onChange }: { label: string; hint?: string; checked: boolean; disabled?: boolean; onChange: (next: boolean) => void }) {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{label}</p>
+          {hint ? <p className="text-xs text-muted">{hint}</p> : null}
+        </div>
+        <button
+          className={`relative h-11 w-16 shrink-0 rounded-full border border-line ${checked ? "bg-[var(--brand)]" : "bg-sand"} disabled:opacity-50`}
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          aria-label={label}
+          disabled={disabled}
+          onClick={() => onChange(!checked)}
+        >
+          <span className={`absolute top-1 h-9 w-9 rounded-full bg-white shadow ${checked ? "left-6" : "left-1"}`} />
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]" data-settings-menu="yes">
+      <nav className={section ? "hidden md:grid" : "grid"} aria-label="Settings sections">
+        {sections.map((item) => (
+          <button key={item.id} className={`btn secondary min-h-11 justify-start ${section === item.id ? "ring-2 ring-[var(--brand)]" : ""}`} type="button" aria-current={section === item.id ? "true" : undefined} onClick={() => setSection(item.id)}>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+      <div className={section ? "grid gap-3" : "hidden md:grid"}>
+        {section ? <button className="btn ghost w-fit md:hidden" type="button" onClick={() => setSection(null)}>Back</button> : <p className="text-sm text-muted">Choose a section.</p>}
+        {section === "details" ? (
       <form className="card grid gap-3 p-4" onSubmit={save}>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" data-setting="at-salon" aria-label="Try-ons only at the salon" checked={form.tryOnsAtSalon} onChange={(event) => set("tryOnsAtSalon", event.target.checked)} />
-          Try-ons only at the salon
-        </label>
-        <p className="text-xs text-muted">Free try-ons start when the customer is at the salon. Staff can add more at the queue.</p>
-        <label className="text-sm">Free try-ons per visit
-          <input className="field narrow mt-1" type="number" min={1} max={20} aria-label="Tries per visit" value={form.visitTryLimit} onChange={(event) => set("visitTryLimit", Number(event.target.value))} />
-        </label>
+        <h2 className="font-serif text-2xl">Salon details</h2>
+        <Switch label="Try-ons only at the salon" hint="Free try-ons start when the customer is at the salon. Staff can add more at the queue." checked={form.tryOnsAtSalon} onChange={(next) => set("tryOnsAtSalon", next)} />
         <label className="text-sm">Salon name<input className="field mt-1" aria-label="Salon name" value={form.name} onChange={(event) => set("name", event.target.value)} /></label>
         <div className="text-sm">
           <span className="block">Salon logo</span>
-          <input className="mt-1 block" type="file" accept="image/*" aria-label="Salon logo" onChange={(event) => void onLogo(event.target.files?.[0])} />
+          <input ref={logoRef} className="sr-only" type="file" accept="image/*" aria-label="Salon logo" onChange={(event) => void onLogo(event.target.files?.[0])} />
+          <button className="btn secondary mt-1" type="button" onClick={() => logoRef.current?.click()}>Choose logo</button>
           <p className="mt-1 text-xs text-muted">Shown beside the salon name. Leave it empty to use the Lookuvi mark.</p>
           {form.logoUrl && (
             <div className="mt-2 flex items-center gap-3">
@@ -193,28 +239,54 @@ export function SettingsForm({
             </div>
           )}
         </div>
-        <label className="text-sm">WhatsApp<input className="field mt-1" value={form.whatsapp} onChange={(event) => set("whatsapp", event.target.value)} /></label>
-        <fieldset className="grid gap-2 text-sm">
-          <legend className="font-medium">WhatsApp messages</legend>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" aria-label="Almost your turn message" checked={form.whatsappAlmostOn} onChange={(event) => set("whatsappAlmostOn", event.target.checked)} />
-            Almost your turn message
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" aria-label="Joined message for walk-ins" checked={form.whatsappWalkInJoined} onChange={(event) => set("whatsappWalkInJoined", event.target.checked)} />
-            Joined message for walk-ins added by staff
-          </label>
-          <p className="text-xs text-muted">Both are off until you turn them on. Guests who join from home still get the joined message. Booking confirmed stays on.</p>
-        </fieldset>
         <label className="text-sm">Address<input className="field mt-1" value={form.address} onChange={(event) => set("address", event.target.value)} /></label>
         <label className="text-sm">Maps link<input className="field mt-1" value={form.mapsUrl} onChange={(event) => set("mapsUrl", event.target.value)} /></label>
         <label className="text-sm">City<input className="field mt-1" value={form.city} onChange={(event) => set("city", event.target.value)} /></label>
-        <fieldset className="grid gap-2 text-sm" data-loyalty="yes">
-          <legend className="font-medium">Loyalty</legend>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" aria-label="Loyalty" checked={form.loyaltyOn} onChange={(event) => set("loyaltyOn", event.target.checked)} />
-            On
-          </label>
+        {showGst ? <label className="text-sm">GSTIN<input className="field mt-1" value={form.gstin} onChange={(event) => set("gstin", event.target.value)} /></label> : null}
+        {showTryOn ? (
+        <Switch label="Phone login before a booking request" hint="When this is off, Book opens WhatsApp." checked={form.requireLoginToBook} onChange={(next) => set("requireLoginToBook", next)} />
+        ) : null}
+        <Switch label="Remove Powered by Lookuvi" hint={canRemoveBranding ? "" : "Pro or Chain"} checked={form.removeBranding} disabled={!canRemoveBranding} onChange={(next) => set("removeBranding", next)} />
+        {showDomain ? (
+          <div className="grid gap-2">
+            <h3 className="text-sm font-semibold">Salon web address</h3>
+            <input className="field" placeholder="try.yoursalon.in" value={host} onChange={(event) => setHost(event.target.value)} aria-label="Custom domain" />
+            <div className="flex gap-2">
+              <button className="btn secondary" type="button" onClick={() => void addDomain(false)}>Save host</button>
+              <button className="btn secondary" type="button" onClick={() => void addDomain(true)}>Check DNS</button>
+            </div>
+            {domainNote && <p className="text-sm" role="status">{domainNote}</p>}
+          </div>
+        ) : null}
+        <button className="btn" type="submit">Save</button>
+      </form>
+        ) : null}
+        {section === "hours" ? (
+      <form className="card grid gap-3 p-4" onSubmit={save}>
+        <h2 className="font-serif text-2xl">Opening hours</h2>
+        <WeekHoursEditor
+          openTime={form.openTime}
+          closeTime={form.closeTime}
+          weeklyHours={form.weeklyHours}
+          onChange={(next) => setForm((current) => ({ ...current, ...next }))}
+        />
+        <button className="btn" type="submit">Save</button>
+      </form>
+        ) : null}
+        {section === "whatsapp" ? (
+      <form className="card grid gap-3 p-4" onSubmit={save}>
+        <h2 className="font-serif text-2xl">WhatsApp</h2>
+        <label className="text-sm">WhatsApp number<input className="field mt-1" aria-label="WhatsApp" value={form.whatsapp} onChange={(event) => set("whatsapp", event.target.value)} /></label>
+        <Switch label="Almost your turn message" checked={form.whatsappAlmostOn} onChange={(next) => set("whatsappAlmostOn", next)} />
+        <Switch label="Joined message for walk-ins" hint="Walk-ins added by staff. Guests who join from home still get the joined message. Booking confirmed stays on." checked={form.whatsappWalkInJoined} onChange={(next) => set("whatsappWalkInJoined", next)} />
+        <button className="btn" type="submit">Save</button>
+      </form>
+        ) : null}
+        {section === "loyalty" ? (
+      <form className="card grid gap-3 p-4" data-loyalty="yes" onSubmit={save}>
+        <h2 className="font-serif text-2xl">Loyalty</h2>
+        <Switch label="Loyalty" checked={form.loyaltyOn} onChange={(next) => set("loyaltyOn", next)} />
+        <fieldset className="grid gap-2 text-sm">
           <label>Points per visit
             <input className="field narrow mt-1" type="number" min={0} max={50} aria-label="Points per visit" value={form.loyaltyPointsPerVisit} onChange={(event) => set("loyaltyPointsPerVisit", Number(event.target.value))} />
           </label>
@@ -239,90 +311,47 @@ export function SettingsForm({
             <button className="btn secondary w-fit" type="button" onClick={() => set("rewards", [...form.rewards, { name: "", cost: 10 }])}>Add reward</button>
           ) : null}
         </fieldset>
-        <WeekHoursEditor
-          openTime={form.openTime}
-          closeTime={form.closeTime}
-          weeklyHours={form.weeklyHours}
-          onChange={(next) => setForm((current) => ({ ...current, ...next }))}
-        />
-        <fieldset className="grid gap-2 text-sm">
-          <legend className="font-medium">Looks on the customer screen</legend>
-          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Bridal" checked={form.productBridal} onChange={(event) => set("productBridal", event.target.checked)} /> Bridal</label>
-          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Groom" checked={form.productGroom} onChange={(event) => set("productGroom", event.target.checked)} /> Groom</label>
-          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Makeup studio" checked={form.productMakeupStudio} onChange={(event) => set("productMakeupStudio", event.target.checked)} /> Makeup studio</label>
-        </fieldset>
-        {showTryOn ? <>
-        <fieldset className="grid gap-2 text-sm">
-          <legend className="font-medium">Tools on the try-on page</legend>
-          {enabledTools.includes("colour") && <label className="flex items-center gap-2"><input type="checkbox" checked={form.toolColour} onChange={(event) => set("toolColour", event.target.checked)} /> Live colour</label>}
-          {enabledTools.includes("hairstyle") && <label className="flex items-center gap-2"><input type="checkbox" checked={form.toolStyle} onChange={(event) => set("toolStyle", event.target.checked)} /> Hairstyle preview</label>}
-          {enabledTools.includes("beard") && <label className="flex items-center gap-2"><input type="checkbox" checked={form.toolBeard} onChange={(event) => set("toolBeard", event.target.checked)} /> Beard try-on</label>}
-          {enabledTools.includes("nails") && <label className="flex items-center gap-2"><input type="checkbox" checked={form.toolNails} onChange={(event) => set("toolNails", event.target.checked)} /> Nail try-on</label>}
-        </fieldset>
-        <fieldset className="grid gap-2 text-sm">
-          <legend className="font-medium">Hair suggestions</legend>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={form.hairPickerOn} onChange={(event) => set("hairPickerOn", event.target.checked)} /> Hair-type picker. Free, on by default. Density and texture chips filter the style photos.</label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={form.hairSuggestOn} onChange={(event) => set("hairSuggestOn", event.target.checked)} /> Get AI suggestions. Off by default. One reading of the photo, then style photos from this menu.</label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={form.hairSuggestUsesCredits} onChange={(event) => set("hairSuggestUsesCredits", event.target.checked)} /> Use 1 try-on for each new suggestion. Repeat clicks on the same photo stay free.</label>
-        </fieldset>
-        </> : null}
-        <details className="rounded-xl border border-line p-3">
-          <summary className="cursor-pointer text-sm font-medium">Advanced</summary>
-          <div className="mt-3 grid gap-3">
-            <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm">Brand colour
-                <input className="mt-1 h-10 w-full" type="color" aria-label="Primary" value={form.primaryColor} onChange={(event) => set("primaryColor", event.target.value)} />
-              </label>
-              <label className="text-sm">Accent
-                <input className="mt-1 h-10 w-full" type="color" aria-label="Accent" value={form.accentColor} onChange={(event) => set("accentColor", event.target.value)} />
-              </label>
-            </div>
-            {showGst ? <label className="text-sm">GSTIN<input className="field mt-1" value={form.gstin} onChange={(event) => set("gstin", event.target.value)} /></label> : null}
-            {showTryOn && enabledTools.includes("brows") ? (
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.toolBrows} onChange={(event) => set("toolBrows", event.target.checked)} /> Eyebrow mapping</label>
-            ) : null}
-            {showTryOn ? (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="text-sm">Anonymous daily previews
-                    <input className="field mt-1" type="number" min={0} max={500} value={form.anonDailyCap} onChange={(event) => set("anonDailyCap", Number(event.target.value))} />
-                  </label>
-                  <label className="text-sm">Tries per signed-in customer per day
-                    <input className="field mt-1" type="number" min={0} max={500} value={form.memberDailyCap} onChange={(event) => set("memberDailyCap", Number(event.target.value))} />
-                  </label>
-                </div>
-                <label className="text-sm">Included try-ons per month
-                  <input className="field mt-1" type="number" min={0} max={5000} aria-label="Included try-ons per month" value={form.monthlyTryAllowance} onChange={(event) => set("monthlyTryAllowance", Number(event.target.value))} />
-                </label>
-                <p className="text-xs text-muted">0 means no AI previews for that group. The monthly number is a hard stop for the salon, including staff. Guests who are not signed in use the anonymous daily cap. These caps are not the try-ons left in the sidebar. Try-ons left is the salon balance, which a super-admin adds or removes. Provider rupee caps still apply.{enabledTools.includes("colour") ? " Live colour stays free." : ""}</p>
-              </>
-            ) : null}
-          </div>
-        </details>
-        {showTryOn ? (
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={form.requireLoginToBook} onChange={(event) => set("requireLoginToBook", event.target.checked)} />
-          Require a phone login before an online booking request. When this is off, Book opens WhatsApp.
-        </label>
-        ) : null}
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={form.removeBranding} disabled={!canRemoveBranding} onChange={(event) => set("removeBranding", event.target.checked)} />
-          Remove “Powered by Lookuvi” {canRemoveBranding ? "" : "(Pro or Chain)"}
-        </label>
         <button className="btn" type="submit">Save</button>
       </form>
-      {showTryOn ? <SalonModeCard initialUrl={salonModeUrl} canRotate /> : null}
-      {showDomain ? <form className="card grid gap-2 p-4" onSubmit={(event) => { event.preventDefault(); void addDomain(false); }}>
-        <h2 className="font-serif text-2xl">Custom domain</h2>
-        <input className="field" placeholder="try.yoursalon.in" value={host} onChange={(event) => setHost(event.target.value)} aria-label="Custom domain" />
-        <div className="flex gap-2">
-          <button className="btn secondary" type="submit">Save host</button>
-          <button className="btn secondary" type="button" onClick={() => void addDomain(true)}>Check DNS</button>
+        ) : null}
+        {section === "look" ? (
+      <form className="card grid gap-3 p-4" onSubmit={save}>
+        <h2 className="font-serif text-2xl">Look of your salon</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-sm">Brand colour
+            <input className="mt-1 h-10 w-full" type="color" aria-label="Primary" value={form.primaryColor} onChange={(event) => set("primaryColor", event.target.value)} />
+          </label>
+          <label className="text-sm">Accent
+            <input className="mt-1 h-10 w-full" type="color" aria-label="Accent" value={form.accentColor} onChange={(event) => set("accentColor", event.target.value)} />
+          </label>
         </div>
-        {domainNote && <p className="text-sm" role="status">{domainNote}</p>}
-      </form> : null}
+        {showTryOn ? (
+          <>
+            <h3 className="text-sm font-semibold">Try-on tools</h3>
+            {enabledTools.includes("colour") ? <Switch label="Live colour" checked={form.toolColour} onChange={(next) => set("toolColour", next)} /> : null}
+            {enabledTools.includes("hairstyle") ? <Switch label="Hairstyle preview" checked={form.toolStyle} onChange={(next) => set("toolStyle", next)} /> : null}
+            {enabledTools.includes("brows") ? <Switch label="Eyebrow mapping" checked={form.toolBrows} onChange={(next) => set("toolBrows", next)} /> : null}
+            {enabledTools.includes("beard") ? <Switch label="Beard try-on" checked={form.toolBeard} onChange={(next) => set("toolBeard", next)} /> : null}
+            {enabledTools.includes("nails") ? <Switch label="Nail try-on" checked={form.toolNails} onChange={(next) => set("toolNails", next)} /> : null}
+            <h3 className="text-sm font-semibold">Hair suggestions</h3>
+            <Switch label="Hair-type picker" hint="Free. Density and texture filter the style photos." checked={form.hairPickerOn} onChange={(next) => set("hairPickerOn", next)} />
+            <Switch label="Get AI suggestions" hint="Off by default. One reading of the photo, then style photos from this menu." checked={form.hairSuggestOn} onChange={(next) => set("hairSuggestOn", next)} />
+            <Switch label="Use 1 try-on for a new suggestion" hint="Repeat clicks on the same photo stay free." checked={form.hairSuggestUsesCredits} onChange={(next) => set("hairSuggestUsesCredits", next)} />
+          </>
+        ) : null}
+        <button className="btn" type="submit">Save</button>
+      </form>
+        ) : null}
+        {section === "import" ? <ImportCustomers /> : null}
+        {section === "team" && teamLogins ? (
       <section id="team" className="card grid gap-3 p-4">
         <h2 className="font-serif text-2xl">Team</h2>
+        <ol className="grid gap-1 text-sm">
+          <li>1. Add their email, name, and a password of at least 12 characters.</li>
+          <li>2. They sign in on the salon login page with that email and password.</li>
+          <li>3. Staff see the queue and customers. Settings and prices stay with you.</li>
+          <li>4. More than one shop? Each shop is its own salon, with its own team.</li>
+        </ol>
         <ul className="space-y-2">
           {team.map((member) => {
             const canRemove = member.userId !== selfId && !(member.role === "OWNER" && ownerCount <= 1);
@@ -345,8 +374,9 @@ export function SettingsForm({
         <button className="btn" type="submit">Create staff login</button>
       </form>
       </section>
-      {message && <p className="text-sm" role="status">{message}</p>}
-      <ImportCustomers />
+        ) : null}
+        {message ? <p className="text-sm" role="status">{message}</p> : null}
+      </div>
     </div>
   );
 }

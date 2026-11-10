@@ -286,6 +286,7 @@ test("a renamed salon shows on the guest header and title", async ({ page }) => 
     await page.waitForURL(/\/admin/, { timeout: 60_000 });
     await expect(page.getByRole("heading", { name: "Leads" })).toBeVisible({ timeout: 30_000 });
     await page.goto("/admin/settings");
+    await page.getByRole("button", { name: "Salon details" }).click();
     await page.getByLabel("Salon name").fill("Indiranagar Studio");
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByText("Settings saved.")).toBeVisible();

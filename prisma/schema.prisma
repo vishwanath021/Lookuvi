@@ -32,13 +32,13 @@ model Tenant {
   productTryOn        Boolean   @default(true)
   /** Sell the live queue and visit alerts. On for a new salon so join-from-home and reminders exist. */
   productQueue        Boolean   @default(true)
-  /** Full bridal looks and mehendi. Off until the owner turns it on. */
+  /** Full bridal looks and mehendi. Set by a super-admin on the salon plan. */
   productBridal       Boolean   @default(false)
-  /** Groom looks and the groom's own clothes. Off until the owner turns it on. */
+  /** Groom looks and the groom's own clothes. Set by a super-admin on the salon plan. */
   productGroom        Boolean   @default(false)
-  /** Photo makeup on one picture. Off until the owner turns it on. */
+  /** Photo makeup on one picture. Set by a super-admin on the salon plan. */
   productMakeupStudio Boolean   @default(false)
-  /** Free paid previews for one visit. 1 unless the owner raises it or staff add tries. */
+  /** Free paid previews for one visit. A super-admin sets this. Staff can still add tries at the queue. */
   visitTryLimit       Int       @default(1)
   /** Free AI try-ons wait until the guest is at the salon today. Off for the sales demo. */
   tryOnsAtSalon       Boolean   @default(true)
@@ -101,6 +101,8 @@ model Tenant {
   loyaltyOn           Boolean   @default(true)
   /** Points added when staff tap Finish. Not tied to a bill. */
   loyaltyPointsPerVisit Int     @default(1)
+  /** Owner can create staff logins. Off until a super-admin turns it on. Salons that already had staff stay on. */
+  teamLogins          Boolean   @default(false)
   /** Soft delete. Null keeps the salon. Suspend uses status and can be resumed; this cannot. */
   deletedAt           DateTime?
   createdAt           DateTime  @default(now())

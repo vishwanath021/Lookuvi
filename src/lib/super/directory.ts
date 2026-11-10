@@ -28,6 +28,11 @@ export type SalonRecord = {
   openTime: string;
   closeTime: string;
   weeklyHours: string;
+  anonDailyCap: number;
+  memberDailyCap: number;
+  monthlyTryAllowance: number;
+  visitTryLimit: number;
+  teamLogins: boolean;
 };
 
 /** Succeeded try-ons only. Demo samples and failed attempts are not previews. */
@@ -97,6 +102,11 @@ export async function loadSalons(): Promise<SalonRecord[]> {
       openTime: tenant.openTime,
       closeTime: tenant.closeTime,
       weeklyHours: tenant.weeklyHours,
+      anonDailyCap: tenant.anonDailyCap,
+      memberDailyCap: tenant.memberDailyCap,
+      monthlyTryAllowance: tenant.monthlyTryAllowance,
+      visitTryLimit: tenant.visitTryLimit,
+      teamLogins: tenant.teamLogins,
     };
   });
 }

@@ -4,6 +4,7 @@ import { isPlanId } from "@/data/plans";
 import { applyPlanChange } from "@/lib/billing/plan-assign";
 import { CreditError, grantCredits } from "@/lib/credits";
 import { prisma } from "@/lib/prisma";
+import { ensureBridalPackages } from "@/lib/bridal-packages";
 import { hoursWrite } from "@/lib/queue/schedule";
 import { requireSuper } from "@/lib/session";
 
@@ -21,6 +22,11 @@ const schema = z.object({
   openTime: z.string().max(8).nullable().optional(),
   closeTime: z.string().max(8).nullable().optional(),
   weeklyHours: z.string().max(4000).nullable().optional(),
+  anonDailyCap: z.number().int().min(0).max(500).optional(),
+  memberDailyCap: z.number().int().min(0).max(500).optional(),
+  monthlyTryAllowance: z.number().int().min(0).max(5000).optional(),
+  visitTryLimit: z.number().int().min(1).max(20).optional(),
+  teamLogins: z.boolean().optional(),
   remove: z.literal(true).optional(),
 });
 
@@ -75,9 +81,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       ...(parsed.data.productBridal !== undefined ? { productBridal: parsed.data.productBridal } : {}),
       ...(parsed.data.productGroom !== undefined ? { productGroom: parsed.data.productGroom } : {}),
       ...(parsed.data.productMakeupStudio !== undefined ? { productMakeupStudio: parsed.data.productMakeupStudio } : {}),
+      ...(parsed.data.anonDailyCap !== undefined ? { anonDailyCap: parsed.data.anonDailyCap } : {}),
+      ...(parsed.data.memberDailyCap !== undefined ? { memberDailyCap: parsed.data.memberDailyCap } : {}),
+      ...(parsed.data.monthlyTryAllowance !== undefined ? { monthlyTryAllowance: parsed.data.monthlyTryAllowance } : {}),
+      ...(parsed.data.visitTryLimit !== undefined ? { visitTryLimit: parsed.data.visitTryLimit } : {}),
+      ...(parsed.data.teamLogins !== undefined ? { teamLogins: parsed.data.teamLogins } : {}),
       ...(hours ?? {}),
     },
   });
+  if (parsed.data.productBridal === true) await ensureBridalPackages(id);
   if (planChange) {
     await prisma.auditLog.create({
       data: {

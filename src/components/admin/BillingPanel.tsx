@@ -111,6 +111,8 @@ export function BillingPanel({
         <section className="card mt-4 grid gap-2 p-4" data-payment="pending">
           <h2 className="text-base font-semibold">Payment pending</h2>
           <p className="text-sm">{current.label} · {formatInr(current.amountInr)}</p>
+          <h3 className="text-sm font-semibold">Pay by UPI</h3>
+          <p className="text-sm">After a UPI payment, Lookuvi adds the tries once payment is confirmed. A super-admin marks it paid or adjusts credits.</p>
           <p className="text-sm">UPI ID <strong>{current.upiId}</strong></p>
           {current.upiPlaceholder ? <p className="text-sm">Ask Lookuvi to confirm this UPI ID before you pay.</p> : null}
           <img src={current.qrDataUrl} alt="UPI QR" className="w-40" />
