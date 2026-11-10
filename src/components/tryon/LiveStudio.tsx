@@ -152,7 +152,7 @@ export function LiveStudio({
       )}
       {count !== null && (
         <div className="absolute inset-0 z-30 grid place-items-center bg-black/45" role="status">
-          <p className="font-serif text-5xl">{count === "capturing" ? "Capturing..." : count}</p>
+          <p className="nums text-5xl">{count === "capturing" ? "Capturing..." : count}</p>
         </div>
       )}
       {busy && stage && (

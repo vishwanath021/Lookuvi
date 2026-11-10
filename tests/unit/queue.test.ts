@@ -92,7 +92,7 @@ describe("queue joins", () => {
     expect(second.waitMin).toBe(15);
     expect(send.mock.calls.filter((call) => call[0].kind === "joined")).toHaveLength(2);
     expect(send.mock.calls.filter((call) => call[0].kind === "almost")).toHaveLength(0);
-    expect(send.mock.calls[0][0].body).toContain("you have joined, token 1, about 0 min");
+    expect(send.mock.calls[0][0].body).toContain("you have joined, token 01, about 0 min");
     const again = await joinQueue({ slug, name: "Asha", phone: "9876500101", consent: true, ip: "join-c", send });
     expect(again.ref).toBe(first.ref);
     expect(again.existing).toBe(false);
@@ -139,7 +139,7 @@ describe("queue joins", () => {
     expect(ticket.waitMin).toBe(0);
     expect(send.mock.calls.filter((call) => call[0].kind === "joined")).toHaveLength(1);
     expect(send.mock.calls.filter((call) => call[0].kind === "almost")).toHaveLength(1);
-    expect(send.mock.calls[0][0].body).toContain("you have joined, token 1, about 0 min");
+    expect(send.mock.calls[0][0].body).toContain("you have joined, token 01, about 0 min");
     await callNext(tenant.id, send);
     expect(send.mock.calls).toHaveLength(2);
     expect(send.mock.calls[1][0].kind).toBe("almost");
@@ -154,10 +154,10 @@ describe("queue joins", () => {
     expect(send.mock.calls).toHaveLength(1);
     expect(send.mock.calls[0][0].kind).toBe("joined");
     expect(send.mock.calls[0][0].to).toBe("919876500112");
-    expect(send.mock.calls[0][0].body).toContain("you have joined, token 1, about 0 min");
+    expect(send.mock.calls[0][0].body).toContain("you have joined, token 01, about 0 min");
     expect(send.mock.calls[0][0].body).toContain("Join from home:");
     expect(send.mock.calls[0][0].body).toContain("Try a look:");
-    expect(send.mock.calls[0][0].parameters[1]).toBe("1");
+    expect(send.mock.calls[0][0].parameters[1]).toBe("01");
     expect(send.mock.calls[0][0].parameters[3]).toContain(`/s/${slug}/q/`);
     expect(send.mock.calls[0][0].parameters[4]).toContain(`/s/${slug}/queue`);
     expect(send.mock.calls[0][0].parameters[5]).toBe(`http://localhost:3000/s/${slug}`);

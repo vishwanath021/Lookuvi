@@ -24,34 +24,34 @@ export default async function SuperPage() {
       <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <article className="card p-4">
           <p className="text-sm text-muted">Active salons</p>
-          <p className="mt-1 font-serif text-3xl">{stats.active}</p>
+          <p className="nums mt-1 text-3xl">{stats.active}</p>
         </article>
         <article className="card p-4">
           <p className="text-sm text-muted">Trials</p>
-          <p className="mt-1 font-serif text-3xl">{stats.trials}</p>
+          <p className="nums mt-1 text-3xl">{stats.trials}</p>
         </article>
         <article className="card p-4">
           <div className="flex items-center gap-1">
             <p className="text-sm text-muted">MRR</p>
             <Hint label="About MRR">Active plans only, ex-GST. Trials are not included.</Hint>
           </div>
-          <p className="font-serif text-3xl">{inr(stats.mrr)}</p>
+          <p className="nums text-3xl">{inr(stats.mrr)}</p>
         </article>
         <article className="card p-4">
           <div className="flex items-center gap-1">
             <p className="text-sm text-muted">Try-ons this month</p>
             <Hint label="About preview counts">Succeeded previews since the start of the month in Asia/Kolkata.</Hint>
           </div>
-          <p className="font-serif text-3xl">{stats.previews.toLocaleString("en-IN")}</p>
+          <p className="nums text-3xl">{stats.previews.toLocaleString("en-IN")}</p>
         </article>
         <article className="card p-4">
           <div className="flex items-center gap-1">
             <p className="text-sm text-muted">AI spend vs cap</p>
             <Hint label="About AI spend">Month spend against the platform cap. The price list is on AI settings.</Hint>
           </div>
-          <p className="font-serif text-3xl">
+          <p className="nums text-3xl">
             {formatAiInr(spend.spentInr)}
-            <span className="text-base text-muted"> / {formatAiInr(spend.capInr)}</span>
+            <span className="text-base font-normal text-muted"> / {formatAiInr(spend.capInr)}</span>
           </p>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-sand" aria-hidden>
             <div className="h-full bg-aubergine" style={{ width: `${cap}%` }} />
@@ -64,7 +64,7 @@ export default async function SuperPage() {
             <p className="text-sm text-muted">Try-ons left</p>
             <Hint label="About credits">Sum of salon credit balances.</Hint>
           </div>
-          <p className="font-serif text-3xl">{stats.credits.toLocaleString("en-IN")}</p>
+          <p className="nums text-3xl">{stats.credits.toLocaleString("en-IN")}</p>
         </article>
       </section>
       <section className="card mt-6 p-4">

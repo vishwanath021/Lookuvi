@@ -182,7 +182,7 @@ test("Sunday rush across three salons", async ({ page, browser, request }, testI
   await shot(guest, "customer_queue_phone");
   await guest.goto(`/s/meera-beauty/q/${parlour.ref}`);
   await guest.locator("[data-status='WAITING'][data-ready='yes']").waitFor();
-  await expect(guest.getByText("You have joined, token 1, about 0 min.")).toBeVisible();
+  await expect(guest.getByText("You have joined, token 01, about 0 min.")).toBeVisible();
   await expect(guest.getByText("Token 1", { exact: true })).toBeVisible();
   await shot(guest, "customer_ticket_phone");
 

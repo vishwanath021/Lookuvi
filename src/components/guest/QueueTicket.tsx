@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { t } from "@/data/i18n";
+import { formatToken } from "@/lib/queue/format-token";
 import { QueueWait, useDisplayedWait } from "@/components/guest/QueueWait";
 import { QUEUE_POLL_MS } from "@/lib/queue/poll";
 import { guestDeviceId } from "@/lib/device-id";
@@ -95,7 +96,7 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
   if (ticket.status === "EXPIRED") line = t(lang, "queueEnded");
 
   const joined = live || ticket.status === "IN_SERVICE"
-    ? t(lang, "queueJoined", { token: ticket.token, min: minutes })
+    ? t(lang, "queueJoined", { token: formatToken(ticket.token), min: minutes })
     : "";
 
   if (terminal) {
@@ -123,7 +124,7 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
       ) : (
         <>
           <p className="mt-6 text-lg">{line}</p>
-          <p className="text-sm text-muted" data-queue-token={ticket.token}>{t(lang, "queueToken", { token: ticket.token })}</p>
+          <p className="nums text-sm font-normal text-muted" data-queue-token={ticket.token}>{t(lang, "queueToken", { token: formatToken(ticket.token) })}</p>
         </>
       )}
       {ticket.serviceName ? <p className="mt-1 text-sm text-muted">{ticket.serviceName}</p> : null}

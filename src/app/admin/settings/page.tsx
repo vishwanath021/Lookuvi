@@ -22,7 +22,7 @@ export default async function SettingsPage() {
   });
   const rewards = await prisma.loyaltyReward.findMany({ where: { tenantId: tenant.id }, orderBy: [{ sort: "asc" }, { name: "asc" }] });
   return (
-    <main className="max-w-3xl">
+    <main className="min-w-0">
       <SettingsFocus
         reminder={(
           <ReminderSettingsCard
@@ -37,7 +37,7 @@ export default async function SettingsPage() {
         rest={(
       <>
       <h1 className="mb-4 page-title">Settings</h1>
-      <p className="mb-4 text-sm">Guests choose a service from your own list when they join the queue. <a className="underline" href="/admin/services">Edit services</a></p>
+      <p className="mb-4 max-w-3xl text-sm">Guests choose a service from your own list when they join the queue. <a className="underline" href="/admin/services">Edit services</a></p>
       <SettingsForm
         teamLogins={tenant.teamLogins}
         selfId={membership.userId}

@@ -17,7 +17,7 @@ describe("suggested hours", () => {
     expect(html).toContain('data-hours-suggested="yes"');
     expect(html).toContain('value="10:00"');
     expect(html).toContain('value="20:00"');
-    expect(html).not.toContain("checked");
+    expect(html).not.toContain('aria-checked="true"');
     expect(suggestedWeek().mon).toEqual([{ open: "10:00", close: "20:00" }]);
     expect(suggestedWeek().sun).toEqual([{ open: "10:00", close: "20:00" }]);
   });
@@ -32,8 +32,8 @@ describe("suggested hours", () => {
       onChange: () => undefined,
     }));
     expect(html).not.toContain("Suggested — not saved yet");
-    expect(html).toMatch(/aria-label="Monday closed"[^>]*checked/);
-    expect(html).not.toMatch(/aria-label="Tuesday closed"[^>]*checked/);
+    expect(html).toMatch(/aria-label="Monday closed"[^>]*aria-checked="true"/);
+    expect(html).toMatch(/aria-label="Tuesday closed"[^>]*aria-checked="false"/);
   });
 
   it("keeps a saved one-session week instead of the suggestion", () => {

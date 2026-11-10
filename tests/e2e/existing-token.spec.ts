@@ -41,7 +41,7 @@ test("a second name on the same phone is told which token already exists", async
   await page.getByLabel("Mobile number").fill("9876501881");
   await page.getByRole("checkbox", { name: /queue updates/i }).check();
   await page.getByRole("button", { name: "Join the queue" }).click();
-  await expect(page.getByRole("status")).toContainText(`This number already has token #${token} for Mom.`);
+  await expect(page.getByRole("status")).toContainText(`This number already has token ${String(token).padStart(2, "0")} for Mom.`);
   await expect(page.getByRole("link", { name: "Open that token" })).toBeVisible();
   await expect(page).toHaveURL(/\/queue$/);
 
