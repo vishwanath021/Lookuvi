@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { t } from "@/data/i18n";
 import type { GuestNavId } from "@/lib/guest-nav";
 
@@ -18,7 +20,9 @@ export function GuestNav({
   lang: string;
   current?: GuestNavId;
 }) {
-  return (
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const nav = (
     <nav className="guest-nav" data-guest-nav="yes" aria-label="Guest">
       {ITEMS.map((item) => {
         const href = item.id === "try" ? `/s/${slug}` : item.id === "services" ? `/s/${slug}/services` : `/s/${slug}/saved`;
@@ -37,4 +41,6 @@ export function GuestNav({
       })}
     </nav>
   );
+  if (mounted) return createPortal(nav, document.body);
+  return nav;
 }

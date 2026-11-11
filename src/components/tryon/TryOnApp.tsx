@@ -250,6 +250,8 @@ export function TryOnApp({
   const [suggestBusy, setSuggestBusy] = useState(false);
   const [suggestFailed, setSuggestFailed] = useState(false);
   const previewLock = useRef(false);
+  const resultSig = useRef<Partial<Record<TryTool, string>>>({});
+  const resultBlobs = useRef<Partial<Record<TryTool, Blob>>>({});
   const faceRef = useRef<Shot | null>(null);
   const handRef = useRef<Shot | null>(null);
   const pendingLook = useRef<Chosen | null>(null);
@@ -384,7 +386,9 @@ export function TryOnApp({
   const bookHref = phone
     ? `https://wa.me/${phone}?text=${encodeURIComponent(`Hi ${config.name}, I would like to book an appointment.`)}`
     : "";
-  const chatHref = phone ? `https://wa.me/${phone}` : "";
+  const chatHref = phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(`Hi ${config.name}, I'd like to know more / book an appointment.`)}`
+    : "";
 
   function track(eventName: string, props?: Record<string, string | number | boolean | null>) {
     const session = sid || sessionId();
@@ -643,6 +647,8 @@ export function TryOnApp({
     }
     setError("");
     const faceTools: TabTool[] = ["style", "colour", "brows", "beard"];
+    resultSig.current = {};
+    resultBlobs.current = {};
     setLooks((current) => clearTabLooks(current, slot === "hand" ? ["nails"] : faceTools));
     track("photo_captured", {});
     await recordPhotoConsent();
@@ -716,6 +722,8 @@ export function TryOnApp({
   }
 
   function resetForAnotherPhoto() {
+    resultSig.current = {};
+    resultBlobs.current = {};
     setLooks({});
     try {
       writeTabSessionRaw(config.slug, serializeTabSession({ looks: {} }));
@@ -791,6 +799,21 @@ export function TryOnApp({
     return next === "nails" ? handRef.current : faceRef.current;
   }
 
+  function comboSig(chosen: Chosen) {
+    const shot = shotRefFor(chosen.tool);
+    const options = chosen.tool === "brows"
+      ? `${browThickness}:${browColour}`
+      : chosen.tool === "style"
+        ? shadeId
+        : "";
+    return `${chosen.tool}|${chosen.id}|${options}|${shot?.blob.size ?? 0}|${shot?.url.length ?? 0}`;
+  }
+
+  function resultReady(chosen: Chosen | null) {
+    if (!chosen) return false;
+    return Boolean(looks[chosen.tool]?.styleId === chosen.id && resultSig.current[chosen.tool] === comboSig(chosen));
+  }
+
   function continuePending() {
     const chosen = pendingLook.current;
     if (!chosen || previewLock.current) return;
@@ -832,6 +855,7 @@ export function TryOnApp({
       setUnlockSheet(true);
       return;
     }
+    if (resultSig.current[chosen.tool] === comboSig(chosen)) return;
     if (previewLock.current) return;
     previewLock.current = true;
     pendingLook.current = null;
@@ -853,6 +877,7 @@ export function TryOnApp({
       body.set("deviceId", guestDeviceId());
       const requestId = crypto.randomUUID();
       body.set("requestId", requestId);
+      if (chosen.tool === "style" && shadeId) body.set("shadeId", shadeId);
       if (salonToken) body.set("salonToken", salonToken);
       if (chosen.tool === "brows") {
         body.set("browThickness", browThickness);
@@ -908,6 +933,9 @@ export function TryOnApp({
       }
       const before = await dataUrl(shot.blob);
       const after = await dataUrl(aligned.blob);
+      resultBlobs.current[chosen.tool] = aligned.blob;
+      resultSig.current[chosen.tool] = comboSig(chosen);
+      setCompareOn(true);
       storeLook({
         id: res.headers.get("x-tryon-id") || crypto.randomUUID(),
         styleId: chosen.id,
@@ -987,8 +1015,24 @@ export function TryOnApp({
 
   async function downloadLook() {
     if (!active) return;
-    await downloadLookFile(active.after, lookDownloadName(config.slug, active.styleName));
-    track("download", { style: active.styleId });
+    try {
+      await downloadLookFile(resultBlobs.current[active.tool] || active.after, lookDownloadName(config.slug, active.styleName));
+      setNotice(t(lang, "downloadReady"));
+      track("download", { style: active.styleId });
+    } catch {
+      setNotice(t(lang, "downloadFailed"));
+    }
+  }
+
+  function saveCurrentLook() {
+    const chosen = chosenNow();
+    if (!chosen) {
+      setNotice(t(lang, "downloadFailed"));
+      return;
+    }
+    const pick = { tool: chosen.tool, id: chosen.id, name: chosen.name };
+    if (!savedPickOn(savedPicks, pick)) keepPick(pick);
+    setNotice(t(lang, "lookSaved"));
   }
 
   const tools: { id: TryTool; label: string; name: string; on: boolean; icon: "style" | "colour" | "brows" | "nails" | "beard" }[] = [
@@ -1084,9 +1128,19 @@ export function TryOnApp({
     saveNote,
     onSave: toggleCurrentStyle,
   };
+  const sameResult = resultReady(chosenLive);
+  const tryControls = {
+    tryLabel: sameResult ? t(lang, "lookDone") : t(lang, "tryThisLook"),
+    tryDisabled: sameResult,
+    onTry: () => {
+      const chosen = chosenNow();
+      if (!chosen || resultReady(chosen)) return;
+      selectLook(chosen, true);
+    },
+  };
 
   return (
-    <div data-salon-mode={salonMode ? "yes" : "no"} data-queue-mode={queueMode} className={embed ? "flex min-h-dvh flex-col" : "guest-shell flex min-h-dvh w-full flex-col"}>
+    <div data-salon-mode={salonMode ? "yes" : "no"} data-queue-mode={queueMode} className={embed ? "flex min-h-svh flex-col" : "guest-shell flex min-h-svh w-full flex-col"}>
       <header className={`salon-bar header-metal sticky top-0 z-30 border-b border-white/15 px-4 py-3 ${embed ? "" : "guest-bar-bleed"}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -1310,7 +1364,7 @@ export function TryOnApp({
       )}
       {showResult && active && (
         <div className="mt-4 grid gap-2">
-          <button className="btn" type="button" onClick={() => void downloadLook()}>{t(lang, "downloadLook")}</button>
+          <button className="btn" type="button" data-save-result="yes" onClick={saveCurrentLook}>{t(lang, "downloadLook")}</button>
           {poseDebug && active.raw && (
             <a className="text-center text-sm underline" href={active.raw} target="_blank" rel="noreferrer" data-testid="provider-image">Provider image</a>
           )}
@@ -1379,7 +1433,7 @@ export function TryOnApp({
               category={lookFilter}
               selectedId={styleId}
               disabled={busy}
-              tryDisabled={false}
+              {...tryControls}
               {...saveLabels}
               items={[
                 ...shownStyles.map((style) => {
@@ -1410,7 +1464,6 @@ export function TryOnApp({
                 const style = shownStyles.find((item) => item.id === id) || config.styles.find((item) => item.id === id);
                 if (style) selectLook({ id: style.id, name: style.name, serviceKeys: style.serviceKeys, tool: "style" });
               }}
-              onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
             />
             {filtersOpen ? (
               <div className="fixed inset-0 z-[60] grid place-items-end bg-black/40 p-4 sm:place-items-center" role="dialog" aria-label={t(lang, "filterTitle")}>
@@ -1458,7 +1511,7 @@ export function TryOnApp({
             label="shades"
             selectedId={shadeId}
             disabled={busy}
-            tryDisabled={false}
+            {...tryControls}
             items={config.shades.map((item) => ({
               id: item.id,
               name: item.name,
@@ -1466,7 +1519,6 @@ export function TryOnApp({
               preview: <span className="block h-16 w-full" style={{ background: item.hex }} />,
             }))}
             onSelect={(id) => pickShade(id)}
-              onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
               {...saveLabels}
           />
         )}
@@ -1478,7 +1530,7 @@ export function TryOnApp({
             label="brows"
             selectedId={styleId}
             disabled={busy}
-            tryDisabled={false}
+            {...tryControls}
             items={browList.map((brow) => ({
               id: brow.id,
               name: brow.name,
@@ -1490,7 +1542,6 @@ export function TryOnApp({
               const brow = browList.find((item) => item.id === id);
               if (brow) selectLook({ id: brow.id, name: brow.name, serviceKeys: brow.serviceKeys, tool: "brows" });
             }}
-              onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
               {...saveLabels}
           />
           </>
@@ -1502,7 +1553,7 @@ export function TryOnApp({
             label="beards"
             selectedId={styleId}
             disabled={busy}
-            tryDisabled={false}
+            {...tryControls}
             items={config.beards.map((beard) => ({
               id: beard.id,
               name: beard.name,
@@ -1513,7 +1564,6 @@ export function TryOnApp({
               const beard = config.beards.find((item) => item.id === id);
               if (beard) selectLook({ id: beard.id, name: beard.name, serviceKeys: beard.serviceKeys, tool: "beard" });
             }}
-              onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
               {...saveLabels}
           />
         )}
@@ -1524,7 +1574,7 @@ export function TryOnApp({
             label="nails"
             selectedId={styleId}
             disabled={busy}
-            tryDisabled={false}
+            {...tryControls}
             items={config.nails.map((nail) => ({
               id: nail.id,
               name: nail.name,
@@ -1535,7 +1585,6 @@ export function TryOnApp({
               const nail = config.nails.find((item) => item.id === id);
               if (nail) selectLook({ id: nail.id, name: nail.name, serviceKeys: nail.serviceKeys, tool: "nails" });
             }}
-              onTry={() => { const chosen = chosenNow(); if (chosen) selectLook(chosen, true); }}
               {...saveLabels}
           />
         )}

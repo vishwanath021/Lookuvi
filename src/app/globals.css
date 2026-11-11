@@ -26,9 +26,10 @@
 }
 
 * { box-sizing: border-box; }
-html { min-height: 100%; overflow-x: clip; }
+html { min-height: 100%; }
 body {
-  min-height: 100dvh;
+  min-height: 100vh;
+  min-height: 100svh;
   margin: 0;
   /* Do not clip body. overflow-x: clip makes body a second scroll container, and the sticky salon bar then sits about 100px down the page. */
   padding-left: env(safe-area-inset-left);
@@ -1272,6 +1273,7 @@ textarea { min-height: 48px; }
     -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 1.75rem), transparent);
     mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 1.75rem), transparent);
   }
+  [data-bridal="flow"] .try-preview { order: 0; }
   .look-grid button { scroll-margin-bottom: 6.5rem; }
   [data-scroll="salon"] { padding-bottom: calc(10.5rem + env(safe-area-inset-bottom)); }
   [data-scroll="salon"][data-mini="yes"] { padding-bottom: calc(10.5rem + env(safe-area-inset-bottom)); }

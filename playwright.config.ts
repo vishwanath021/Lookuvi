@@ -32,13 +32,13 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   projects: [
-    { name: "android", testIgnore: /responsive/, use: { ...devices["Pixel 5"], ...chromiumCamera } },
+    { name: "android", testIgnore: /responsive|guest-regression/, use: { ...devices["Pixel 5"], ...chromiumCamera } },
     {
       name: "iphone",
-      testIgnore: /responsive|phone-matrix|bridal\.spec|(?:^|[/\\])studio\.spec|generation-ux\.spec/,
+      testIgnore: /responsive|phone-matrix|bridal\.spec|(?:^|[/\\])studio\.spec|generation-ux\.spec|guest-regression/,
       use: { ...devices["iPhone 13"], browserName: "chromium", defaultBrowserType: "chromium", ...chromiumCamera },
     },
-    { name: "desktop", testIgnore: /responsive|phone-matrix|bridal\.spec|(?:^|[/\\])studio\.spec|generation-ux\.spec/, use: desktop(1280, 800) },
+    { name: "desktop", testIgnore: /responsive|phone-matrix|bridal\.spec|(?:^|[/\\])studio\.spec|generation-ux\.spec|guest-regression/, use: desktop(1280, 800) },
     { name: "tablet", testMatch: /five-tools/, use: { ...desktop(768, 1024), viewport: { width: 768, height: 1024 } } },
     { name: "webkit-iphone-13", testMatch: /responsive/, use: { ...devices["iPhone 13"] } },
     { name: "webkit-iphone-15", testMatch: /responsive/, use: { ...devices["iPhone 15"] } },
@@ -52,6 +52,16 @@ export default defineConfig({
     { name: "desk-1280", testMatch: /responsive/, use: desktop(1280, 800) },
     { name: "desk-1440", testMatch: /responsive/, use: desktop(1440, 900) },
     { name: "desk-1920", testMatch: /responsive/, use: desktop(1920, 1080) },
+    {
+      name: "regression-iphone",
+      testMatch: /guest-regression\.spec/,
+      use: { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } },
+    },
+    {
+      name: "regression-desktop",
+      testMatch: /guest-regression\.spec/,
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
+    },
   ],
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000",

@@ -8,12 +8,30 @@ import { releasePaidCall } from "@/lib/ai/spend";
 
 const STALE_MS = 90_000;
 
-export function jobFingerprint(parts: { photo: Buffer; styleId: string; tool: string; shadeId: string; mode: string }) {
+export function jobFingerprint(parts: { photo: Buffer; styleId: string; tool: string; shadeId: string; mode: string; sessionId?: string }) {
   const hash = createHash("sha256");
   hash.update(parts.photo);
   hash.update("\0");
-  hash.update([parts.mode, parts.tool, parts.styleId, parts.shadeId].join("\0"));
+  const fields = [parts.mode, parts.tool, parts.styleId, parts.shadeId];
+  if (parts.sessionId) fields.push(parts.sessionId);
+  hash.update(fields.join("\0"));
   return hash.digest("hex");
+}
+
+/** Same photo, style, options, and session already finished. Does not reserve a try. */
+export async function replayReadyFingerprint(tenantId: string, fingerprint: string) {
+  const row = await prisma.generationJob.findFirst({
+    where: { tenantId, fingerprint, status: "READY", expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!row?.imagePath) return null;
+  const image = await readStored(row.imagePath);
+  if (!image) return null;
+  return {
+    image,
+    demoReason: row.demoReason,
+    contentType: row.imagePath.endsWith(".json") ? "application/json" : "image/jpeg",
+  };
 }
 
 function jobKey(tenantId: string, requestId: string, fileName: string) {
