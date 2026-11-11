@@ -345,10 +345,10 @@ test("super-admin: try-on only, queue only, and both change what the owner and g
   await guestBoth.page.goto(`/s/${slug}`);
   await expect(guestBoth.page.getByRole("tab", { name: "Hair style" })).toBeVisible();
   await expect(guestBoth.page.getByRole("button", { name: "Bridal", exact: true })).toBeVisible();
-  await expect(guestBoth.page.getByRole("link", { name: "Join / Book" })).toBeVisible();
+  await expect(guestBoth.page.getByRole("link", { name: "Get Token" })).toBeVisible();
   await guestBoth.page.getByRole("button", { name: "Bridal", exact: true }).click();
   await expect(guestBoth.page.locator("[data-bridal='flow']")).toBeVisible();
-  await expect(guestBoth.page.getByRole("link", { name: "Join / Book" })).toBeVisible();
+  await expect(guestBoth.page.getByRole("link", { name: "Get Token" })).toBeVisible();
   await guestBoth.page.getByRole("tab", { name: "My looks" }).click();
   await expect(guestBoth.page.getByRole("button", { name: "Book bridal trial" })).toBeVisible();
   await guestBoth.context.close();

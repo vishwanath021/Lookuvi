@@ -1099,17 +1099,18 @@ export function TryOnApp({
             </span>
             <h1 className="min-w-0 flex-1 break-words text-lg leading-tight sm:text-xl">{config.name}</h1>
           </div>
-          {phone ? (
-            <div className="flex gap-2">
-              <a className="btn bar-book flex-1 whitespace-nowrap sm:flex-none" href={bookHref} target="_blank" rel="noreferrer">{t(lang, "bookNow")}</a>
-              <a className="btn bar-chat flex-1 whitespace-nowrap sm:flex-none" href={chatHref} target="_blank" rel="noreferrer">
-                <WhatsAppIcon />
-                {t(lang, "whatsappBtn")}
-              </a>
-            </div>
-          ) : (
-            <p className="max-w-xs text-sm leading-snug">{t(lang, "whatsappMissing")}</p>
-          )}
+          <div className={`${showQueue ? "grid-cols-3" : "grid-cols-2"} grid w-full gap-2 sm:flex sm:w-auto`}>
+            {showQueue ? <a className="btn bar-book min-h-11 px-2 text-center text-sm sm:px-4" href={joinHref}>{t(lang, "navToken")}</a> : null}
+            {phone ? (
+              <>
+                <a className="btn bar-book min-h-11 px-2 text-center text-sm sm:px-4" href={bookHref} target="_blank" rel="noreferrer">{t(lang, "bookNow")}</a>
+                <a className="btn bar-chat min-h-11 px-2 text-center text-sm sm:px-4" href={chatHref} target="_blank" rel="noreferrer">
+                  <WhatsAppIcon />
+                  {t(lang, "whatsappBtn")}
+                </a>
+              </>
+            ) : <p className="col-span-2 self-center text-sm leading-snug sm:col-span-1">{t(lang, "whatsappMissing")}</p>}
+          </div>
         </div>
       </header>
       <ConsentSheet open={consent.open} lang={lang} onAgree={(ageGate) => { track("consent_accepted", { lang }); void consent.agree(ageGate); }} onClose={consent.close} />
@@ -1252,7 +1253,7 @@ export function TryOnApp({
         </div>
       </section>
 
-      {activeShot && !cameraOn ? (
+      {activeShot && !cameraOn && !showResult ? (
         <div className="mt-3">
           <CropPhotoButton src={activeShot.url} disabled={busy} onApply={(blob) => applyBlob(blob)} />
         </div>
@@ -1309,7 +1310,6 @@ export function TryOnApp({
       )}
       {showResult && active && (
         <div className="mt-4 grid gap-2">
-          <h3 className="text-center font-serif text-2xl">{active.styleName}</h3>
           <button className="btn" type="button" onClick={() => void downloadLook()}>{t(lang, "downloadLook")}</button>
           {poseDebug && active.raw && (
             <a className="text-center text-sm underline" href={active.raw} target="_blank" rel="noreferrer" data-testid="provider-image">Provider image</a>
@@ -1323,12 +1323,6 @@ export function TryOnApp({
         </div>
       )}
       </div>
-      {miniPreview ? (
-        <div className="try-mini" data-mini-preview="yes">
-          {(showResult && active) || activeShot ? <img src={showResult && active ? active.after : activeShot?.url} alt="" /> : null}
-          <p className="min-w-0 flex-1 truncate text-sm">{showResult && active ? active.styleName : activeShot ? "Your photo" : "Your preview"}</p>
-        </div>
-      ) : null}
       <div className="try-picks">
       {visibleTools.length > 1 && (
       <div className="tool-row seg-fade">
@@ -1357,7 +1351,7 @@ export function TryOnApp({
       )}
       <div className="mt-3 flex items-center gap-2">
         {audiences.length > 1 ? (
-          <div className="seg min-w-0 flex-1" role="group" aria-label={t(lang, "audienceLabel")}>
+          <div className="seg seg-fill min-w-0 flex-1" role="group" aria-label={t(lang, "audienceLabel")}>
             {audiences.map((item) => (
               <button key={item} className="seg-btn" type="button" aria-pressed={gender === item} onClick={() => chooseGender(item)}>
                 {t(lang, item)}
@@ -1435,7 +1429,7 @@ export function TryOnApp({
                   <div className="mt-3">
                     <HairTypePicker
                       pickerOn={config.hairPickerOn}
-                      suggestOn={!salonLocked && config.hairSuggestOn}
+                      suggestOn={false}
                       usesCredits={config.hairSuggestUsesCredits}
                       density={pickedDensity}
                       texture={pickedTexture}
@@ -1568,7 +1562,7 @@ export function TryOnApp({
       <LegalFooter className="mt-auto px-0 pb-2" />
       </div>
       </div>
-      {embed ? null : <GuestNav slug={config.slug} lang={lang} joinHref={joinHref} current="try" />}
+      {embed ? null : <GuestNav slug={config.slug} lang={lang} current="try" />}
     </div>
   );
 }

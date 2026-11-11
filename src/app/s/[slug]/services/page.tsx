@@ -2,11 +2,9 @@ import { notFound } from "next/navigation";
 import { GuestNav } from "@/components/guest/GuestNav";
 import { LegalFooter } from "@/components/legal/LegalFooter";
 import { SalonPaused } from "@/components/guest/SalonPaused";
-import { t } from "@/data/i18n";
-import { guestJoinHref } from "@/lib/guest-nav";
+import { guestPageLocale, parseLanguages, t } from "@/data/i18n";
 import { loadTenantBySlug } from "@/lib/salon";
 import { isBlockedStatus } from "@/lib/salon-status";
-import { normalizeWhatsAppPhone } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +13,7 @@ export default async function ServicesPage({ params }: { params: Promise<{ slug:
   const tenant = await loadTenantBySlug(slug);
   if (!tenant) notFound();
   if (isBlockedStatus(tenant.status)) return <SalonPaused name={tenant.name} trialEnded={tenant.status === "EXPIRED"} />;
-  const lang = tenant.defaultLang || "en";
-  const phone = normalizeWhatsAppPhone(tenant.whatsapp);
-  const bookHref = phone
-    ? `https://wa.me/${phone}?text=${encodeURIComponent(`Hi ${tenant.name}, I would like to book an appointment.`)}`
-    : "";
-  const joinHref = guestJoinHref({ slug: tenant.slug, showQueue: tenant.productQueue, bookHref });
+  const lang = guestPageLocale(tenant.defaultLang, parseLanguages(tenant.languages));
   const services = [...tenant.services].sort((a, b) => a.name.localeCompare(b.name));
   return (
     <div className="guest-shell">
@@ -39,7 +32,7 @@ export default async function ServicesPage({ params }: { params: Promise<{ slug:
         )}
       </main>
       <LegalFooter />
-      <GuestNav slug={tenant.slug} lang={lang} joinHref={joinHref} current="services" />
+      <GuestNav slug={tenant.slug} lang={lang} current="services" />
     </div>
   );
 }

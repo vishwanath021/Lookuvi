@@ -342,8 +342,8 @@ const en: Record<string, string> = {
   queueMinShort: "About {min} min",
   queueRequestNote: "Tell us when you would like to come. The salon will confirm.",
   atSalonLocked: "Your free try-on opens when you reach the salon. Browse and save styles now; staff will unlock it when you arrive.",
-  atSalonDesireTitle: "See this look on you, free at the salon.",
-  atSalonDesireBody: "Your AI try-on unlocks when staff check you in. Save the looks you love now.",
+  atSalonDesireTitle: "Your free AI preview unlocks when you reach the salon.",
+  atSalonDesireBody: "Save the looks you love now. Staff check you in, and the preview is free.",
   atSalonJoin: "Join the queue",
   atSalonGotIt: "Got it",
   atSalonSaved: "Saved. Try it on when you arrive.",
@@ -361,6 +361,7 @@ const en: Record<string, string> = {
   queueTriesLine: "{used} used · {left} left",
   navTry: "Try on",
   navJoin: "Join / Book",
+  navToken: "Get Token",
   navSaved: "Saved",
   sectionEveryday: "Everyday",
   sectionBridal: "Bridal",
@@ -1231,6 +1232,15 @@ export function isLocale(value: string): value is Locale {
  * still offers English, so a partial translation cannot label three chips in
  * another language while the rest of the page stays English.
  */
+export function parseLanguages(raw: string | null | undefined) {
+  try {
+    const parsed = JSON.parse(raw || "[]") as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export function guestPageLocale(defaultLang: string | null | undefined, languages?: string[] | null) {
   const enabled = (languages ?? []).filter(isLocale);
   if (enabled.includes("en") || !enabled.length) return "en" as const;
