@@ -28,6 +28,7 @@ export function LookPicker({
   dropLabel = "Remove this look",
   onSelect,
   onTry,
+  tryLabel,
   onSave,
   saveNote,
 }: {
@@ -44,6 +45,7 @@ export function LookPicker({
   dropLabel?: string;
   onSelect: (id: string) => void;
   onTry: () => void;
+  tryLabel?: string;
   onSave?: () => void;
   saveNote?: string;
 }) {
@@ -103,7 +105,7 @@ export function LookPicker({
       ) : null}
       <div className="try-cta">
         <button className="btn w-full min-h-11" type="button" disabled={disabled || tryDisabled || !selected} onClick={onTry}>
-          Try this look
+          {tryLabel || "Try this look"}
         </button>
       </div>
     </div>

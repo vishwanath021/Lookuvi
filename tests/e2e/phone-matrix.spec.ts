@@ -106,8 +106,10 @@ test("guest: upload, every tab including bridal, generate, before/after, save, a
 
   await previewLook(page, "Soft Bob");
   await expect(page.getByRole("slider", { name: /BEFORE \/ AFTER/i })).toBeVisible();
-  const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Saved to your looks")).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download" }).click();
   expect((await downloadPromise).suggestedFilename()).toMatch(/\.jpg$/);
   const popupPromise = page.waitForEvent("popup");
   await page.getByRole("button", { name: "Book this look" }).click();

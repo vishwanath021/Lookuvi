@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { bridalFinishById, bridalHairById, bridalLipById, bridalLookById, bridalMakeupById, mehendiCardById, mehendiChoice, MEHENDI_COVERAGE, MEHENDI_DENSITY, MEHENDI_SHADES, MEHENDI_STYLES } from "@/data/bridal";
 import { readBridalGenerateFields } from "@/lib/bridal-request";
 import { parseBrowColour, parseBrowThickness } from "@/data/brows";
-import { claimGenerationJob, failGenerationJob, jobFingerprint } from "@/lib/ai/dedupe";
+import { claimGenerationJob, failGenerationJob, jobFingerprint, replayReadyFingerprint } from "@/lib/ai/dedupe";
 import { demoGuestPreview, engineForGuestTool, guestEngineReady, guestEngineToRun, loadGuestReference, readGuestEngine, runGuestHairstyleIfReady, runGuestLookIfReady } from "@/lib/ai/guest-hairstyle";
 import { guestPreviewHeaders } from "@/lib/ai/guest-response";
 import { auth } from "@/auth";
@@ -196,25 +196,40 @@ export async function POST(req: Request) {
 
   const requestId = String(form.get("requestId") || "");
   let jobId = "";
+  const fingerprint = jobFingerprint({
+    photo: jpeg,
+    styleId,
+    tool,
+    shadeId: tool === "brows"
+      ? `${browThickness}:${browColour}`
+      : tool === "style"
+        ? shadeId || ""
+        : tool === "bridal"
+          ? [finish.id, lip.id, makeup?.id || "", hair?.id || ""].join(":")
+          : tool === "mehendi"
+            ? [mehendiStyle?.id || "", mehendiCoverage?.id || "", mehendiShade?.id || "", mehendiDensity?.id || ""].join(":")
+            : "",
+    mode: tool,
+    sessionId,
+  });
+  const cached = await replayReadyFingerprint(tenant.id, fingerprint);
+  if (cached) {
+    if (cached.demoReason === "reference") {
+      return new NextResponse(new Uint8Array(cached.image), {
+        status: 200,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+      });
+    }
+    return new NextResponse(new Uint8Array(cached.image), {
+      status: 200,
+      headers: guestPreviewHeaders({ tryOnId: "replay", creditsLeft: tenant.creditBalance, demoReason: cached.demoReason }),
+    });
+  }
   if (requestId) {
     const claim = await claimGenerationJob({
       tenantId: tenant.id,
       requestId,
-      fingerprint: jobFingerprint({
-        photo: jpeg,
-        styleId,
-        tool,
-        shadeId: tool === "brows"
-          ? `${browThickness}:${browColour}`
-          : tool === "style"
-            ? shadeId || ""
-            : tool === "bridal"
-              ? [finish.id, lip.id, makeup?.id || "", hair?.id || ""].join(":")
-              : tool === "mehendi"
-                ? [mehendiStyle?.id || "", mehendiCoverage?.id || "", mehendiShade?.id || "", mehendiDensity?.id || ""].join(":")
-                : "",
-        mode: tool,
-      }),
+      fingerprint,
     });
     if (claim.kind === "conflict") return NextResponse.json({ error: "CONFLICT", message: claim.message }, { status: 409 });
     if (claim.kind === "inflight") return NextResponse.json({ error: "IN_FLIGHT", message: claim.message }, { status: 409 });

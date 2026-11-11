@@ -152,8 +152,10 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   await page.screenshot({ path: "docs/screenshots/04-preview.png", fullPage: true });
   await page.screenshot({ path: "docs/screenshots/15-demo-result.png", fullPage: true });
 
-  const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Saved to your looks")).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download" }).click();
   expect((await downloadPromise).suggestedFilename()).toMatch(/\.jpg$/);
   await page.getByRole("button", { name: "Try another" }).click();
   await expect(page.getByRole("button", { name: "Take photo" })).toBeEnabled();
