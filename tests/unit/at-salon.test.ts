@@ -3,7 +3,7 @@ import { POST as generate } from "@/app/api/v1/tryon/generate/route";
 import { POST as suggest } from "@/app/api/v1/tryon/suggest/route";
 import { auth } from "@/auth";
 import { deskUserId } from "@/lib/at-salon-gate";
-import { t } from "@/data/i18n";
+import { guestPageLocale, t } from "@/data/i18n";
 import {
   ASK_WAIT_MS,
   askMoreTries,
@@ -62,6 +62,9 @@ describe("at-salon try-ons", () => {
 
   it("keeps the unlocked copy singular for one try", () => {
     expect(t("en", "atSalonLocked")).toBe("Your free try-on opens when you reach the salon. Browse and save styles now; staff will unlock it when you arrive.");
+    expect(NOT_AT_SALON_MESSAGE).toBe("Your free AI preview unlocks when you reach the salon.");
+    expect(guestPageLocale("te", ["en", "te"])).toBe("en");
+    expect(t(guestPageLocale("te", ["en", "te"]), "services")).toBe("Services");
     expect(t("en", "atSalonUnlockedOne")).toBe("You're in! You have 1 free try-on");
     expect(t("en", "atSalonUnlockedMany", { count: 2 })).toBe("You're in! You have 2 free try-ons");
     expect(t("hi", "atSalonLocked")).not.toBe("atSalonLocked");
@@ -258,5 +261,38 @@ describe("at-salon try-ons", () => {
     const suggested = await suggest(new Request("http://localhost/api/v1/tryon/suggest", { method: "POST", body: suggestForm }));
     expect(suggested.status).toBe(403);
     expect((await suggested.json()).error).toBe("NOT_AT_SALON");
+  });
+
+  it("refuses a paid preview after a remote queue join until staff mark Arrived", async () => {
+    const tenant = await salon(`salon-lock-join-${Date.now()}`);
+    const sessionId = "session-join-12345678";
+    const deviceId = "device-join-12345678";
+    const entry = await prisma.queueEntry.create({
+      data: {
+        tenantId: tenant.id,
+        dayKey: kolkataDayKey(),
+        token: 4,
+        name: "Remote",
+        phone: "919800011199",
+        status: "WAITING",
+        source: "ONLINE",
+        cancelToken: `cancel-${Date.now()}-join`,
+        sessionId,
+        deviceId,
+      },
+    });
+    const form = new FormData();
+    form.set("slug", tenant.slug);
+    form.set("styleId", "pixie");
+    form.set("sessionId", sessionId);
+    form.set("deviceId", deviceId);
+    form.set("tool", "style");
+    form.set("photo", new File([Uint8Array.from([1, 2, 3])], "selfie.jpg", { type: "image/jpeg" }));
+    const blocked = await generate(new Request("http://localhost/api/v1/tryon/generate", { method: "POST", body: form }));
+    expect(blocked.status).toBe(403);
+    expect((await blocked.json()).error).toBe("NOT_AT_SALON");
+    expect(await prisma.tryOn.count({ where: { tenantId: tenant.id } })).toBe(0);
+    expect((await markArrived(tenant.id, entry.id)).ok).toBe(true);
+    expect(await refuseAtSalon({ tenant, sessionId, deviceId })).toBeNull();
   });
 });

@@ -5,7 +5,7 @@ import { unlockVisit } from "@/lib/visit-allowance";
 import { VISIT_CAP_MESSAGE, VISIT_TRY_KINDS } from "@/lib/visit-tries";
 
 export const NOT_AT_SALON_MESSAGE =
-  "Your free try-on opens when you reach the salon. Browse and save styles now; staff will unlock it when you arrive.";
+  "Your free AI preview unlocks when you reach the salon.";
 
 export const TRY_ADD_MIN = 1;
 export const TRY_ADD_MAX = 9;

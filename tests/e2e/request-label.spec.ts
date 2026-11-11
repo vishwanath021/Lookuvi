@@ -29,6 +29,7 @@ test("request mode says Request a time on the welcome and the try-on", async ({ 
   await expect(page.getByRole("link", { name: "Request a time" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Join queue", exact: true })).toHaveCount(0);
   await page.goto(`/s/${SLUG}`);
-  await expect(page.locator("[data-guest-nav='yes']").getByRole("link", { name: "Join / Book" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Get Token" })).toBeVisible();
+  await expect(page.locator("[data-guest-nav='yes']").getByRole("link", { name: "Join / Book" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Join queue", exact: true })).toHaveCount(0);
 });
