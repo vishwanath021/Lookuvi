@@ -20,7 +20,8 @@ import {
   type BridalStyleId,
 } from "@/data/bridal";
 import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
-import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { AtSalonNote } from "@/components/guest/AtSalonNote";
+import { AtSalonSheet, useUnlockSheet } from "@/components/guest/AtSalonSheet";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
@@ -42,7 +43,7 @@ function remember(current: Shot | undefined, next: Shot) {
 }
 
 export function BridalOwnLook({ config }: { config: SalonConfig }) {
-  const atSalon = useAtSalon();
+  const gate = useUnlockSheet(config.tryOnsAtSalon);
   const [face, setFace] = useState<Shot | null>(null);
   const [items, setItems] = useState<Partial<Record<OwnLookSlotId, Shot>>>({});
   const [makeupStyle, setMakeupStyle] = useState<BridalStyleId>(defaultBridalStyle(BRIDAL_MAKEUP));
@@ -220,8 +221,8 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
   }
 
   async function generate() {
+    if (gate.stop()) return;
     if (busy || !face || !chosen) return;
-    if (atSalon.required && !atSalon.unlocked) return;
     const problem = payloadProblem([
       ...(face.serverId ? [] : [{ label: "selfie", size: face.blob.size }]),
       ...OWN_LOOK_SLOTS.flatMap((slot) => {
@@ -396,13 +397,13 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
         <AtSalonNote lang={config.defaultLang || "en"} />
         <TryBar
           label={ownButton.label}
-          enabled={ownButton.enabled}
+          enabled={gate.locked || ownButton.enabled}
           busy={busy}
           counter={counter}
           note={capNote}
           another={ownButton.another}
           onAnother={() => scrollToStep("own-steps")}
-          onClick={() => void generate()}
+          onClick={() => { if (!gate.stop()) void generate(); }}
         />
         {camError ? <p className="text-sm" role="alert">{camError}</p> : null}
         {error && !busy ? <p className="rounded-lg border border-[#e9b4b4] bg-[#fdf1f1] p-2 text-sm text-[#7a1f1f]" role="alert" data-own-error="yes">{error}</p> : null}
@@ -420,6 +421,7 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
           addFile(fileTarget.current, file);
         }}
       />
+      <AtSalonSheet open={gate.open} lang={config.defaultLang || "en"} joinHref={`/s/${config.slug}/queue`} onClose={gate.close} />
     </div>
   );
 }

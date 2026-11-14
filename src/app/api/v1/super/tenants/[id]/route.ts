@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isPlanId } from "@/data/plans";
@@ -36,12 +37,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!("session" in access)) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
   const { id } = await ctx.params;
   const parsed = schema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "INVALID" }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "INVALID", message: "That salon update was not understood." }, { status: 400 });
   const tenant = await prisma.tenant.findUnique({ where: { id } });
-  if (!tenant) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  if (!tenant) return NextResponse.json({ error: "NOT_FOUND", message: "That salon was not found." }, { status: 404 });
   if (parsed.data.remove) {
     const deletedAt = new Date();
-    await prisma.tenant.update({ where: { id }, data: { deletedAt } });
+    const removed = await prisma.tenant.updateMany({ where: { id, deletedAt: null }, data: { deletedAt } });
+    if (!removed.count) return NextResponse.json({ error: "NOT_FOUND", message: "That salon was not found." }, { status: 404 });
     await prisma.auditLog.create({
       data: {
         actorId: access.session.user.id,
@@ -71,24 +73,22 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     };
   }
   const planChange = parsed.data.plan && isPlanId(parsed.data.plan) ? await applyPlanChange(id, parsed.data.plan) : null;
-  await prisma.tenant.update({
-    where: { id },
-    data: {
-      name: parsed.data.name,
-      status: parsed.data.status,
-      ...(parsed.data.productTryOn !== undefined ? { productTryOn: parsed.data.productTryOn } : {}),
-      ...(parsed.data.productQueue !== undefined ? { productQueue: parsed.data.productQueue } : {}),
-      ...(parsed.data.productBridal !== undefined ? { productBridal: parsed.data.productBridal } : {}),
-      ...(parsed.data.productGroom !== undefined ? { productGroom: parsed.data.productGroom } : {}),
-      ...(parsed.data.productMakeupStudio !== undefined ? { productMakeupStudio: parsed.data.productMakeupStudio } : {}),
-      ...(parsed.data.anonDailyCap !== undefined ? { anonDailyCap: parsed.data.anonDailyCap } : {}),
-      ...(parsed.data.memberDailyCap !== undefined ? { memberDailyCap: parsed.data.memberDailyCap } : {}),
-      ...(parsed.data.monthlyTryAllowance !== undefined ? { monthlyTryAllowance: parsed.data.monthlyTryAllowance } : {}),
-      ...(parsed.data.visitTryLimit !== undefined ? { visitTryLimit: parsed.data.visitTryLimit } : {}),
-      ...(parsed.data.teamLogins !== undefined ? { teamLogins: parsed.data.teamLogins } : {}),
-      ...(hours ?? {}),
-    },
-  });
+  const patch: Record<string, unknown> = { ...(hours ?? {}) };
+  if (parsed.data.name !== undefined) patch.name = parsed.data.name;
+  if (parsed.data.status !== undefined) patch.status = parsed.data.status;
+  if (parsed.data.productTryOn !== undefined) patch.productTryOn = parsed.data.productTryOn;
+  if (parsed.data.productQueue !== undefined) patch.productQueue = parsed.data.productQueue;
+  if (parsed.data.productBridal !== undefined) patch.productBridal = parsed.data.productBridal;
+  if (parsed.data.productGroom !== undefined) patch.productGroom = parsed.data.productGroom;
+  if (parsed.data.productMakeupStudio !== undefined) patch.productMakeupStudio = parsed.data.productMakeupStudio;
+  if (parsed.data.anonDailyCap !== undefined) patch.anonDailyCap = parsed.data.anonDailyCap;
+  if (parsed.data.memberDailyCap !== undefined) patch.memberDailyCap = parsed.data.memberDailyCap;
+  if (parsed.data.monthlyTryAllowance !== undefined) patch.monthlyTryAllowance = parsed.data.monthlyTryAllowance;
+  if (parsed.data.visitTryLimit !== undefined) patch.visitTryLimit = parsed.data.visitTryLimit;
+  if (parsed.data.teamLogins !== undefined) patch.teamLogins = parsed.data.teamLogins;
+  if (Object.keys(patch).length) {
+    await prisma.tenant.update({ where: { id }, data: patch as Prisma.TenantUpdateInput });
+  }
   if (parsed.data.productBridal === true) await ensureBridalPackages(id);
   if (planChange) {
     await prisma.auditLog.create({

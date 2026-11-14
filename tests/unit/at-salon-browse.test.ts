@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { addSavedPick, readSavedPicks, showLockedBrowse } from "@/lib/at-salon-browse";
+import { addSavedPick, readSavedPicks, removeSavedPick, showLockedBrowse, writeSavedPicks, SAVED_DROP_ERROR } from "@/lib/at-salon-browse";
 
 describe("locked browse", () => {
   it("hides the empty photo frame until the guest is unlocked", () => {
@@ -18,6 +18,12 @@ describe("locked browse", () => {
     expect(colour.map((item) => item.name)).toEqual(["Honey", "Bob"]);
     expect(readSavedPicks(JSON.stringify(colour))).toEqual(colour);
     expect(readSavedPicks("nope")).toEqual([]);
+    const dropped = removeSavedPick(colour, { tool: "style", id: "bob" });
+    expect(dropped.map((item) => item.name)).toEqual(["Honey"]);
+    expect(writeSavedPicks(dropped, () => { throw new Error("full"); })).toEqual({ ok: false, message: SAVED_DROP_ERROR });
+    const writes: string[] = [];
+    expect(writeSavedPicks(dropped, (raw) => { writes.push(raw); }).ok).toBe(true);
+    expect(readSavedPicks(writes[0])).toEqual(dropped);
   });
 
   it("labels the custom tries box and does not offer a counter QR", () => {

@@ -40,7 +40,7 @@ model Tenant {
   productMakeupStudio Boolean   @default(false)
   /** Free paid previews for one visit. A super-admin sets this. Staff can still add tries at the queue. */
   visitTryLimit       Int       @default(1)
-  /** Free AI try-ons wait until the guest is at the salon today. Off for the sales demo. */
+  /** Free AI try-ons wait until the guest is at the salon today. The demo salon is on. */
   tryOnsAtSalon       Boolean   @default(true)
   /** WhatsApp when a waiting guest is nearly due. Off until the owner turns it on. */
   whatsappAlmostOn    Boolean   @default(false)

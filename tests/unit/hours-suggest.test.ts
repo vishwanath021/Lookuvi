@@ -69,7 +69,8 @@ describe("closed toggle and AM/PM", () => {
 
 describe("owner onboarding", () => {
   it("reaches hours after services and before the QR step, with WhatsApp as step 3", () => {
-    expect(ONBOARDING_STEPS).toEqual(["Brand", "Services", "WhatsApp", "Languages", "Hours", "Reminders", "Done"]);
+    expect(ONBOARDING_STEPS).toEqual(["Brand", "Services", "WhatsApp", "Hours", "Reminders", "Done"]);
+    expect(ONBOARDING_STEPS).not.toContain("Languages");
     expect(ONBOARDING_STEPS.indexOf("Hours")).toBeGreaterThan(ONBOARDING_STEPS.indexOf("Services"));
     expect(ONBOARDING_STEPS.indexOf("Reminders")).toBeGreaterThan(ONBOARDING_STEPS.indexOf("Hours"));
     expect(ONBOARDING_STEPS.indexOf("Reminders")).toBeLessThan(ONBOARDING_STEPS.indexOf("Done"));
@@ -77,7 +78,9 @@ describe("owner onboarding", () => {
     const html = renderToStaticMarkup(createElement(OnboardingWizard, {
       initial: { name: "Demo", primaryColor: "#69517D", whatsapp: "", address: "", languages: ["en"], services: [] },
     }));
-    expect(html).toContain("Step 1 of 7");
+    expect(html).toContain("Step 1 of 6");
+    expect(html).not.toContain("తెలుగు");
+    expect(html).not.toContain("हिन्दी");
     expect(html).not.toContain("How do you want to send come-back reminders?");
     expect(html).toContain("Brand");
     expect(html).not.toContain('data-onboarding-step="hours"');

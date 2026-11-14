@@ -5,9 +5,10 @@ import { flushSync } from "react-dom";
 import { isPlatformLogo, LookuviMark } from "@/components/brand/LookuviMark";
 import { WhatsAppIcon } from "@/components/icons/ContactIcons";
 import { BeforeAfter } from "@/components/tryon/BeforeAfter";
-import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { AtSalonNote } from "@/components/guest/AtSalonNote";
+import { AtSalonSheet, useUnlockSheet } from "@/components/guest/AtSalonSheet";
 import { GuestNav } from "@/components/guest/GuestNav";
-import { addSavedPick, readSavedPicks, savedPickOn, savedPicksKey, showLockedBrowse, type SavedPick } from "@/lib/at-salon-browse";
+import { addSavedPick, readSavedPicks, removeSavedPick, savedPickOn, savedPicksKey, writeSavedPicks, SAVED_DROP_ERROR, type SavedPick } from "@/lib/at-salon-browse";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
@@ -210,7 +211,7 @@ export function TryOnApp({
   showMakeup?: boolean;
 }) {
   const lang = guestPageLocale(config.defaultLang, config.languages);
-  const atSalon = useAtSalon();
+  const gate = useUnlockSheet(config.tryOnsAtSalon);
   const [savedPicks, setSavedPicks] = useState<SavedPick[]>([]);
   const [savedFlash, setSavedFlash] = useState(false);
   const sections = guestSections({ everyday: showEveryday, bridal: showBridal, groom: showGroom, makeup: showMakeup });
@@ -236,14 +237,12 @@ export function TryOnApp({
   const [styleId, setStyleId] = useState("");
   const browThickness: BrowThickness = "natural";
   const browColour: BrowColour = "natural";
-  const [unlockSheet, setUnlockSheet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [busyTool, setBusyTool] = useState<TryTool | null>(null);
   const [pickedDensity, setPickedDensity] = useState("");
   const [pickedTexture, setPickedTexture] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [lookFilter, setLookFilter] = useState("all");
-  const [droppedPicks, setDroppedPicks] = useState<SavedPick[]>([]);
   const [hairReading, setHairReading] = useState<HairReading | null>(null);
   const [suggestNote, setSuggestNote] = useState("");
   const [suggestCost, setSuggestCost] = useState("");
@@ -744,7 +743,7 @@ export function TryOnApp({
   }
 
   async function suggestHair() {
-    if (showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon)) return;
+    if (gate.locked) return;
     if (!faceShot) {
       needPhoto();
       return;
@@ -826,8 +825,8 @@ export function TryOnApp({
     setPicked((current) => ({ ...current, [chosen.tool]: chosen.id }));
     setTool(chosen.tool);
     setError("");
-    if (showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon)) {
-      if (generate) setUnlockSheet(true);
+    if (gate.locked) {
+      if (generate) gate.show();
       return;
     }
     if (!shotRefFor(chosen.tool)) {
@@ -851,10 +850,7 @@ export function TryOnApp({
       frameRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
-    if (atSalon.required && !atSalon.unlocked) {
-      setUnlockSheet(true);
-      return;
-    }
+    if (gate.stop()) return;
     if (resultSig.current[chosen.tool] === comboSig(chosen)) return;
     if (previewLock.current) return;
     previewLock.current = true;
@@ -894,6 +890,7 @@ export function TryOnApp({
       const res = await postGuestGenerate({ slug: config.slug, body, requestId });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ message: GUEST_PREVIEW_FAILED }));
+        if (gate.fromRefusal(data)) return;
         setError(data.message || GUEST_PREVIEW_FAILED);
         if (poseDebug && data.debug) setPoseNote(data.debug as PlacementDebug);
         track("generate_failed", { styleId: chosen.id });
@@ -980,6 +977,10 @@ export function TryOnApp({
   function pickShade(id: string) {
     const item = config.shades.find((shade) => shade.id === id);
     if (!item) return;
+    if (gate.locked) {
+      gate.show();
+      return;
+    }
     setShadeId(id);
     track("colour_selected", { shade: id });
     selectLook({ id: item.id, name: item.name, serviceKeys: item.serviceKeys ?? [], tool: "colour" });
@@ -1047,7 +1048,7 @@ export function TryOnApp({
   const audiences = (["women", "men", "kids"] as const).filter((item) => (item === "women" ? config.showWomen : item === "men" ? config.showMen : config.showKids));
 
   const platformLogo = isPlatformLogo(config.logoUrl);
-  const salonLocked = showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon);
+  const salonLocked = gate.locked;
   const lockedBrowse = salonLocked && !cameraOn && !activeShot && !showResult;
   useEffect(() => {
     const node = previewDockRef.current;
@@ -1089,15 +1090,20 @@ export function TryOnApp({
   }
 
   function keepPick(pick: SavedPick) {
-    setDroppedPicks((current) => current.filter((item) => !(item.tool === pick.tool && item.id === pick.id)));
     writePicks(addSavedPick(savedPicks, pick));
     setSavedFlash(true);
   }
 
   function dropPick(pick: SavedPick) {
-    setDroppedPicks((current) => [pick, ...current.filter((item) => !(item.tool === pick.tool && item.id === pick.id))].slice(0, 12));
-    writePicks(savedPicks.filter((item) => !(item.tool === pick.tool && item.id === pick.id)));
+    const previous = savedPicks;
+    const next = removeSavedPick(previous, pick);
+    setSavedPicks(next);
     setSavedFlash(true);
+    const saved = writeSavedPicks(next, (raw) => localStorage.setItem(savedPicksKey(config.slug), raw));
+    if (!saved.ok) {
+      setSavedPicks(previous);
+      setNotice(saved.message || SAVED_DROP_ERROR);
+    }
   }
 
   function toggleCurrentStyle() {
@@ -1110,10 +1116,8 @@ export function TryOnApp({
 
   function markFor(pick: SavedPick) {
     if (lookFilter !== "saved") return undefined;
-    const saved = savedPickOn(savedPicks, pick);
-    const removed = !saved && droppedPicks.some((item) => item.tool === pick.tool && item.id === pick.id);
-    if (!saved && !removed) return undefined;
-    return { removed, onKeep: () => keepPick(pick), onDrop: () => dropPick(pick) };
+    if (!savedPickOn(savedPicks, pick)) return undefined;
+    return { removed: false, onKeep: () => keepPick(pick), onDrop: () => dropPick(pick) };
   }
 
   const chosenLive = chosenNow();
@@ -1246,7 +1250,7 @@ export function TryOnApp({
                 onUpload={() => { stopCamera(); openFile(); }}
                 onDownload={active ? () => void downloadLook() : undefined}
                 canDownload={Boolean(active)}
-                makeup={tool === "colour" && modelStatus !== "error" ? (
+                makeup={tool === "colour" && !salonLocked && modelStatus !== "error" ? (
                   <div className="absolute inset-0">
                     <ColourStage
                       video={videoEl}
@@ -1266,7 +1270,7 @@ export function TryOnApp({
                 <img src={activeShot.url} alt="" className="h-full w-full object-contain" />
               </div>
             )}
-            {tool === "colour" && !cameraOn && !busy && faceShot && modelStatus !== "error" && (
+            {tool === "colour" && !salonLocked && !cameraOn && !busy && faceShot && modelStatus !== "error" && (
               <div className="absolute inset-0">
                 <ColourStage
                   video={null}
@@ -1446,19 +1450,6 @@ export function TryOnApp({
                     mark: markFor(pick),
                   };
                 }),
-                ...droppedPicks.flatMap((pick) => {
-                  if (lookFilter !== "saved" || pick.tool !== "style" || savedPickOn(savedPicks, pick)) return [];
-                  if (shownStyles.some((style) => style.id === pick.id)) return [];
-                  const style = config.styles.find((item) => item.id === pick.id && item.gender === gender);
-                  if (!style) return [];
-                  return [{
-                    id: style.id,
-                    name: style.name,
-                    tags: ["saved"],
-                    preview: <StyleCard id={style.id} name={style.name} />,
-                    mark: markFor(pick),
-                  }];
-                }),
               ]}
               onSelect={(id) => {
                 const style = shownStyles.find((item) => item.id === id) || config.styles.find((item) => item.id === id);
@@ -1591,21 +1582,14 @@ export function TryOnApp({
       </section>
       </div>
       </div>
-      {unlockSheet ? (
-        <div className="fixed inset-0 z-50 grid items-end bg-black/40 p-3 sm:place-items-center" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setUnlockSheet(false); }}>
-          <div className="card grid w-full max-w-sm gap-3 overflow-hidden p-4" role="dialog" aria-label={t(lang, "atSalonDesireTitle")} data-unlock-sheet="yes">
-            <img src="/samples/portrait.jpg" alt="" className="h-40 w-full rounded-xl object-cover object-top" />
-            <h2 className="font-serif text-2xl leading-tight">{t(lang, "atSalonDesireTitle")}</h2>
-            <p className="text-sm leading-6 text-muted">{t(lang, "atSalonDesireBody")}</p>
-            <button className="btn min-h-11" type="button" disabled={!chosenNow()} onClick={toggleCurrentStyle}>{chosenSaved ? t(lang, "unsaveThisLook") : t(lang, "saveThisLook")}</button>
-            {showQueue ? (
-              <a className="btn secondary min-h-11 text-center" href={joinHref}>{t(lang, "atSalonJoin")}</a>
-            ) : (
-              <button className="btn secondary min-h-11" type="button" onClick={() => setUnlockSheet(false)}>{t(lang, "atSalonGotIt")}</button>
-            )}
-          </div>
-        </div>
-      ) : null}
+      <AtSalonSheet
+        open={gate.open}
+        lang={lang}
+        joinHref={showQueue ? joinHref : undefined}
+        onClose={gate.close}
+        onSave={chosenNow() ? toggleCurrentStyle : undefined}
+        saveLabel={chosenNow() ? (chosenSaved ? t(lang, "unsaveThisLook") : t(lang, "saveThisLook")) : undefined}
+      />
       </>}
       <div data-page-foot="yes">
       <LegalFooter className="mt-auto px-0 pb-2" />

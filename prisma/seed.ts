@@ -37,7 +37,7 @@ async function main() {
       anonDailyCap: 8,
       memberDailyCap: 30,
       requireLoginToBook: false,
-      tryOnsAtSalon: false,
+      tryOnsAtSalon: true,
       teamLogins: true,
     },
     create: {
@@ -74,7 +74,7 @@ async function main() {
       anonDailyCap: 8,
       memberDailyCap: 30,
       requireLoginToBook: false,
-      tryOnsAtSalon: false,
+      tryOnsAtSalon: true,
     },
   });
 

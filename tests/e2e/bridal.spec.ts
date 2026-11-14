@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
 import { mkdir } from "node:fs/promises";
 
 test.use({ viewport: { width: 390, height: 844 } });
@@ -170,7 +171,9 @@ test("zero try-ons still shows a bridal preview and the owner balance", async ({
   const prisma = await salonDb();
   await prisma.tenant.update({ where: { slug: "demo" }, data: { creditBalance: 0, productBridal: true, productTryOn: true } });
   await prisma.$disconnect();
+  await arriveDemoGuest(page);
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
   await page.locator("[data-photo='bridal']").setInputFiles("public/samples/portrait.jpg");
   await page.getByRole("button", { name: "Try now" }).click();

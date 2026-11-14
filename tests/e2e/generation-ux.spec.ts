@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import sharp from "sharp";
 import { expect, test } from "@playwright/test";
+import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
 
 test.use({ viewport: { width: 375, height: 812 } });
 
@@ -29,7 +30,9 @@ test("the bridal photo shows the loading sweep, then a crossfade", async ({ page
   });
 
   await page.clock.install();
+  await arriveDemoGuest(page);
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
   await page.locator("[data-photo='bridal']").setInputFiles(FACE);
   await expect(page.getByRole("img", { name: "Your selfie" })).toBeVisible();

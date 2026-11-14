@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
+import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
 import { openLive } from "./live-entry";
 
 const OUT = "/opt/cursor/artifacts/ux-r5";
@@ -74,8 +75,10 @@ test("a choice change after the result does not call the preview", async ({ page
   test.skip(testInfo.project.name !== "desktop", "one viewport is enough");
   test.setTimeout(120_000);
   await shotGuard(page);
+  await arriveDemoGuest(page);
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
   await page.locator("[data-photo='bridal']").setInputFiles("public/samples/portrait.jpg");
   await page.getByRole("button", { name: "Try now" }).click();
@@ -103,7 +106,7 @@ async function shotGuard(page: Page) {
   const prisma = await salonDb();
   await prisma.tenant.update({
     where: { slug: "demo" },
-    data: { productBridal: true, productTryOn: true, creditBalance: 900, visitTryLimit: 3, tryOnsAtSalon: false },
+    data: { productBridal: true, productTryOn: true, creditBalance: 900, visitTryLimit: 3, tryOnsAtSalon: true },
   });
   await prisma.$disconnect();
 }

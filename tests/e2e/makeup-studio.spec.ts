@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
+import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
 
 const SHOTS = "/opt/cursor/artifacts/makeup-studio";
 const PORTRAIT = "tests/fixtures/portraits/woman-pink.jpg";
@@ -52,7 +53,9 @@ test("a photo is painted on the device and photoreal stays a sample", async ({ p
   const prisma = await salonDb();
   await prisma.tenant.update({ where: { slug: "demo" }, data: { productMakeupStudio: true, productTryOn: true, creditBalance: 0 } });
   await prisma.$disconnect();
+  await arriveDemoGuest(page);
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   await page.getByRole("button", { name: "Makeup", exact: true }).click();
   await page.locator("[data-makeup-upload]").setInputFiles(PORTRAIT);
   await expect(page.locator("[data-makeup-status='ready']")).toBeVisible({ timeout: 90_000 });

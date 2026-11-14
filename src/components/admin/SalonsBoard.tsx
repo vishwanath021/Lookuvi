@@ -28,6 +28,7 @@ function applySalonPatch(row: SalonRecord, body: Record<string, unknown>): Salon
     ...(typeof body.monthlyTryAllowance === "number" ? { monthlyTryAllowance: body.monthlyTryAllowance } : {}),
     ...(typeof body.visitTryLimit === "number" ? { visitTryLimit: body.visitTryLimit } : {}),
     ...(typeof body.teamLogins === "boolean" ? { teamLogins: body.teamLogins } : {}),
+    ...(typeof body.status === "string" ? { status: body.status } : {}),
   };
 }
 
@@ -54,6 +55,7 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
   const [status, setStatus] = useState("");
   const [focus, setFocus] = useState("");
   const [selected, setSelected] = useState<SalonRecord | null>(null);
+  const [actionSalon, setActionSalon] = useState<SalonRecord | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const dialogClosedAt = useRef(0);
   const [notice, setNotice] = useState("");
@@ -139,11 +141,13 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
   }
 
   function openSuspend(row: SalonRecord) {
+    setActionSalon(row);
     setSelected(row);
     setSuspendOpen(true);
   }
 
   function openDelete(row: SalonRecord) {
+    setActionSalon(row);
     setSelected(row);
     setDeleteConfirm("");
     setDeleteOpen(true);
@@ -215,6 +219,7 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
     if (body.remove === true) {
       setRows((current) => current.filter((row) => row.id !== id));
       setSelected(null);
+      setActionSalon(null);
       setDeleteOpen(false);
       setDeleteConfirm("");
       say("Salon deleted. Guest links now return not found. Nothing was removed from the database.");
@@ -285,12 +290,15 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
             <tbody>
               {filtered.map((row) => (
                 <tr key={row.id} className="cursor-pointer border-t border-line" onClick={() => openSalon(row)}>
-                  <td className="py-3 pr-3 font-medium">{row.name}</td>
+                  <td className="py-3 pr-3 font-medium">
+                    {row.name}
+                    {row.status === "SUSPENDED" ? <span className="mt-0.5 block text-xs text-[var(--bad)]" data-suspended="yes">Paused for guests</span> : null}
+                  </td>
                   <td className="py-3 pr-3">
                     <a className="underline" href={`/s/${row.slug}`} onClick={(event) => event.stopPropagation()}>{row.slug}</a>
                   </td>
                   <td className="py-3 pr-3">{row.planName}</td>
-                  <td className="py-3 pr-3"><Badge tone={statusTone(row.status)}>{row.status}</Badge></td>
+                  <td className="py-3 pr-3" data-salon-status={row.status}><Badge tone={statusTone(row.status)}>{row.status === "SUSPENDED" ? "Suspended" : row.status}</Badge></td>
                   <td className="py-3 pr-3">{row.credits}</td>
                   <td className="py-3 pr-3">{row.previewsThisMonth}</td>
                   <td className="py-3 pr-3">{when(row.trialEndsAt)}</td>
@@ -611,15 +619,16 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
             className="grid gap-3"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!selected || deleteConfirm !== selected.slug) return;
-              void update(selected.id, { remove: true });
+              const target = actionSalon || selected;
+              if (!target || deleteConfirm !== target.slug) return;
+              void update(target.id, { remove: true });
             }}
           >
             <label className="text-sm">Type {selected?.slug} to confirm
               <input className="field mt-1" aria-label="Type the salon link to confirm" value={deleteConfirm} onChange={(event) => setDeleteConfirm(event.target.value)} autoComplete="off" />
             </label>
             <div className="flex flex-wrap gap-2">
-              <button className="btn" type="submit" disabled={busy || !selected || deleteConfirm !== selected.slug}>{busy ? "Deleting…" : "Delete salon"}</button>
+              <button className="btn" type="submit" disabled={busy || !(actionSalon || selected) || deleteConfirm !== (actionSalon || selected)?.slug}>{busy ? "Deleting…" : "Delete salon"}</button>
               <button className="btn secondary" type="button" onClick={() => setDeleteOpen(false)}>Cancel</button>
             </div>
           </form>
@@ -628,20 +637,21 @@ export function SalonsBoard({ rows: initial, aiReady = true }: { rows: SalonReco
 
       <Dialog open={suspendOpen} onOpenChange={(open) => { setSuspendOpen(open); if (!open) { noteDialogClose(); setDetailOpen(false); } }}>
         <DialogContent
-          title={selected?.status === "SUSPENDED" ? "Resume salon" : "Suspend salon"}
-          description={selected?.status === "SUSPENDED" ? "The salon home opens again." : "Guests see a paused page until you resume."}
+          title={(actionSalon || selected)?.status === "SUSPENDED" ? "Resume salon" : "Suspend salon"}
+          description={(actionSalon || selected)?.status === "SUSPENDED" ? "The salon home opens again. Guests can try on." : "Guests see a paused page until you resume. Nothing is deleted."}
         >
           <div className="flex flex-wrap gap-2">
             <button
               className="btn"
               type="button"
-              disabled={busy || !selected}
+              disabled={busy || !(actionSalon || selected)}
               onClick={() => {
-                if (!selected) return;
-                void update(selected.id, { status: selected.status === "SUSPENDED" ? "ACTIVE" : "SUSPENDED" });
+                const target = actionSalon || selected;
+                if (!target) return;
+                void update(target.id, { status: target.status === "SUSPENDED" ? "ACTIVE" : "SUSPENDED" });
               }}
             >
-              {busy ? "Saving…" : selected?.status === "SUSPENDED" ? "Confirm resume" : "Confirm suspend"}
+              {busy ? "Saving…" : (actionSalon || selected)?.status === "SUSPENDED" ? "Confirm resume" : "Confirm suspend"}
             </button>
             <button className="btn secondary" type="button" onClick={() => setSuspendOpen(false)}>Cancel</button>
           </div>

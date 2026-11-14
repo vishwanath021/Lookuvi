@@ -148,7 +148,7 @@ export async function isAtSalon(args: {
   bypass?: boolean;
   now?: Date;
 }) {
-  if (!args.tenant.tryOnsAtSalon || args.bypass) return true;
+  if (args.tenant.tryOnsAtSalon === false || args.bypass) return true;
   const now = args.now ?? new Date();
   const dayKey = kolkataDayKey(now);
   const values = [args.sessionId, args.deviceId || "", args.phone || ""].map((value) => value.trim()).filter((value) => value.length >= 8);
@@ -192,9 +192,9 @@ export async function blockPaidVisit(args: {
     const away = await refuseAtSalon(args);
     if (away) return { ...away, status: 403 as const };
   }
-  const enforce = args.tenant.tryOnsAtSalon ? args.countsAsTry : args.legacyVisit;
+  const enforce = args.tenant.tryOnsAtSalon !== false ? args.countsAsTry : args.legacyVisit;
   if (!enforce) return null;
-  if (args.tenant.tryOnsAtSalon) {
+  if (args.tenant.tryOnsAtSalon !== false) {
     const budget = await visitBudget({
       tenantId: args.tenant.id,
       sessionId: args.sessionId,
@@ -222,8 +222,8 @@ export async function stampPaidVisit(
   photoId: string,
   legacyVisit: boolean,
 ) {
-  if (!tenant.tryOnsAtSalon && !legacyVisit) return response;
-  if (tenant.tryOnsAtSalon) {
+  if (tenant.tryOnsAtSalon === false && !legacyVisit) return response;
+  if (tenant.tryOnsAtSalon !== false) {
     const budget = await visitBudget({
       tenantId: tenant.id,
       sessionId,
@@ -322,9 +322,9 @@ export async function atSalonView(args: {
 }) {
   const now = args.now ?? new Date();
   if (args.sessionId.length >= 8) await attachGuest(args.tenant.id, args.sessionId, args.deviceId || "", now);
-  const required = args.tenant.tryOnsAtSalon && !args.bypass;
+  const required = args.tenant.tryOnsAtSalon !== false && !args.bypass;
   const unlocked = await isAtSalon({ ...args, bypass: args.bypass, now });
-  const budget = args.tenant.tryOnsAtSalon
+  const budget = args.tenant.tryOnsAtSalon !== false
     ? await visitBudget({
         tenantId: args.tenant.id,
         sessionId: args.sessionId,
@@ -355,7 +355,7 @@ export async function tryLineForEntry(
 ) {
   const dayKey = kolkataDayKey(now);
   const arrived = Boolean(entry.arrivedAt && kolkataDayKey(entry.arrivedAt) === dayKey);
-  const kinds = tenant.tryOnsAtSalon ? AI_PREVIEW_KINDS : VISIT_TRY_KINDS;
+  const kinds = tenant.tryOnsAtSalon !== false ? AI_PREVIEW_KINDS : VISIT_TRY_KINDS;
   const ids = await sessionIdsFor(entry.id, entry.sessionId);
   const [used, grants] = await Promise.all([
     ids.length

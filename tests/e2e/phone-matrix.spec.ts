@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -39,6 +40,8 @@ async function freshPage(browser: Browser) {
 }
 
 async function previewLook(page: Page, styleName: string) {
+  await arriveDemoGuest(page);
+  await waitForDemoUnlock(page);
   await page.locator("input[data-photo='gallery']").setInputFiles("public/samples/portrait.jpg");
   await expect(page.getByRole("button", { name: "Retake" })).toBeVisible();
   const gallery = page.getByRole("region", { name: "Styles" });
