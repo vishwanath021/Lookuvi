@@ -319,28 +319,28 @@ test("a queued guest cannot generate until staff mark Arrived", async ({ page })
       await expect(row.getByText("Arrived ✓")).toBeVisible();
     }).toPass();
     await page.context().clearCookies();
-    await expect(async () => {
-      if (new URL(page.url()).pathname !== "/s/demo") await page.goto("/s/demo", { waitUntil: "domcontentloaded" });
-      expect(new URL(page.url()).pathname).toBe("/s/demo");
-    }).toPass();
-    await waitForDemoUnlock(page);
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await waitForDemoUnlock(page);
+    const unlocked = page.waitForResponse(async (res) => {
+      if (!res.url().includes("/api/v1/at-salon") || res.request().method() !== "GET" || !res.ok()) return false;
+      const body = await res.json().catch(() => null);
+      return Boolean(body?.unlocked);
+    });
+    await page.goto("/s/demo", { waitUntil: "domcontentloaded" });
+    await unlocked;
+    await expect(page.locator("[data-at-salon='unlocked']")).toBeVisible();
     await page.locator("[data-photo='gallery']").setInputFiles(FACE);
+    await expect(page.locator("section[aria-label='Photo'] img")).toBeVisible();
     await card.click();
-    await expect(async () => {
-      const sheet = page.locator("[data-unlock-sheet='yes']");
-      if (await sheet.isVisible()) await sheet.locator("xpath=..").click({ position: { x: 8, y: 8 } });
-      const photo = page.locator("section[aria-label='Photo'] img");
-      if (!(await photo.isVisible())) {
-        await page.locator("[data-photo='gallery']").setInputFiles(FACE);
-        await expect(photo).toBeVisible();
-      }
-      await card.click();
-      await page.getByRole("button", { name: "Try this look" }).click();
-      await expect(sheet).toBeHidden({ timeout: 3_000 });
-      await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 30_000 });
-    }).toPass({ timeout: 90_000 });
+    await expect(card).toHaveAttribute("aria-pressed", "true");
+    const tryLook = page.getByRole("button", { name: "Try this look" });
+    const before = page.getByTestId("before-after");
+    if (await tryLook.isDisabled()) {
+      await expect(before).toBeVisible({ timeout: 60_000 });
+    } else {
+      const generated = page.waitForResponse((res) => res.url().includes("/api/v1/tryon/generate") && res.request().method() === "POST");
+      await tryLook.click();
+      expect((await generated).ok()).toBeTruthy();
+      await expect(before).toBeVisible({ timeout: 60_000 });
+    }
     expect(generates).toBe(1);
   } finally {
     const restore = await salonDb();

@@ -38,6 +38,13 @@ async function clearLine(request: APIRequestContext, cookie: string) {
   }
 }
 
+async function openTicket(page: Page, ref: string, status: string) {
+  await expect(async () => {
+    await page.goto(`${BASE}/s/demo/q/${ref}`, { waitUntil: "domcontentloaded", timeout: 20_000 });
+    await expect(page.locator("[data-status]")).toHaveAttribute("data-status", status, { timeout: 5_000 });
+  }).toPass({ timeout: 60_000 });
+}
+
 async function join(request: APIRequestContext, name: string, phone: string, extra: Record<string, unknown> = {}) {
   const res = await request.post(`${BASE}/api/v1/queue`, {
     data: { slug: "demo", name, phone, consent: true, deviceId: `e2e-${phone}-${Date.now()}`, ...extra },
@@ -48,14 +55,14 @@ async function join(request: APIRequestContext, name: string, phone: string, ext
 
 test.describe("queue stabilize regressions", () => {
   test("ticket CTAs follow start, no-show, and done", async ({ page, request }) => {
+    test.setTimeout(120_000);
     await login(page);
     const cookie = await cookieHeader(page);
     await clearLine(request, cookie);
 
     const { data: t } = await join(request, "StabA", "9876511001");
     await request.post(`${BASE}/api/v1/queue/visit`, { data: { slug: "demo", ref: t.ref, action: "way" } });
-    await page.goto(`${BASE}/s/demo/q/${t.ref}`);
-    await expect(page.locator("[data-status]")).toHaveAttribute("data-status", "WAITING");
+    await openTicket(page, t.ref, "WAITING");
     await expect(page.locator("[data-queue-coming]")).toBeVisible();
     await expect(page.locator("[data-queue-try]")).toBeVisible();
 
@@ -63,8 +70,7 @@ test.describe("queue stabilize regressions", () => {
     const entry = (next.data.serving || []).find((s: { entry?: { token: number; id: string } }) => s.entry?.token === t.token)?.entry;
     expect(entry?.id).toBeTruthy();
     await admin(request, cookie, { action: "start", id: entry.id });
-    await page.reload();
-    await expect(page.locator("[data-status]")).toHaveAttribute("data-status", "IN_SERVICE");
+    await openTicket(page, t.ref, "IN_SERVICE");
     await expect(page.getByText("You are being served")).toBeVisible();
     await expect(page.locator("[data-queue-coming]")).toHaveCount(0);
     await expect(page.locator("[data-queue-try]")).toHaveCount(0);
@@ -74,14 +80,12 @@ test.describe("queue stabilize regressions", () => {
     const desk = await admin(request, cookie);
     const waiting = (desk.data.waiting || []).find((w: { token: number }) => w.token === t2.token);
     await admin(request, cookie, { action: "noshow", id: waiting.id });
-    await page.goto(`${BASE}/s/demo/q/${t2.ref}`);
-    await expect(page.locator("[data-status]")).toHaveAttribute("data-status", "NO_SHOW");
+    await openTicket(page, t2.ref, "NO_SHOW");
     await expect(page.locator("[data-queue-coming]")).toHaveCount(0);
     await expect(page.locator("[data-queue-try]")).toHaveCount(0);
 
     await admin(request, cookie, { action: "done", id: entry.id });
-    await page.goto(`${BASE}/s/demo/q/${t.ref}`);
-    await expect(page.locator("[data-status]")).toHaveAttribute("data-status", "DONE");
+    await openTicket(page, t.ref, "DONE");
     await expect(page.locator("[data-queue-try]")).toHaveCount(0);
   });
 

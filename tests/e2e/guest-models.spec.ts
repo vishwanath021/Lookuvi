@@ -41,8 +41,10 @@ test("super-admin can select a guest fal model and the fal key field stays on th
   const model = page.getByLabel("Guest hairstyle model");
   await expect(model).toHaveValue("gpt-image-2.5-sunburst");
   await expect(model.locator("option")).toHaveCount(7);
+  const saved = page.waitForResponse((res) => res.url().includes("/api/v1/super/ai") && res.request().method() === "PUT");
   await model.selectOption("meta/muse-image/edit");
-  await expect(page.getByRole("status")).toContainText("meta/muse-image/edit is in use.");
+  expect((await saved).ok()).toBeTruthy();
+  await expect(page.getByRole("status").filter({ hasText: "meta/muse-image/edit is in use." })).toBeVisible();
   const prisma = await db();
   expect((await prisma.platformSetting.findUnique({ where: { key: "guest_hairstyle_model" } }))?.value).toBe("meta/muse-image/edit");
   await prisma.$disconnect();
