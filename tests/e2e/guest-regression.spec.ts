@@ -331,10 +331,15 @@ test("a queued guest cannot generate until staff mark Arrived", async ({ page })
     await expect(async () => {
       const sheet = page.locator("[data-unlock-sheet='yes']");
       if (await sheet.isVisible()) await sheet.locator("xpath=..").click({ position: { x: 8, y: 8 } });
+      const photo = page.locator("section[aria-label='Photo'] img");
+      if (!(await photo.isVisible())) {
+        await page.locator("[data-photo='gallery']").setInputFiles(FACE);
+        await expect(photo).toBeVisible();
+      }
       await card.click();
       await page.getByRole("button", { name: "Try this look" }).click();
       await expect(sheet).toBeHidden({ timeout: 3_000 });
-      await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 30_000 });
     }).toPass({ timeout: 90_000 });
     expect(generates).toBe(1);
   } finally {

@@ -45,8 +45,10 @@ test("super-admin confirm-delete hides the salon and the guest link is not found
   await expect(page.getByRole("link", { name: SLUG })).toBeVisible();
   await page.getByRole("button", { name: `Actions for ${SLUG}` }).click();
   await page.getByRole("menuitem", { name: "Suspend" }).click();
+  const suspended = page.waitForResponse((res) => res.url().includes("/api/v1/super/tenants/") && res.request().method() === "POST" && res.ok());
   await page.getByRole("dialog", { name: "Suspend salon" }).getByRole("button", { name: "Confirm suspend" }).click();
-  await expect(page.getByRole("row").filter({ hasText: SLUG }).getByText("Paused for guests")).toBeVisible({ timeout: 20_000 });
+  await suspended;
+  await expect(page.getByRole("row").filter({ hasText: SLUG }).getByText("Paused for guests")).toBeVisible();
   await page.goto(`/s/${SLUG}`);
   await expect(page.getByRole("heading", { name: "This salon is paused" })).toBeVisible();
   await page.goto("/super/salons");
