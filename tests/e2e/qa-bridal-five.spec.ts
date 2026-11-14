@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import sharp from "sharp";
 import { expect, test, type Page } from "@playwright/test";
+import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
 import { kolkataDayKey } from "@/lib/queue/day";
 import { base32Decode, totp } from "@/lib/totp";
 import { PrismaClient } from "@prisma/client";
@@ -43,7 +44,7 @@ test.beforeAll(async () => {
       creditBalance: 900,
       anonDailyCap: 80,
       whatsapp: "919800011122",
-      tryOnsAtSalon: false,
+      tryOnsAtSalon: true,
     },
   });
   await prisma.queueState.upsert({
@@ -88,7 +89,9 @@ test.beforeEach(async ({ page }) => {
 
 async function openDemo(page: Page, width: number) {
   await page.setViewportSize({ width, height: width < 500 ? 844 : 800 });
+  await arriveDemoGuest(page);
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   await expect(page.getByRole("heading", { level: 1, name: "Demo Salon – Bengaluru" })).toBeVisible();
 }
 
@@ -100,7 +103,7 @@ test.afterAll(async () => {
   });
   await prisma.tenant.update({
     where: { slug: "demo" },
-    data: { anonDailyCap: 8, loyaltyOn: false, tryOnsAtSalon: false },
+    data: { anonDailyCap: 8, loyaltyOn: false, tryOnsAtSalon: true },
   });
   await prisma.$disconnect();
 });

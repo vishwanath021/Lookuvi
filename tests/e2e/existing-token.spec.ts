@@ -31,8 +31,28 @@ test("a second name on the same phone is told which token already exists", async
   await page.getByLabel("Name", { exact: true }).fill("Mom");
   await page.getByLabel("Mobile number").fill("9876501881");
   await page.getByRole("checkbox", { name: /queue updates/i }).check();
+  const joined: { statusPath?: string } = {};
+  let joinStatus = 0;
+  await page.route("**/api/v1/queue", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    const upstream = await route.fetch();
+    const text = await upstream.text();
+    joinStatus = upstream.status();
+    Object.assign(joined, JSON.parse(text));
+    await route.fulfill({ response: upstream, body: text });
+  });
   await page.getByRole("button", { name: "Join the queue" }).click();
-  await expect(page.locator("[data-status='WAITING'][data-ready='yes']")).toBeVisible();
+  await expect.poll(() => joinStatus).toBeGreaterThan(0);
+  expect(joinStatus).toBeLessThan(400);
+  await expect(async () => {
+    if (!joined.statusPath || new URL(page.url()).pathname !== joined.statusPath) {
+      await page.goto(joined.statusPath!, { waitUntil: "domcontentloaded" });
+    }
+    await expect(page.locator("[data-status='WAITING'][data-ready='yes']")).toBeVisible();
+  }).toPass();
   const token = await page.locator("[data-queue-token]").getAttribute("data-queue-token");
 
   await page.goto("/s/family-phone/queue");

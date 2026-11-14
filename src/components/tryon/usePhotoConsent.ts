@@ -6,6 +6,7 @@ import { guestSessionId } from "@/lib/guest-session";
 /** One photo notice per browser session. The camera stays closed until the guest agrees. */
 export function usePhotoConsent(slug: string, lang: string) {
   const idRef = useRef("");
+  const agreed = useRef(false);
   const pending = useRef<null | (() => void)>(null);
   const [open, setOpen] = useState(false);
   const storageKey = `lookuvi-consent-${slug}`;
@@ -46,7 +47,7 @@ export function usePhotoConsent(slug: string, lang: string) {
   }
 
   function gate(action: () => void) {
-    if (idRef.current) {
+    if (idRef.current || agreed.current) {
       action();
       return;
     }
@@ -56,6 +57,7 @@ export function usePhotoConsent(slug: string, lang: string) {
 
   function agree(ageGate = true) {
     if (!ageGate) return;
+    agreed.current = true;
     const next = pending.current;
     pending.current = null;
     setOpen(false);

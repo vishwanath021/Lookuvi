@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import sharp from "sharp";
 import { expect, test, type Page } from "@playwright/test";
+import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
 
 const selfiePath = "tests/fixtures/portraits/glasses-beard.jpg";
 
@@ -36,7 +37,9 @@ async function previewShifted(page: Page, shifted: Buffer) {
       body: shifted,
     });
   });
+  await arriveDemoGuest(page);
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   await page.locator("input[data-photo='gallery']").setInputFiles(selfiePath);
   await expect(page.getByRole("button", { name: "Retake" })).toBeVisible();
   await page.getByRole("region", { name: "Styles" }).getByRole("button", { name: "Soft Bob" }).click();

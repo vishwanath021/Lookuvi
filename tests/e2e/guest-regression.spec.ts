@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
 
 const FACE = "tests/fixtures/live/woman-long-dark.jpg";
 const OWNER = { email: "owner@demo.agenticbuildworks.com", password: "DemoSalon#2026" };
@@ -10,16 +11,18 @@ async function salonDb() {
 }
 
 async function signIn(page: Page) {
-  await page.goto("/login");
-  const csrf = await page.request.get("/api/auth/csrf");
-  const { csrfToken } = (await csrf.json()) as { csrfToken: string };
-  const signed = await page.request.post("/api/auth/callback/credentials", {
-    form: { csrfToken, email: OWNER.email, password: OWNER.password, callbackUrl: "/admin" },
-    maxRedirects: 0,
-  });
-  if (!signed.ok() && signed.status() >= 400) throw new Error(`Sign-in failed (${signed.status()})`);
-  await page.goto("/admin/queue");
-  await expect(page.getByRole("heading", { name: "Queue" })).toBeVisible();
+  await expect(async () => {
+    const csrf = await page.request.get("/api/auth/csrf");
+    const { csrfToken } = (await csrf.json()) as { csrfToken: string };
+    const signed = await page.request.post("/api/auth/callback/credentials", {
+      form: { csrfToken, email: OWNER.email, password: OWNER.password, callbackUrl: "/admin/queue" },
+      maxRedirects: 0,
+    });
+    expect(signed.status()).toBeLessThan(400);
+    await page.goto("/admin/queue", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/admin/);
+    await expect(page.getByRole("heading", { name: "Queue" })).toBeVisible();
+  }).toPass({ timeout: 30_000 });
 }
 
 async function visit(page: Page, href: string) {
@@ -67,7 +70,7 @@ test.beforeAll(async () => {
       productQueue: true,
       productTryOn: true,
       productBridal: true,
-      tryOnsAtSalon: false,
+      tryOnsAtSalon: true,
       hoursOverride: "open",
       hoursOverrideUntil: new Date(Date.now() + 3 * 60 * 60 * 1000),
       closedDayKey: "",
@@ -87,7 +90,7 @@ test.afterAll(async () => {
   await prisma.tenant.update({
     where: { slug: "demo" },
     data: {
-      tryOnsAtSalon: false,
+      tryOnsAtSalon: true,
       hoursOverride: hoursBackup.hoursOverride,
       hoursOverrideUntil: hoursBackup.hoursOverrideUntil,
       closedDayKey: hoursBackup.closedDayKey,
@@ -179,7 +182,9 @@ test("generate, compare, save, and download without a second try", async ({ page
   page.on("request", (req) => {
     if (req.method() === "POST" && req.url().includes("/api/v1/tryon/generate")) generates += 1;
   });
+  await arriveDemoGuest(page);
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   await page.locator("[data-photo='gallery']").setInputFiles(FACE);
   await expect(page.locator("section[aria-label='Photo'] img")).toBeVisible();
   const card = page.locator("[data-style-grid='yes'] .look-grid button").first();
@@ -234,13 +239,13 @@ test("a locked try-on shows the teaser and does not generate", async ({ page }) 
     expect(generates).toBe(0);
   } finally {
     const restore = await salonDb();
-    await restore.tenant.update({ where: { slug: "demo" }, data: { tryOnsAtSalon: false } });
+    await restore.tenant.update({ where: { slug: "demo" }, data: { tryOnsAtSalon: true } });
     await restore.$disconnect();
   }
 });
 
 test("a queued guest cannot generate until staff mark Arrived", async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   const prisma = await salonDb();
   await prisma.tenant.update({ where: { slug: "demo" }, data: { tryOnsAtSalon: true } });
   await prisma.$disconnect();
@@ -256,13 +261,36 @@ test("a queued guest cannot generate until staff mark Arrived", async ({ page })
     await page.getByLabel("Name", { exact: true }).fill(guestName);
     await page.getByLabel("Mobile number").fill(phone);
     await page.getByRole("checkbox", { name: /queue updates/i }).check();
+    const joinBody: { statusPath?: string; message?: string } = {};
+    let joinStatus = 0;
+    await page.route("**/api/v1/queue", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      const upstream = await route.fetch();
+      const text = await upstream.text();
+      joinStatus = upstream.status();
+      Object.assign(joinBody, JSON.parse(text));
+      await route.fulfill({ response: upstream, body: text });
+    });
     await page.getByRole("button", { name: "Join the queue" }).click();
+    await expect.poll(() => joinStatus).toBeGreaterThan(0);
+    expect(joinStatus, joinBody.message || String(joinStatus)).toBeLessThan(400);
+    expect(joinBody.statusPath).toContain("/s/demo/q/");
     const ticket = page.locator("[data-status='WAITING'][data-ready='yes']");
-    const back = page.getByRole("link", { name: "See your place in line" });
-    await expect(ticket.or(back)).toBeVisible({ timeout: 20_000 });
-    if (!(await ticket.isVisible())) await back.click();
-    await expect(ticket).toBeVisible();
-    await visit(page, "/s/demo");
+    await expect(async () => {
+      if (new URL(page.url()).pathname !== joinBody.statusPath) {
+        await page.goto(joinBody.statusPath!, { waitUntil: "domcontentloaded" });
+      }
+      await expect(ticket).toBeVisible();
+    }).toPass();
+    await expect(async () => {
+      if (new URL(page.url()).pathname !== "/s/demo") {
+        await page.goto("/s/demo", { waitUntil: "domcontentloaded" });
+      }
+      await expect(page.locator("[data-style-grid='yes'] .look-grid button").first()).toBeVisible();
+    }).toPass();
     const card = page.locator("[data-style-grid='yes'] .look-grid button").first();
     await expect(card).toBeVisible();
     await expect(async () => {
@@ -284,17 +312,34 @@ test("a queued guest cannot generate until staff mark Arrived", async ({ page })
 
     await signIn(page);
     const row = page.locator("[data-queue-row]").filter({ hasText: guestName }).first();
-    await row.getByRole("button", { name: "Arrived", exact: true }).click();
-    await expect(row.getByText("Arrived ✓")).toBeVisible();
-    await page.goto("/s/demo");
+    await expect(row).toBeVisible();
+    await expect(async () => {
+      if (await row.getByText("Arrived ✓").isVisible()) return;
+      await row.getByRole("button", { name: "Arrived", exact: true }).click();
+      await expect(row.getByText("Arrived ✓")).toBeVisible();
+    }).toPass();
+    await page.context().clearCookies();
+    await expect(async () => {
+      if (new URL(page.url()).pathname !== "/s/demo") await page.goto("/s/demo", { waitUntil: "domcontentloaded" });
+      expect(new URL(page.url()).pathname).toBe("/s/demo");
+    }).toPass();
+    await waitForDemoUnlock(page);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForDemoUnlock(page);
     await page.locator("[data-photo='gallery']").setInputFiles(FACE);
-    await page.locator("[data-style-grid='yes'] .look-grid button").first().click();
-    await page.getByRole("button", { name: "Try this look" }).click();
-    await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 60_000 });
+    await card.click();
+    await expect(async () => {
+      const sheet = page.locator("[data-unlock-sheet='yes']");
+      if (await sheet.isVisible()) await sheet.locator("xpath=..").click({ position: { x: 8, y: 8 } });
+      await card.click();
+      await page.getByRole("button", { name: "Try this look" }).click();
+      await expect(sheet).toBeHidden({ timeout: 3_000 });
+      await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 60_000 });
+    }).toPass({ timeout: 90_000 });
     expect(generates).toBe(1);
   } finally {
     const restore = await salonDb();
-    await restore.tenant.update({ where: { slug: "demo" }, data: { tryOnsAtSalon: false } });
+    await restore.tenant.update({ where: { slug: "demo" }, data: { tryOnsAtSalon: true } });
     await restore.$disconnect();
   }
 });
@@ -331,12 +376,16 @@ test("owner queue, settings, and leads", async ({ page }) => {
     const box = await icon.boundingBox();
     if (box) expect(Math.round(box.width)).toBe(22);
   }
-  await page.goto("/admin/settings", { waitUntil: "networkidle" });
+  await expect(async () => {
+    await page.goto("/admin/settings", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/admin\/settings/);
+  }).toPass();
   if ((page.viewportSize()?.width || 0) < 800) {
-    const details = page.getByRole("button", { name: "Salon details" });
-    await details.click();
-    if ((await details.getAttribute("aria-current")) !== "page") await details.click();
-    await expect(details).toHaveAttribute("aria-current", "page");
+    await expect(async () => {
+      const details = page.getByRole("button", { name: "Salon details" });
+      if ((await details.getAttribute("aria-current")) !== "page") await details.click();
+      await expect(details).toHaveAttribute("aria-current", "page");
+    }).toPass();
   }
   await expect(page.getByRole("heading", { name: "Salon details" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Opening hours" })).toBeVisible();

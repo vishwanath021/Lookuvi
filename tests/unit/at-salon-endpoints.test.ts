@@ -68,10 +68,10 @@ describe("at-salon gate on every paid endpoint", () => {
     await prisma.tenant.delete({ where: { id: tenant.id } });
   });
 
-  it("records the demo seed lock as off and the schema default as on", () => {
+  it("records the demo seed lock as on and the schema default as on", () => {
     const seed = readFileSync("prisma/seed.ts", "utf8");
     const schema = readFileSync("prisma/schema.prisma", "utf8");
-    expect(seed.match(/tryOnsAtSalon: false/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(seed.match(/tryOnsAtSalon: true/g)?.length).toBeGreaterThanOrEqual(2);
     expect(schema).toContain("@default(true)");
     expect(schema).toMatch(/tryOnsAtSalon\s+Boolean\s+@default\(true\)/);
   });

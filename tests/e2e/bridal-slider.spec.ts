@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
 import { mkdir } from "node:fs/promises";
 
 const SHOTS = "/workspace/bridal-slider";
@@ -10,7 +11,9 @@ async function shot(page: Page, name: string) {
 }
 
 async function openBridalResult(page: Page) {
+  await arriveDemoGuest(page);
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
   await expect(page.locator("[data-bridal='flow']")).toBeVisible();
   const selfie = page.locator("#bridal-selfie");

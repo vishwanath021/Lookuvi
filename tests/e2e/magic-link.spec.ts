@@ -85,10 +85,12 @@ test("an invalid, expired, or used magic link shows an error and stays signed ou
   const prisma = await db();
   const token = "expired-magic-token-0123456789abcdef0123456789abcdef";
   const { createHash } = await import("node:crypto");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  await prisma.magicLink.deleteMany({ where: { tokenHash } });
   await prisma.magicLink.create({
     data: {
       email: OWNER_EMAIL,
-      tokenHash: createHash("sha256").update(token).digest("hex"),
+      tokenHash,
       expiresAt: new Date(Date.now() - 60_000),
       used: false,
     },
