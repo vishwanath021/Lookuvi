@@ -303,8 +303,8 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
       ) : null}
 
       {live ? (
-        <div className="mt-4 grid gap-6">
-          <section aria-label="Waiting">
+        <div className="queue-floor mt-4">
+          <section aria-label="Waiting" className="queue-waiting">
             <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted">{t(lang, "queueWaiting")}</h2>
             {desk.waiting.length === 0 ? <p className="mt-2 text-sm text-muted">{stale ? "Waiting list could not be loaded." : t(lang, "queueNobody")}</p> : null}
             {wide ? (
@@ -351,11 +351,11 @@ export function QueueDesk({ initial, lang, monthTries }: { initial: Desk; lang: 
               </div>
             )}
           </section>
-          <section aria-label="Chairs">
+          <section aria-label="Chairs" className="queue-chairs">
             <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted">Chairs</h2>
-            <div className={wide ? "mt-2 grid gap-2" : "mt-2 flex flex-wrap gap-2"}>
+            <div className="mt-2 grid gap-1.5">
               {desk.serving.map((seat) => (
-                <article key={seat.unit} className={wide ? "card flex w-full flex-col items-start gap-2 p-3" : "card inline-flex w-fit max-w-full flex-wrap items-center gap-2 px-3 py-2"} data-chair={seat.unit}>
+                <article key={seat.unit} className="queue-chair" data-chair={seat.unit}>
                   <p className="min-w-0 text-sm">
                     <span className="font-medium">{place} {seat.unit}</span>
                     {seat.entry?.status === "CALLED" ? (

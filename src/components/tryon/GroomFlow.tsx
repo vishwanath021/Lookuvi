@@ -20,9 +20,9 @@ import {
   type GroomSlotId,
 } from "@/data/groom";
 import { captureShouldMirror, visiblePortraitCrop } from "@/lib/capture";
-import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { AtSalonNote } from "@/components/guest/AtSalonNote";
+import { AtSalonSheet, useUnlockSheet } from "@/components/guest/AtSalonSheet";
 import { LockedPhotoNote } from "@/components/guest/LockedPhotoNote";
-import { showLockedBrowse } from "@/lib/at-salon-browse";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
@@ -43,8 +43,8 @@ function remember(current: Shot | undefined, next: Shot) {
 }
 
 export function GroomFlow({ config }: { config: SalonConfig }) {
-  const atSalon = useAtSalon();
-  const locked = showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon);
+  const gate = useUnlockSheet(config.tryOnsAtSalon);
+  const locked = gate.locked;
   const [panel, setPanel] = useState<Panel>("looks");
   const [hairId, setHairId] = useState(GROOM_HAIR[0]?.id || "");
   const [beardId, setBeardId] = useState("");
@@ -207,8 +207,8 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
 
   async function generate(kind: Panel) {
     const shot = kind === "own" ? ownFace : face;
+    if (gate.stop()) return;
     if (busy || !shot) return;
-    if (atSalon.required && !atSalon.unlocked) return;
     const key = previewKey(kind, shot);
     const cache = kind === "own" ? ownCache.current : looksCache.current;
     const cached = cache.get(key);
@@ -393,13 +393,13 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
             <AtSalonNote lang={config.defaultLang || "en"} />
             <TryBar
               label={looksButton.label}
-              enabled={looksButton.enabled}
+              enabled={locked || looksButton.enabled}
               busy={busy}
               counter={counter}
               note={capNote(looksButton.note)}
               another={looksButton.another}
               onAnother={() => scrollToStep("groom-steps")}
-              onClick={() => void generate("looks")}
+              onClick={() => { if (!gate.stop()) void generate("looks"); }}
             />
           </section>
         </div>
@@ -461,13 +461,13 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
             <AtSalonNote lang={config.defaultLang || "en"} />
             <TryBar
               label={ownButton.label}
-              enabled={ownButton.enabled}
+              enabled={locked || ownButton.enabled}
               busy={busy}
               counter={counter}
               note={capNote(ownButton.note)}
               another={ownButton.another}
               onAnother={() => scrollToStep("groom-own-steps")}
-              onClick={() => void generate("own")}
+              onClick={() => { if (!gate.stop()) void generate("own"); }}
             />
           </section>
         </div>
@@ -489,6 +489,7 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
         }}
       />
       <span className="sr-only" data-shot={shotFor(live || "face") ? "yes" : "no"} />
+      <AtSalonSheet open={gate.open} lang={config.defaultLang || "en"} joinHref={`/s/${config.slug}/queue`} onClose={gate.close} />
     </div>
   );
 }

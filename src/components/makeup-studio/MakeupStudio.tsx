@@ -5,7 +5,8 @@ import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { UserCameraDialog } from "@/components/tryon/UserCameraDialog";
 import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import { useVisitTries } from "@/components/tryon/useVisitTries";
-import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { AtSalonNote } from "@/components/guest/AtSalonNote";
+import { AtSalonSheet, useUnlockSheet } from "@/components/guest/AtSalonSheet";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import { detectStudioFace, type StudioFace } from "@/lib/makeup-studio/detect";
@@ -81,7 +82,7 @@ async function uploadBlob(canvas: HTMLCanvasElement) {
 }
 
 export function MakeupStudio({ config }: { config: SalonConfig }) {
-  const atSalon = useAtSalon();
+  const gate = useUnlockSheet(config.tryOnsAtSalon);
   const consent = usePhotoConsent(config.slug, config.defaultLang || "en");
   const visit = useVisitTries(config.slug);
   const uploadRef = useRef<HTMLInputElement>(null);
@@ -105,7 +106,16 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!photo || !face || !canvas || aiUrl) return;
+    if (!photo || !canvas || aiUrl) return;
+    if (gate.locked) {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      canvas.width = photo.canvas.width;
+      canvas.height = photo.canvas.height;
+      ctx.drawImage(photo.canvas, 0, 0);
+      return;
+    }
+    if (!face) return;
     let live = true;
     const frame = requestAnimationFrame(() => {
       if (!live) return;
@@ -131,7 +141,7 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
       live = false;
       cancelAnimationFrame(frame);
     };
-  }, [photo, face, params, aiUrl]);
+  }, [photo, face, params, aiUrl, gate.locked]);
 
   useEffect(() => () => {
     if (photoRef.current) URL.revokeObjectURL(photoRef.current.url);
@@ -186,7 +196,7 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
   async function runPhotoreal() {
     const current = photoRef.current;
     if (!current || !face || busy) return;
-    if (atSalon.required && !atSalon.unlocked) return;
+    if (gate.stop()) return;
     if (visit.atLimit) {
       setNote(VISIT_CAP_MESSAGE);
       return;
@@ -279,7 +289,7 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
   const actions = (
     <div className="grid gap-2">
       <AtSalonNote lang={config.defaultLang || "en"} />
-      <button className="btn w-full" type="button" disabled={!face || busy || visit.atLimit} onClick={() => consent.gate(() => { void runPhotoreal(); })}>
+      <button className="btn w-full" type="button" disabled={(!face && !gate.locked) || busy || visit.atLimit} onClick={() => { if (gate.stop()) return; consent.gate(() => { void runPhotoreal(); }); }}>
         {busy ? "Working…" : `Photoreal · ${counter}`}
       </button>
       <div className="flex gap-2">
@@ -365,6 +375,7 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
           <div className="mt-3 hidden md:block">{actions}</div>
         </div>
       </div>
+      <AtSalonSheet open={gate.open} lang={config.defaultLang || "en"} joinHref={`/s/${config.slug}/queue`} onClose={gate.close} />
     </section>
   );
 }

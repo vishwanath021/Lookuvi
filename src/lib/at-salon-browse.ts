@@ -44,3 +44,19 @@ export function readSavedPicks(raw: string | null): SavedPick[] {
 export function savedPicksKey(slug: string) {
   return `lookuvi-saved:${slug}`;
 }
+
+export const SAVED_DROP_ERROR = "Could not remove that look. It is still saved.";
+
+/** The card leaves the list immediately. The caller writes storage and rolls back on failure. */
+export function removeSavedPick(list: SavedPick[], pick: { tool: string; id: string }) {
+  return list.filter((item) => !(item.tool === pick.tool && item.id === pick.id));
+}
+
+export function writeSavedPicks(list: SavedPick[], write: (raw: string) => void) {
+  try {
+    write(JSON.stringify(list));
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const, message: SAVED_DROP_ERROR };
+  }
+}

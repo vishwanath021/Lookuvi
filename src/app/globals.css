@@ -891,6 +891,23 @@ textarea { min-height: 48px; }
   padding: 0;
 }
 .queue-icon svg { width: 22px; height: 22px; display: block; }
+.queue-floor { display: grid; gap: 0.75rem; align-items: start; }
+.queue-chairs, .queue-waiting { min-width: 0; }
+.queue-chair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card, #fff);
+}
+@media (min-width: 768px) {
+  .queue-floor { grid-template-columns: minmax(13.5rem, 18rem) minmax(0, 1fr); }
+  .queue-floor .queue-chairs { grid-column: 1; grid-row: 1; }
+  .queue-floor .queue-waiting { grid-column: 2; grid-row: 1; }
+}
 @media (max-width: 767px) {
   .owner-shell h1.page-title,
   .owner-shell [data-queue-mode] > header > h1,

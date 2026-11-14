@@ -35,9 +35,10 @@ import {
   type BridalEventId,
   type BridalStyleId,
 } from "@/data/bridal";
-import { AtSalonNote, useAtSalon } from "@/components/guest/AtSalonNote";
+import { AtSalonNote } from "@/components/guest/AtSalonNote";
 import { LockedPhotoNote } from "@/components/guest/LockedPhotoNote";
-import { showLockedBrowse } from "@/lib/at-salon-browse";
+import { SAVED_DROP_ERROR } from "@/lib/at-salon-browse";
+import { AtSalonSheet, useUnlockSheet } from "@/components/guest/AtSalonSheet";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import { postGuestGenerate } from "@/lib/guest-preview";
@@ -156,8 +157,9 @@ function readSaved(slug: string): SavedLook[] {
 function writeSaved(slug: string, looks: SavedLook[]) {
   try {
     localStorage.setItem(storageKey(slug), JSON.stringify(looks.slice(0, MAX_SAVED)));
+    return true;
   } catch {
-    // The phone may refuse a large photo. The looks still stay on this screen.
+    return false;
   }
 }
 
@@ -172,8 +174,8 @@ async function blobUrlToData(url: string) {
 }
 
 export function BridalFlow({ config }: { config: SalonConfig }) {
-  const atSalon = useAtSalon();
-  const locked = showLockedBrowse(Boolean(config.tryOnsAtSalon), atSalon);
+  const gate = useUnlockSheet(config.tryOnsAtSalon);
+  const locked = gate.locked;
   const [eventId, setEventId] = useState<BridalEventId>("wedding");
   const [panel, setPanel] = useState<"looks" | "own" | "mehendi" | "saved">("looks");
   const [lookStyle, setLookStyle] = useState<BridalStyleId>(defaultBridalStyle(BRIDAL_LOOKS));
@@ -197,7 +199,6 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
   const [error, setError] = useState("");
   const [result, setResult] = useState<LookResult | null>(() => resultFromStored(config.slug));
   const [saved, setSaved] = useState<SavedLook[]>([]);
-  const [gone, setGone] = useState<SavedLook[]>([]);
   const [compare, setCompare] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [eventDate, setEventDate] = useState("");
@@ -271,7 +272,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
 
   async function generate(kind: "look" | "mehendi", shot: Shot, overrides?: { finishId?: string; lipId?: string; makeupId?: string; hairId?: string }) {
     if (busy) return;
-    if (atSalon.required && !atSalon.unlocked) return;
+    if (gate.stop()) return;
     const finish = overrides?.finishId || finishId;
     const lip = overrides?.lipId || lipId;
     const makeup = overrides?.makeupId ?? makeupId;
@@ -338,6 +339,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
           const res = await postGuestGenerate({ slug: config.slug, body, requestId });
           const data = res.ok ? null : await res.json().catch(() => ({}));
           if (!res.ok) {
+            if (gate.fromRefusal(data)) throw new Error("");
             if (data?.error === "VISIT_CAP") visit.applyBody(data);
             throw new Error(data?.message || "That preview did not finish.");
           }
@@ -382,7 +384,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
       }
       if (outcome.result) showSaved(kind, key, outcome.result);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "That preview did not finish.");
+      const message = error instanceof Error ? error.message : "That preview did not finish.";
+      if (message) setError(message);
     } finally {
       setBusy(false);
       setBusyKind(null);
@@ -401,7 +404,6 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
       const next = saved.filter((item) => item.id !== existing.id);
       setSaved(next);
       writeSaved(config.slug, next);
-      setGone((current) => [existing, ...current.filter((item) => item.id !== existing.id)]);
       return;
     }
     const after = result.after.startsWith("data:") ? result.after : await blobUrlToData(result.after).catch(() => result.after);
@@ -419,7 +421,6 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
     const trimmed = [next, ...saved.filter((item) => item.lookId !== next.lookId || item.kind !== next.kind)].slice(0, MAX_SAVED);
     setSaved(trimmed);
     writeSaved(config.slug, trimmed);
-    setGone((current) => current.filter((item) => item.lookId !== next.lookId || item.kind !== next.kind));
     setPanel("saved");
   }
 
@@ -427,14 +428,16 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
     const trimmed = [look, ...saved.filter((item) => item.id !== look.id)].slice(0, MAX_SAVED);
     setSaved(trimmed);
     writeSaved(config.slug, trimmed);
-    setGone((current) => current.filter((item) => item.id !== look.id));
   }
 
   function removeLook(look: SavedLook) {
+    const previous = saved;
     const next = saved.filter((item) => item.id !== look.id);
     setSaved(next);
-    writeSaved(config.slug, next);
-    setGone((current) => [look, ...current.filter((item) => item.id !== look.id)]);
+    if (!writeSaved(config.slug, next)) {
+      setSaved(previous);
+      setError(SAVED_DROP_ERROR);
+    }
   }
 
   function toggleCompare(id: string) {
@@ -847,13 +850,13 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
             <AtSalonNote lang={config.defaultLang || "en"} />
             <TryBar
               label={lookButton.label}
-              enabled={lookButton.enabled}
+              enabled={locked || lookButton.enabled}
               busy={busy}
               counter={counter}
               note={capNote(lookButton.note)}
               another={lookButton.another}
               onAnother={() => scrollToStep("bridal-steps")}
-              onClick={() => { if (face) void generate("look", face); }}
+              onClick={() => { if (gate.stop()) return; if (face) void generate("look", face); }}
               onSave={result?.kind === "look" && !busy ? () => void saveCurrent() : undefined}
               saveLabel={currentSaved()?.kind === "look" ? "Unsave" : "Save this look"}
             />
@@ -918,13 +921,13 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
             <AtSalonNote lang={config.defaultLang || "en"} />
             <TryBar
               label={mehendiButton.label}
-              enabled={mehendiButton.enabled}
+              enabled={locked || mehendiButton.enabled}
               busy={busy}
               counter={counter}
               note={capNote(mehendiButton.note)}
               another={mehendiButton.another}
               onAnother={() => scrollToStep("bridal-mehendi")}
-              onClick={() => { if (hand) void generate("mehendi", hand); }}
+              onClick={() => { if (gate.stop()) return; if (hand) void generate("mehendi", hand); }}
               onSave={result?.kind === "mehendi" && !busy ? () => void saveCurrent() : undefined}
               saveLabel={currentSaved()?.kind === "mehendi" ? "Unsave" : "Save this look"}
             />
@@ -938,7 +941,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
         <div className="mt-4 grid gap-4">
           {saved.length === 0 ? <p className="text-sm">Save a look to compare it and send it to your family.</p> : null}
           <ul className="grid gap-3">
-            {[...saved.map((look) => ({ look, removed: false })), ...gone.filter((look) => !saved.some((item) => item.id === look.id)).map((look) => ({ look, removed: true }))].map(({ look, removed }) => {
+            {saved.map((look) => {
+              const removed = false;
               const compareOn = compareControl(compare.includes(look.id));
               return (
               <li key={look.id} className="card grid gap-3 p-3 sm:grid-cols-[9rem_1fr]">
@@ -1004,6 +1008,8 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
           </form>
         </div>
       )}
+      {error && panel === "saved" ? <p className="mt-3 text-sm" role="alert">{error}</p> : null}
+      <AtSalonSheet open={gate.open} lang={config.defaultLang || "en"} joinHref={`/s/${config.slug}/queue`} onClose={gate.close} />
     </div>
   );
 }

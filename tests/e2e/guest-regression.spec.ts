@@ -239,12 +239,98 @@ test("a locked try-on shows the teaser and does not generate", async ({ page }) 
   }
 });
 
+test("a queued guest cannot generate until staff mark Arrived", async ({ page }) => {
+  test.setTimeout(120_000);
+  const prisma = await salonDb();
+  await prisma.tenant.update({ where: { slug: "demo" }, data: { tryOnsAtSalon: true } });
+  await prisma.$disconnect();
+  try {
+    let generates = 0;
+    page.on("request", (req) => {
+      if (req.method() === "POST" && /\/api\/v1\/(tryon\/generate|bridal\/own|groom|makeup-studio\/render)/.test(req.url())) generates += 1;
+    });
+    const phone = `9${String(Date.now()).slice(-9)}`;
+    const guestName = `Lock ${phone.slice(-4)}`;
+    await page.goto("/s/demo/queue");
+    await page.locator("form[data-ready='yes']").waitFor();
+    await page.getByLabel("Name", { exact: true }).fill(guestName);
+    await page.getByLabel("Mobile number").fill(phone);
+    await page.getByRole("checkbox", { name: /queue updates/i }).check();
+    await page.getByRole("button", { name: "Join the queue" }).click();
+    const ticket = page.locator("[data-status='WAITING'][data-ready='yes']");
+    const back = page.getByRole("link", { name: "See your place in line" });
+    await expect(ticket.or(back)).toBeVisible({ timeout: 20_000 });
+    if (!(await ticket.isVisible())) await back.click();
+    await expect(ticket).toBeVisible();
+    await visit(page, "/s/demo");
+    const card = page.locator("[data-style-grid='yes'] .look-grid button").first();
+    await expect(card).toBeVisible();
+    await expect(async () => {
+      await card.click();
+      await expect(card).toHaveAttribute("aria-pressed", "true");
+    }).toPass();
+    await page.getByRole("button", { name: "Try this look" }).click();
+    await expect(page.locator("[data-unlock-sheet='yes']")).toContainText("Your free AI preview unlocks when you reach the salon.");
+    await page.locator("[data-unlock-sheet='yes']").locator("xpath=..").click({ position: { x: 8, y: 8 } });
+    await expect(page.locator("[data-unlock-sheet='yes']")).toBeHidden();
+    await page.getByRole("tab", { name: "Hair colour" }).click();
+    await page.locator("[data-style-grid='yes'] .look-grid button").first().click();
+    await expect(page.locator("[data-unlock-sheet='yes']")).toBeVisible();
+    await page.locator("[data-unlock-sheet='yes']").locator("xpath=..").click({ position: { x: 8, y: 8 } });
+    await page.getByRole("button", { name: "Bridal", exact: true }).click();
+    await page.getByRole("button", { name: "Try now" }).first().click();
+    await expect(page.locator("[data-unlock-sheet='yes']")).toBeVisible();
+    expect(generates).toBe(0);
+
+    await signIn(page);
+    const row = page.locator("[data-queue-row]").filter({ hasText: guestName }).first();
+    await row.getByRole("button", { name: "Arrived", exact: true }).click();
+    await expect(row.getByText("Arrived ✓")).toBeVisible();
+    await page.goto("/s/demo");
+    await page.locator("[data-photo='gallery']").setInputFiles(FACE);
+    await page.locator("[data-style-grid='yes'] .look-grid button").first().click();
+    await page.getByRole("button", { name: "Try this look" }).click();
+    await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 60_000 });
+    expect(generates).toBe(1);
+  } finally {
+    const restore = await salonDb();
+    await restore.tenant.update({ where: { slug: "demo" }, data: { tryOnsAtSalon: false } });
+    await restore.$disconnect();
+  }
+});
+
+test("removing a saved look takes the card off the list", async ({ page }) => {
+  await page.goto("/s/demo");
+  await page.evaluate(() => {
+    localStorage.setItem("lookuvi-saved:demo", JSON.stringify([{ tool: "style", id: "soft-bob", name: "Soft Bob" }]));
+  });
+  await page.goto("/s/demo/saved");
+  await expect(page.getByText("Soft Bob")).toBeVisible();
+  await page.getByRole("button", { name: "Remove this look" }).click();
+  await expect(page.getByText("Soft Bob")).toHaveCount(0);
+  await expect(page.locator(".is-removed")).toHaveCount(0);
+});
+
 test("owner queue, settings, and leads", async ({ page }) => {
   await signIn(page);
   await page.goto("/admin/queue");
   const pending = page.locator("[data-queue-row]").filter({ hasText: "Regression Guest" }).filter({ has: page.getByRole("button", { name: "Arrived", exact: true }) });
   if (await pending.count()) await pending.first().getByRole("button", { name: "Arrived", exact: true }).click();
   await expect(page.locator("[data-queue-row]").filter({ hasText: "Regression Guest" }).getByText("Arrived ✓").first()).toBeVisible();
+  const chairs = await page.getByRole("region", { name: "Chairs" }).boundingBox();
+  const waiting = await page.getByRole("region", { name: "Waiting" }).boundingBox();
+  expect(chairs && waiting).toBeTruthy();
+  if ((page.viewportSize()?.width || 0) >= 768) {
+    expect(chairs!.x + chairs!.width).toBeLessThanOrEqual(waiting!.x + 4);
+    expect(chairs!.width).toBeLessThan((await page.locator(".queue-floor").boundingBox())!.width * 0.5);
+  } else {
+    expect(waiting!.y).toBeLessThan(chairs!.y);
+  }
+  const icon = page.locator(".queue-icon svg").first();
+  if (await icon.count()) {
+    const box = await icon.boundingBox();
+    if (box) expect(Math.round(box.width)).toBe(22);
+  }
   await page.goto("/admin/settings", { waitUntil: "networkidle" });
   if ((page.viewportSize()?.width || 0) < 800) {
     const details = page.getByRole("button", { name: "Salon details" });
