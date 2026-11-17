@@ -8,6 +8,7 @@ import { QUEUE_POLL_MS } from "@/lib/queue/poll";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import { kolkataDayKey } from "@/lib/queue/day";
+import { bookableSlots } from "@/lib/queue/schedule";
 import { parseVisitMemory, rememberVisit, serializeVisitMemory, visitMemoryKey, type VisitMemory } from "@/lib/queue/visit-memory";
 import { serviceChoiceLabel } from "@/lib/service-label";
 import { Notice } from "@/components/ui/Notice";
@@ -25,6 +26,9 @@ type Board = {
   hoursClose?: string;
   hoursClosed?: boolean;
   hoursMessage?: string;
+  weeklyHours?: string;
+  openTime?: string;
+  closeTime?: string;
   todayHours?: string;
   nextOpen?: string;
   services: { id: string; name: string; minutes: number; priceInr: number }[];
@@ -48,6 +52,11 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
   const [returnToken, setReturnToken] = useState("");
   const request = board.mode === "REQUEST";
   const hoursClosed = !request && Boolean(board.hoursClosed);
+  const slots = request && date
+    ? bookableSlots({ weeklyHours: board.weeklyHours, openTime: board.openTime, closeTime: board.closeTime }, date)
+    : [];
+  const slotClosed = request && Boolean(date) && slots.length === 0;
+  const slotInvalid = request && Boolean(slot) && !slots.includes(slot);
 
   useEffect(() => {
     setReady(true);
@@ -98,6 +107,13 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
   }, [board.slug]);
 
   async function join(nextName: string, nextPhone: string, agreed: boolean) {
+    if (request) {
+      const allowed = bookableSlots({ weeklyHours: board.weeklyHours, openTime: board.openTime, closeTime: board.closeTime }, date);
+      if (!allowed.includes(slot)) {
+        setMessage(allowed.length ? "Choose a time while the salon is open." : "The salon is closed that day.");
+        return;
+      }
+    }
     setBusy(true);
     setMessage("");
     setHeldPath("");
@@ -146,7 +162,7 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
             <Notice tone="warning">{[board.nextOpen ? `Closed now · opens ${board.nextOpen}` : "Closed now", board.hoursMessage].filter(Boolean).join(". ")}</Notice>
           </div>
         ) : board.open ? (
-          <QueueWait serverWait={board.waitMin} ahead={board.ahead} lang={lang} phrase="join" />
+          <QueueWait serverWait={board.waitMin} ahead={board.ahead} lang={lang} phrase="join" scope={`join:${board.slug}`} />
         ) : <p className="mt-2 text-sm">{t(lang, "queueClosed")}</p>}
       </div>
       {board.todayHours ? <p className="mt-2 text-sm" data-today-hours={board.todayHours}>{t(lang, "queueTodayLine", { hours: board.todayHours })}</p> : null}
@@ -189,15 +205,20 @@ export function QueueJoinForm({ initial }: { initial: Board }) {
               <input className="field mt-1" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
             </label>
             <label className="text-sm">{t(lang, "queueTime")}
-              <input className="field mt-1" type="time" min={board.hoursOpen || "06:00"} max={board.hoursClose || "22:00"} value={slot} onChange={(event) => setSlot(event.target.value)} required />
+              <select className="field mt-1" value={slots.includes(slot) ? slot : ""} onChange={(event) => setSlot(event.target.value)} required disabled={!date || slotClosed}>
+                <option value="">{date ? (slotClosed ? "Closed that day" : "Choose a time") : "Choose a date first"}</option>
+                {slots.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
             </label>
+            {slotClosed ? <p className="text-sm" role="status">The salon is closed that day. Pick another date.</p> : null}
+            {slotInvalid ? <p className="text-sm" role="status">That time is after the salon closes. Choose one of the open times.</p> : null}
           </>
         ) : null}
         <label className="flex min-h-11 items-start gap-2 text-sm" htmlFor="queue-updates">
           <input id="queue-updates" className="mt-1" type="checkbox" checked={consent} aria-label={t(lang, "queueConsent")} onChange={(event) => setConsent(event.target.checked)} required />
           <span>{t(lang, "queueConsent")}<span className="mt-1 block text-muted">This salon may send one WhatsApp reminder after your visit. Reply STOP to opt out.</span></span>
         </label>
-        <button className="btn w-full text-lg" type="submit" disabled={busy || hoursClosed || (!board.open && !request)}>{busy ? "…" : request ? t(lang, "queueRequest") : t(lang, "queueJoin")}</button>
+        <button className="btn w-full text-lg" type="submit" disabled={busy || hoursClosed || slotClosed || slotInvalid || (request && (!date || !slot)) || (!board.open && !request)}>{busy ? "…" : request ? t(lang, "queueRequest") : t(lang, "queueJoin")}</button>
         {message ? <p className="text-sm" role="status">{message}</p> : null}
         {heldPath ? <a className="btn secondary" href={heldPath}>Open that token</a> : null}
       </form>

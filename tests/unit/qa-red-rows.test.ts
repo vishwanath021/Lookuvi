@@ -7,7 +7,7 @@ import { POST as resetPassword } from "@/app/api/v1/auth/reset/route";
 import PrivacyPage from "@/app/privacy/page";
 import { looksForEvent } from "@/data/bridal";
 import { HAIR_READING_RETRY, HAIR_SUGGEST_TIMEOUT_MS } from "@/lib/ai/hair-suggest";
-import { rememberGenerated, readGenerated } from "@/lib/generated-session";
+import { holdGenerated, readGenerated, rememberGenerated } from "@/lib/generated-session";
 import { prisma } from "@/lib/prisma";
 import { remainingServiceMinutes } from "@/lib/queue/estimate";
 import { sessionCloseClock, visitShouldExpire } from "@/lib/queue/expiry";
@@ -122,6 +122,14 @@ describe("qa red rows", () => {
       kind: "look",
     });
     expect(readGenerated(key).map((item) => item.name)).toEqual(["Soft rose"]);
+  });
+
+  it("keeps a generated preview after leaving the detail", async () => {
+    const jpeg = new Blob([Uint8Array.from([1, 2, 3])], { type: "image/jpeg" });
+    const key = "lookuvi-generated:qa-detail:makeup";
+    const stored = await holdGenerated(key, { id: "look-2", name: "Glam", before: jpeg, after: jpeg, kind: "makeup" });
+    expect(stored?.after.startsWith("data:image/jpeg;base64,")).toBe(true);
+    expect(readGenerated(key).map((item) => item.name)).toEqual(["Glam"]);
   });
 
   it("row 59: yesterday's token and a closed session expire; a future request does not", () => {

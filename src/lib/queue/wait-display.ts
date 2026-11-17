@@ -11,3 +11,12 @@ export function waitSample(prev: { wait: number; at: number }, serverWait: numbe
   if (wait !== prev.wait) return { wait, at: now };
   return prev;
 }
+
+/** A remount keeps the original sample when the server wait has not changed. */
+export function restoreWaitSample(stored: { wait: number; at: number } | null, serverWait: number, now: number) {
+  const wait = Math.max(0, Math.floor(Number(serverWait) || 0));
+  if (!stored || stored.wait !== wait || !Number.isFinite(stored.at) || stored.at <= 0 || stored.at > now) {
+    return { wait, at: now };
+  }
+  return { wait, at: stored.at };
+}

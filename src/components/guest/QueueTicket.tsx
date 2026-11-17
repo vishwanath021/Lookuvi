@@ -37,7 +37,7 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
   const [ready, setReady] = useState(false);
   const [others, setOthers] = useState<VisitMemory[]>([]);
   const lang = ticket.lang || "en";
-  const minutes = useDisplayedWait(ticket.waitMin);
+  const minutes = useDisplayedWait(ticket.waitMin, ticket.ref);
   const live = ticket.status === "WAITING" || ticket.status === "CALLED";
   const terminal = ticket.status === "CANCELLED" || ticket.status === "EXPIRED" || ticket.status === "DONE" || ticket.status === "NO_SHOW";
   const canCancel = live || ticket.status === "REQUESTED" || ticket.status === "CONFIRMED";
@@ -120,7 +120,7 @@ export function QueueTicket({ slug, initial }: { slug: string; initial: Ticket }
     <div data-status={ticket.status} data-ready={ready ? "yes" : "no"}>
       {joined ? <p className="mt-4 text-lg" data-queue-joined="yes">{joined}</p> : null}
       {live ? (
-        <QueueWait serverWait={ticket.waitMin} ahead={ticket.ahead} token={ticket.token} lang={lang} phrase={ticket.status === "CALLED" ? "turn" : undefined} />
+        <QueueWait serverWait={ticket.waitMin} ahead={ticket.ahead} token={ticket.token} lang={lang} phrase={ticket.status === "CALLED" ? "turn" : undefined} scope={ticket.ref} />
       ) : (
         <>
           <p className="mt-6 text-lg">{line}</p>

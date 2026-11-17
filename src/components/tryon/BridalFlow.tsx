@@ -44,7 +44,7 @@ import { guestSessionId } from "@/lib/guest-session";
 import { postGuestGenerate } from "@/lib/guest-preview";
 import type { SalonConfig } from "@/lib/salon";
 import { tryNowReady } from "@/lib/try-now";
-import { rememberGenerated, readGenerated } from "@/lib/generated-session";
+import { holdGenerated, readGenerated } from "@/lib/generated-session";
 import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
 import { isPastKolkataDay, kolkataDayKey, PAST_DATE_MESSAGE } from "@/lib/queue/day";
 import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
@@ -235,6 +235,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
 
   useEffect(() => {
     setSaved(readSaved(config.slug));
+    setResult((current) => current ?? resultFromStored(config.slug));
   }, [config.slug]);
 
   useEffect(() => {
@@ -245,7 +246,7 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
       const after = result.after.startsWith("data:") ? result.after : await blobUrlToData(result.after).catch(() => "");
       const before = result.before.startsWith("data:") ? result.before : await blobUrlToData(result.before).catch(() => "");
       if (cancel || !after.startsWith("data:")) return;
-      rememberGenerated(generatedKey(config.slug), {
+      holdGenerated(generatedKey(config.slug), {
         id: `${result.kind}:${result.lookId}:${result.name}`,
         name: result.name,
         before,
@@ -363,17 +364,28 @@ export function BridalFlow({ config }: { config: SalonConfig }) {
           const aligned = kind === "look" && !sample
             ? (await alignGeneratedPhoto(shot.blob, raw, false).catch(() => null))?.blob || raw
             : raw;
-          const out = URL.createObjectURL(aligned);
           const styleName = kind === "mehendi"
             ? `Mehendi · ${MEHENDI_STYLES.find((item) => item.id === mehendiStyle)?.label || "Bridal"}`
             : chosen?.name || "Bridal look";
+          const lookId = kind === "mehendi" ? mehendiStyle : chosen?.id || "";
+          const share = res.headers.get("x-look-share") || "";
+          const durable = await holdGenerated(generatedKey(config.slug), {
+            id: `${kind}:${lookId}:${styleName}`,
+            name: styleName,
+            before: shot.blob,
+            after: aligned,
+            kind,
+            lookId,
+            share,
+          });
+          const out = durable?.after || URL.createObjectURL(aligned);
           return {
             url: out,
             name: styleName,
-            before: shot.url,
+            before: durable?.before || shot.url,
             after: out,
-            share: res.headers.get("x-look-share") || "",
-            lookId: kind === "mehendi" ? mehendiStyle : chosen?.id || "",
+            share,
+            lookId,
             kind,
           };
         },

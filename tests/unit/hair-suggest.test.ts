@@ -302,6 +302,26 @@ describe("hair picker markup", () => {
     expect(free).toContain("Suits thick wavy hair");
     expect(free).toContain("/styles/thumbs/pixie.webp");
     expect(free).not.toContain("Get AI suggestions");
+    const enabled = renderToStaticMarkup(createElement(HairTypePicker, {
+      pickerOn: false,
+      suggestOn: true,
+      usesCredits: false,
+      density: "",
+      texture: "",
+      suggestions: [],
+      selectedId: "",
+      busy: false,
+      note: "We couldn't analyze your photo. Please try again.",
+      costLine: "",
+      onDensity: () => undefined,
+      onTexture: () => undefined,
+      onSuggest: () => undefined,
+      onPick: () => undefined,
+      suggestLabel: "Try again",
+    }));
+    expect(enabled).toContain("Try again");
+    expect(enabled).toContain("analyze your photo");
+    expect(enabled).not.toContain("disabled");
     const guest = readFileSync("src/components/tryon/TryOnApp.tsx", "utf8");
     expect(guest).not.toContain("gpt-4.1");
     expect(guest).not.toMatch(/estimateInr|costUsd/);

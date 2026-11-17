@@ -8,7 +8,7 @@ import { notifyGuest, sendWhatsApp, type NotifyMessage } from "@/lib/notify";
 import { prisma } from "@/lib/prisma";
 import { kolkataDayKey } from "@/lib/queue/day";
 import { peopleAhead, waitMinutes } from "@/lib/queue/estimate";
-import { displayedWait, waitSample } from "@/lib/queue/wait-display";
+import { displayedWait, restoreWaitSample, waitSample } from "@/lib/queue/wait-display";
 import { indianMobile } from "@/lib/queue/phone";
 import { QUEUE_DEVICE_JOINS_PER_HOUR, QUEUE_IP_JOINS_PER_HOUR, QUEUE_PHONE_JOINS_PER_HOUR, QueueError, addWalkIn, callNext, confirmRequest, deskSnapshot, ensureQueueState, existingTokenMessage, finishEntry, guestTicket, guestVisit, joinQueue, publicBoard, purgeOldQueueEntries, saveQueueSettings, returnToLine, setQueueOpen, startEntry, sweepAlerts } from "@/lib/queue/service";
 import { resetRateLimits, sharedRateLimit } from "@/lib/ratelimit";
@@ -58,6 +58,14 @@ describe("queue maths and phone", () => {
     const changed = waitSample(first, 10, 1_000 + 90_000);
     expect(changed).toEqual({ wait: 10, at: 1_000 + 90_000 });
     expect(displayedWait(changed.wait, changed.at, 1_000 + 90_000)).toBe(10);
+  });
+
+  it("keeps the countdown when the ticket is opened again", () => {
+    const stored = { wait: 30, at: 1_000 };
+    const back = restoreWaitSample(stored, 30, 1_000 + 60_000);
+    expect(back).toEqual(stored);
+    expect(displayedWait(back.wait, back.at, 1_000 + 60_000)).toBe(29);
+    expect(restoreWaitSample(stored, 20, 1_000 + 60_000)).toEqual({ wait: 20, at: 1_000 + 60_000 });
   });
 
   it("accepts Indian mobiles and rejects everything else", () => {

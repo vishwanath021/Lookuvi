@@ -7,6 +7,7 @@ import { loadTenantBySlug, servicesForLook, toSalonConfig } from "@/lib/salon";
 import { tooMany } from "@/lib/http/guard";
 import { prisma } from "@/lib/prisma";
 import { shareableLookUrl } from "@/lib/media-link";
+import { indianMobile } from "@/lib/queue/phone";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 
 const bodySchema = z.object({
@@ -63,12 +64,18 @@ export async function POST(req: Request) {
   if (!link.url) {
     return NextResponse.json({ error: "WHATSAPP", message: "This salon has not added a WhatsApp number yet." }, { status: 400 });
   }
+  const guestName = (parsed.data.name || "").trim().slice(0, 80);
+  const rawPhone = (parsed.data.phone || "").trim();
+  const guestPhone = rawPhone ? indianMobile(rawPhone) : "";
+  if (rawPhone && !guestPhone) {
+    return NextResponse.json({ error: "PHONE", message: "Enter a 10-digit Indian mobile number." }, { status: 400 });
+  }
   const lead = await prisma.lead.create({
     data: {
       tenantId: tenant.id,
       sessionId: parsed.data.sessionId,
-      name: parsed.data.name || null,
-      phone: parsed.data.phone || null,
+      name: guestName || null,
+      phone: guestPhone || null,
       lookName,
       shadeName: shade?.name || null,
       services: JSON.stringify(services),

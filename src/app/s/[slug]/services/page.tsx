@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { GuestNav } from "@/components/guest/GuestNav";
+import { SalonBrand } from "@/components/guest/SalonBrand";
 import { LegalFooter } from "@/components/legal/LegalFooter";
 import { SalonPaused } from "@/components/guest/SalonPaused";
 import { guestPageLocale, parseLanguages, t } from "@/data/i18n";
@@ -18,7 +19,7 @@ export default async function ServicesPage({ params }: { params: Promise<{ slug:
   return (
     <div className="guest-shell">
       <main className="pt-6">
-        <h1 className="page-title">{tenant.name}</h1>
+        <SalonBrand name={tenant.name} logoUrl={tenant.logoUrl} />
         <h2 className="mt-4 text-base font-semibold">{t(lang, "services")}</h2>
         {services.length === 0 ? <p className="mt-3 text-sm text-muted">{t(lang, "servicesEmpty")}</p> : (
           <ul className="mt-3 divide-y divide-line rounded-[14px] border border-line bg-white">

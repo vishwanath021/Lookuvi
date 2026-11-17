@@ -292,6 +292,9 @@ export async function publicBoard(slug: string) {
     lang: tenant.defaultLang,
     hoursOpen: view.hoursOpen,
     hoursClose: view.hoursClose,
+    weeklyHours: tenant.weeklyHours || "",
+    openTime: tenant.openTime || "",
+    closeTime: tenant.closeTime || "",
     services: services.map((service) => ({ id: service.id, name: service.name, minutes: serviceMinutes(service.durationMin, state.avgMinutes), priceInr: service.priceInr })),
   };
 }

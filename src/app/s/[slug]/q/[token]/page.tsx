@@ -1,6 +1,7 @@
 import { isBlockedStatus } from "@/lib/salon-status";
 import { notFound } from "next/navigation";
 import { GuestNav } from "@/components/guest/GuestNav";
+import { SalonBrand } from "@/components/guest/SalonBrand";
 import { QueueTicket } from "@/components/guest/QueueTicket";
 import { SalonPaused } from "@/components/guest/SalonPaused";
 import { guestPageLocale, parseLanguages } from "@/data/i18n";
@@ -18,7 +19,7 @@ export default async function QueueStatusPage({ params }: { params: Promise<{ sl
     return (
       <div className="guest-shell">
         <main className="mx-auto max-w-lg py-16 text-center">
-          <h1 className="page-title">{tenant.name}</h1>
+          <SalonBrand name={tenant.name} logoUrl={tenant.logoUrl} />
           <p className="mt-3 text-sm">The queue is turned off for this salon.</p>
         </main>
         <GuestNav slug={tenant.slug} lang={lang} />
@@ -31,7 +32,7 @@ export default async function QueueStatusPage({ params }: { params: Promise<{ sl
     return (
       <div className="guest-shell">
         <main className="mx-auto max-w-lg py-8">
-          <h1 className="page-title">{tenant.name}</h1>
+          <SalonBrand name={tenant.name} logoUrl={tenant.logoUrl} />
           <QueueTicket slug={tenant.slug} initial={ticket} />
         </main>
         <GuestNav slug={tenant.slug} lang={lang} />
@@ -42,7 +43,7 @@ export default async function QueueStatusPage({ params }: { params: Promise<{ sl
       return (
         <div className="guest-shell">
           <main className="mx-auto max-w-lg py-16 text-center">
-            <h1 className="page-title">{tenant.name}</h1>
+            <SalonBrand name={tenant.name} logoUrl={tenant.logoUrl} />
             <p className="mt-3 text-sm">That visit was not found.</p>
           </main>
           <GuestNav slug={tenant.slug} lang={lang} />

@@ -27,6 +27,7 @@ import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
 import { tryNowReady } from "@/lib/try-now";
 import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
+import { generatedFlowKey, holdGenerated, readGenerated } from "@/lib/generated-session";
 import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
 import { useVisitTries } from "@/components/tryon/useVisitTries";
 import { OWN_ITEM_EDGE, OWN_SELFIE_EDGE, payloadProblem, postPreview, shrinkPhoto } from "@/lib/own-upload";
@@ -271,8 +272,17 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
           visit.applyHeaders(res);
           const photoId = readPhotoId(res);
           if (photoId) setFace((current) => current && current.digest === face.digest ? { ...current, serverId: photoId } : current);
-          const out = URL.createObjectURL(await res.blob());
-          return { url: out, name: chosen.name, before: face.url, after: out };
+          const blob = await res.blob();
+          const durable = await holdGenerated(generatedFlowKey(config.slug, "bridal-own"), {
+            id: chosen.id,
+            name: chosen.name,
+            before: face.blob,
+            after: blob,
+            kind: "own",
+            lookId: chosen.id,
+          });
+          const out = durable?.after || URL.createObjectURL(blob);
+          return { url: out, name: chosen.name, before: durable?.before || face.url, after: out };
         },
       });
       if ("blocked" in outcome && outcome.blocked) {
@@ -303,6 +313,13 @@ export function BridalOwnLook({ config }: { config: SalonConfig }) {
   });
   const counter = tryCounterLabel(visit.used, visit.allowance);
   const capNote = ownButton.note || "";
+
+  useEffect(() => {
+    const saved = readGenerated(generatedFlowKey(config.slug, "bridal-own"))[0];
+    if (!saved) return;
+    setResult((current) => current ?? { url: saved.after, name: saved.name, before: saved.before, after: saved.after });
+    setReveal((current) => current || saved.after);
+  }, [config.slug]);
 
   useEffect(() => {
     if (!ownKey) return;

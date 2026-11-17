@@ -90,6 +90,7 @@ export function WeekHoursEditor({
     <fieldset className="hours-editor grid gap-3 text-sm" data-hours-editor="yes">
       <legend className="font-medium">Opening hours</legend>
       <p className="text-xs text-muted">India time. Two sessions a day at most. Clear hours keeps the desk switch, with 06:00–22:00 for time requests.</p>
+      {unsaved ? <p className="text-xs" role="status" data-hours-unsaved="yes">These times are a suggestion until you save settings. Requests can still be made from 06:00 to 22:00 until then.</p> : null}
       <div className="hours-pair">
         <label>Opens
           <input className="field mt-1" type="time" aria-label="Opens" value={sameOpen} onChange={(event) => onSame({ open: event.target.value })} />

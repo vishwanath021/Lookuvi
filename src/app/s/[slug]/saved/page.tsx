@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { GuestNav } from "@/components/guest/GuestNav";
+import { SalonBrand } from "@/components/guest/SalonBrand";
 import { SavedLooks } from "@/components/guest/SavedLooks";
 import { LegalFooter } from "@/components/legal/LegalFooter";
 import { SalonPaused } from "@/components/guest/SalonPaused";
@@ -18,7 +19,7 @@ export default async function SavedPage({ params }: { params: Promise<{ slug: st
   return (
     <div className="guest-shell">
       <main className="pt-6">
-        <p className="text-sm text-muted">{tenant.name}</p>
+        <SalonBrand name={tenant.name} logoUrl={tenant.logoUrl} />
         <SavedLooks slug={tenant.slug} lang={lang} />
       </main>
       <LegalFooter />

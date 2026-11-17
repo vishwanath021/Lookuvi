@@ -28,6 +28,7 @@ import { guestSessionId } from "@/lib/guest-session";
 import type { SalonConfig } from "@/lib/salon";
 import { tryNowReady } from "@/lib/try-now";
 import { selectionKey, takePreview, tryButton, tryCounterLabel, VISIT_CAP_MESSAGE, type CachedLook } from "@/lib/visit-tries";
+import { generatedFlowKey, holdGenerated, readGenerated } from "@/lib/generated-session";
 import { attachSelfie, readPhotoId, shotFromBlob } from "@/lib/visit-photo";
 import { useVisitTries } from "@/components/tryon/useVisitTries";
 import { OWN_ITEM_EDGE, OWN_SELFIE_EDGE, postPreview, shrinkPhoto } from "@/lib/own-upload";
@@ -256,9 +257,17 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
             if (kind === "own") setOwnFace(mark);
             else setFace(mark);
           }
-          const out = URL.createObjectURL(await res.blob());
+          const blob = await res.blob();
           const name = kind === "own" ? "Your own look" : GROOM_HAIR.find((item) => item.id === hairId)?.name || "Groom look";
-          return { url: out, name, before: shot.url, after: out, panel: kind };
+          const durable = await holdGenerated(generatedFlowKey(config.slug, "groom"), {
+            id: `${kind}:${name}`,
+            name,
+            before: shot.blob,
+            after: blob,
+            kind,
+          });
+          const out = durable?.after || URL.createObjectURL(blob);
+          return { url: out, name, before: durable?.before || shot.url, after: out, panel: kind };
         },
       });
       if ("blocked" in outcome && outcome.blocked) {
@@ -309,6 +318,15 @@ export function GroomFlow({ config }: { config: SalonConfig }) {
   });
   const counter = tryCounterLabel(visit.used, visit.allowance);
   const capNote = (text: string) => text;
+
+  useEffect(() => {
+    const saved = readGenerated(generatedFlowKey(config.slug, "groom"))[0];
+    if (!saved) return;
+    const panelName = saved.kind === "own" ? "own" : "looks";
+    setResult((current) => current ?? { url: saved.after, name: saved.name, before: saved.before, after: saved.after, panel: panelName });
+    setReveal((current) => current || saved.after);
+    if (panelName === "own") setPanel("own");
+  }, [config.slug]);
 
   useEffect(() => {
     if (panel !== "looks" || !looksKey) return;

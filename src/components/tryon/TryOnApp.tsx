@@ -10,6 +10,8 @@ import { AtSalonSheet, useUnlockSheet } from "@/components/guest/AtSalonSheet";
 import { GuestNav } from "@/components/guest/GuestNav";
 import { addSavedPick, readSavedPicks, removeSavedPick, savedPickOn, savedPicksKey, writeSavedPicks, SAVED_DROP_ERROR, type SavedPick } from "@/lib/at-salon-browse";
 import { guestDeviceId } from "@/lib/device-id";
+import { indianMobile } from "@/lib/queue/phone";
+import { parseVisitMemory, visitMemoryKey } from "@/lib/queue/visit-memory";
 import { guestSessionId } from "@/lib/guest-session";
 import { ConsentSheet } from "@/components/tryon/ConsentSheet";
 import { LegalFooter } from "@/components/legal/LegalFooter";
@@ -275,6 +277,10 @@ export function TryOnApp({
   const consent = usePhotoConsent(config.slug, lang);
   const [zoom, setZoom] = useState(1);
   const [compareOn, setCompareOn] = useState(true);
+  const [bookOpen, setBookOpen] = useState(false);
+  const [bookName, setBookName] = useState("");
+  const [bookPhone, setBookPhone] = useState("");
+  const [bookError, setBookError] = useState("");
 
   useEffect(() => {
     const saved = parseTabSession(readTabSessionRaw(config.slug));
@@ -737,6 +743,7 @@ export function TryOnApp({
     setPickedTexture("");
     setSuggestNote("");
     setSuggestCost("");
+    setSuggestFailed(false);
     setNotice("");
     frameRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     void startCamera(tool === "nails" ? "environment" : "user");
@@ -986,8 +993,32 @@ export function TryOnApp({
     selectLook({ id: item.id, name: item.name, serviceKeys: item.serviceKeys ?? [], tool: "colour" });
   }
 
+  function openBook() {
+    if (!bookName && !bookPhone) {
+      try {
+        const visit = parseVisitMemory(localStorage.getItem(visitMemoryKey(config.slug)))[0];
+        if (visit?.name) setBookName(visit.name);
+        if (visit?.phone) setBookPhone(visit.phone);
+      } catch {
+        /* The form stays blank. */
+      }
+    }
+    setBookError("");
+    setBookOpen(true);
+  }
+
   async function book() {
     if (!active) return;
+    const name = bookName.trim();
+    const phone = indianMobile(bookPhone);
+    if (name.length < 2) {
+      setBookError("Add your name.");
+      return;
+    }
+    if (!phone) {
+      setBookError("Enter a 10-digit Indian mobile number.");
+      return;
+    }
     const res = await fetch("/api/v1/leads", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -998,19 +1029,22 @@ export function TryOnApp({
         tool: active.tool,
         shadeId: active.tool === "colour" ? active.styleId : active.tool === "style" ? shadeId || null : null,
         lang,
+        name,
+        phone,
         src: embed ? "embed" : "tryon",
         lookUrl: active.lookShare || null,
       }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!data.whatsappUrl) {
-      setError(t(lang, "whatsappMissing"));
+      setBookError(typeof data.message === "string" ? data.message : t(lang, "whatsappMissing"));
       return;
     }
     if (embed && window.parent !== window) {
       window.parent.postMessage({ type: "tryon:booked", look: active.styleName }, "*");
     }
     window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+    setBookOpen(false);
     track("lead_submitted", { look: active.styleName });
   }
 
@@ -1373,7 +1407,22 @@ export function TryOnApp({
             <a className="text-center text-sm underline" href={active.raw} target="_blank" rel="noreferrer" data-testid="provider-image">Provider image</a>
           )}
           {phone ? (
-            <button className="btn secondary" type="button" onClick={() => void book()}>{t(lang, "bookLook")}</button>
+            bookOpen ? (
+              <form className="grid gap-2" data-book-guest="yes" onSubmit={(event) => { event.preventDefault(); void book(); }}>
+                <p className="text-sm">Your name and phone stay on this lead so the salon can reach you.</p>
+                <label className="text-sm">Your name
+                  <input className="field mt-1" value={bookName} onChange={(event) => setBookName(event.target.value)} required minLength={2} autoComplete="name" maxLength={80} />
+                </label>
+                <label className="text-sm">Phone
+                  <input className="field mt-1" inputMode="tel" autoComplete="tel" value={bookPhone} onChange={(event) => setBookPhone(event.target.value)} required />
+                </label>
+                {bookError ? <p className="text-sm text-[var(--bad)]" role="alert">{bookError}</p> : null}
+                <button className="btn" type="submit">Send on WhatsApp</button>
+                <button className="btn secondary" type="button" onClick={() => setBookOpen(false)}>Cancel</button>
+              </form>
+            ) : (
+              <button className="btn secondary" type="button" onClick={openBook}>{t(lang, "bookLook")}</button>
+            )
           ) : (
             <p className="text-center text-sm" role="status">{t(lang, "whatsappMissing")}</p>
           )}
@@ -1473,7 +1522,7 @@ export function TryOnApp({
                   <div className="mt-3">
                     <HairTypePicker
                       pickerOn={config.hairPickerOn}
-                      suggestOn={false}
+                      suggestOn={config.hairSuggestOn}
                       usesCredits={config.hairSuggestUsesCredits}
                       density={pickedDensity}
                       texture={pickedTexture}

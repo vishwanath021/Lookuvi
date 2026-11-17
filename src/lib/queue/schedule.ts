@@ -269,6 +269,36 @@ export function requestBounds(source: HoursSource) {
   return { open, close };
 }
 
+function clockMinutes(hhmm: string) {
+  const [hour, minute] = hhmm.split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return Number.NaN;
+  return hour * 60 + minute;
+}
+
+function minutesClock(total: number) {
+  const hour = Math.floor(total / 60);
+  const minute = total % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+/** Request start times for one date. Includes open and close. Nothing after that day's close. */
+export function bookableSlots(source: HoursSource, date: string, stepMin = 30) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
+  const step = Math.max(1, Math.floor(stepMin));
+  const week = effectiveWeek(source);
+  const sessions = week.kind === "fallback"
+    ? [{ open: REQUEST_SLOT_EARLIEST, close: REQUEST_SLOT_LATEST }]
+    : week.week[weekdayOfDayKey(date)];
+  const slots: string[] = [];
+  for (const session of sessions) {
+    const start = clockMinutes(session.open);
+    const end = clockMinutes(session.close);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) continue;
+    for (let cursor = start; cursor <= end; cursor += step) slots.push(minutesClock(cursor));
+  }
+  return slots;
+}
+
 export function slotProblem(source: HoursSource, date: string, slot: string) {
   const week = effectiveWeek(source);
   if (week.kind === "fallback") {

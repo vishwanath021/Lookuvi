@@ -3,14 +3,45 @@
 import { useEffect, useState } from "react";
 import { t } from "@/data/i18n";
 import { formatToken } from "@/lib/queue/format-token";
-import { displayedWait, waitSample } from "@/lib/queue/wait-display";
+import { displayedWait, restoreWaitSample, waitSample } from "@/lib/queue/wait-display";
 
-/** Counts the server wait down once a minute. Resamples when the server figure changes; never remounts on poll. */
-export function useDisplayedWait(serverWait: number) {
-  const [sample, setSample] = useState(() => ({ wait: serverWait, at: Date.now() }));
+function sampleKey(scope: string) {
+  return `lookuvi-wait:${scope}`;
+}
+
+function readStoredSample(scope: string) {
+  if (!scope || typeof sessionStorage === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(sampleKey(scope));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { wait?: number; at?: number };
+    if (typeof parsed.wait !== "number" || typeof parsed.at !== "number") return null;
+    return { wait: parsed.wait, at: parsed.at };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSample(scope: string, sample: { wait: number; at: number }) {
+  if (!scope || typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.setItem(sampleKey(scope), JSON.stringify(sample));
+  } catch {
+    /* The in-memory sample still counts down on this screen. */
+  }
+}
+
+/** Counts the server wait down once a minute. The sample survives leaving the ticket and coming back. */
+export function useDisplayedWait(serverWait: number, scope = "") {
+  const [sample, setSample] = useState(() => {
+    const next = restoreWaitSample(readStoredSample(scope), serverWait, Date.now());
+    writeStoredSample(scope, next);
+    return next;
+  });
   const [now, setNow] = useState(() => Date.now());
   const next = waitSample(sample, serverWait, Date.now());
   if (next !== sample && (next.wait !== sample.wait || next.at !== sample.at)) {
+    writeStoredSample(scope, next);
     setSample(next);
   }
 
@@ -38,14 +69,17 @@ export function QueueWait({
   token,
   lang,
   phrase,
+  scope = "",
 }: {
   serverWait: number;
   ahead: number;
   token?: number;
   lang: string;
   phrase?: "next" | "turn" | "join";
+  /** Same id on the way back keeps the countdown, for example the ticket ref. */
+  scope?: string;
 }) {
-  const minutes = useDisplayedWait(serverWait);
+  const minutes = useDisplayedWait(serverWait, scope);
   if (phrase === "join") {
     return (
       <div className="mt-6 text-center" data-queue-wait={String(minutes)} data-queue-join="yes">
