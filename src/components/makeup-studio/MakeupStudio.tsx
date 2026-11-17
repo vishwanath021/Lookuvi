@@ -7,6 +7,7 @@ import { usePhotoConsent } from "@/components/tryon/usePhotoConsent";
 import { useVisitTries } from "@/components/tryon/useVisitTries";
 import { AtSalonNote } from "@/components/guest/AtSalonNote";
 import { AtSalonSheet, useUnlockSheet } from "@/components/guest/AtSalonSheet";
+import { generatedFlowKey, holdGenerated, readGenerated } from "@/lib/generated-session";
 import { guestDeviceId } from "@/lib/device-id";
 import { guestSessionId } from "@/lib/guest-session";
 import { detectStudioFace, type StudioFace } from "@/lib/makeup-studio/detect";
@@ -103,6 +104,12 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
   const [busy, setBusy] = useState(false);
   const [photoId, setPhotoId] = useState("");
   const preset = matchingPreset(params);
+
+  useEffect(() => {
+    const saved = readGenerated(generatedFlowKey(config.slug, "makeup"))[0];
+    if (!saved?.after) return;
+    setAiUrl((current) => current || saved.after);
+  }, [config.slug]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -225,9 +232,25 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
       const nextId = res.headers.get("x-photo-id") || "";
       if (nextId) setPhotoId(nextId);
       const blob = await res.blob();
+      let beforeShot = "";
+      try {
+        beforeShot = current.canvas.toDataURL("image/jpeg", 0.8);
+      } catch {
+        beforeShot = "";
+      }
+      const durable = beforeShot
+        ? await holdGenerated(generatedFlowKey(config.slug, "makeup"), {
+          id: "photoreal",
+          name: "Makeup",
+          before: beforeShot,
+          after: blob,
+          kind: "makeup",
+        })
+        : null;
+      const nextUrl = durable?.after || URL.createObjectURL(blob);
       setAiUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return URL.createObjectURL(blob);
+        if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+        return nextUrl;
       });
       setDemo((res.headers.get("x-demo-reason") || "") !== "");
       setBefore(0);
@@ -320,7 +343,9 @@ export function MakeupStudio({ config }: { config: SalonConfig }) {
           {looks}
         </div>
         <div className="max-md:order-first md:sticky md:top-4 md:col-start-2 md:row-start-1 md:self-start">
-          {!photo ? (
+          {!photo && aiUrl ? (
+            <img src={aiUrl} alt="" data-makeup-result={demo ? "sample" : "photo"} className="block w-full rounded-[14px]" />
+          ) : !photo ? (
             <div className="card grid min-h-64 place-items-center gap-3 p-6 text-center">
               <p className="text-base font-medium">Add a photo to try makeup.</p>
               <div className="flex w-full max-w-xs gap-2">

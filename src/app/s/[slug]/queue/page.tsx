@@ -1,6 +1,7 @@
 import { isBlockedStatus } from "@/lib/salon-status";
 import { notFound } from "next/navigation";
 import { GuestNav } from "@/components/guest/GuestNav";
+import { SalonBrand } from "@/components/guest/SalonBrand";
 import { SalonPaused } from "@/components/guest/SalonPaused";
 import { QueueJoinForm } from "@/components/guest/QueueJoinForm";
 import { guestPageLocale, parseLanguages } from "@/data/i18n";
@@ -17,7 +18,7 @@ export default async function GuestQueuePage({ params }: { params: Promise<{ slu
     return (
       <div className="guest-shell">
         <main className="py-10 text-center">
-          <h1 className="page-title">{tenant.name}</h1>
+          <SalonBrand name={tenant.name} logoUrl={tenant.logoUrl} />
           <p className="mt-3 text-sm">The queue is turned off for this salon.</p>
         </main>
         <GuestNav slug={tenant.slug} lang={guestPageLocale(tenant.defaultLang, parseLanguages(tenant.languages))} />
@@ -29,7 +30,7 @@ export default async function GuestQueuePage({ params }: { params: Promise<{ slu
   return (
     <div className="guest-shell">
       <main className="pt-6">
-        <h1 className="page-title">{tenant.name}</h1>
+        <SalonBrand name={tenant.name} logoUrl={tenant.logoUrl} />
         <QueueJoinForm initial={board} />
       </main>
       <GuestNav slug={tenant.slug} lang={guestPageLocale(tenant.defaultLang, parseLanguages(tenant.languages))} />

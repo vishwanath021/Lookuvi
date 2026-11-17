@@ -3,6 +3,7 @@ import { PUT as saveSettings } from "@/app/api/v1/admin/settings/route";
 import { POST as updateTenant } from "@/app/api/v1/super/tenants/[id]/route";
 import { prisma } from "@/lib/prisma";
 import { HOURS_INVALID, parseOperatingHours, requestWindow } from "@/lib/queue/hours";
+import { bookableSlots } from "@/lib/queue/schedule";
 import { addWalkIn, joinQueue, saveQueueSettings, setQueueOpen } from "@/lib/queue/service";
 import { resetRateLimits } from "@/lib/ratelimit";
 
@@ -73,6 +74,21 @@ describe("operating hours", () => {
     expect(requestWindow("", "")).toEqual({ open: "06:00", close: "22:00" });
     expect(requestWindow("18:00", "10:00")).toEqual({ open: "06:00", close: "22:00" });
     expect(requestWindow("11:00", "20:00")).toEqual({ open: "11:00", close: "20:00" });
+  });
+
+  it("lists only times inside that day's close", () => {
+    const source = { openTime: "10:00", closeTime: "18:00", weeklyHours: "" };
+    const anyDay = bookableSlots(source, "2026-11-16");
+    expect(anyDay[0]).toBe("10:00");
+    expect(anyDay).toContain("18:00");
+    expect(anyDay).not.toContain("18:30");
+    expect(anyDay).not.toContain("20:30");
+    const closed = JSON.stringify({
+      mon: [{ open: "10:00", close: "18:00" }],
+      tue: [], wed: [], thu: [], fri: [], sat: [], sun: [],
+    });
+    expect(bookableSlots({ weeklyHours: closed, openTime: "10:00", closeTime: "18:00" }, "2026-11-17")).toEqual([]);
+    expect(bookableSlots({ weeklyHours: closed, openTime: "10:00", closeTime: "18:00" }, "2026-11-16")).toContain("10:00");
   });
 
   it("uses salon hours for REQUEST joins and the global window when hours are unset", async () => {

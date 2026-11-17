@@ -170,8 +170,11 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   await gallery.getByRole("button", { name: "Wolf Cut" }).click();
   await page.getByRole("button", { name: "Try this look" }).click();
   await expect(page.getByRole("heading", { name: "Wolf Cut" })).toBeVisible({ timeout: 45_000 });
-  const popupPromise = page.waitForEvent("popup");
   await page.getByRole("button", { name: "Book this look" }).click();
+  await page.getByLabel("Your name").fill("Eeshaan");
+  await page.getByLabel("Phone").fill("9876543210");
+  const popupPromise = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Send on WhatsApp" }).click();
   const popup = await popupPromise;
   await expect(popup).toHaveURL(/919800011122/);
   const booking = decodeURIComponent(popup.url()).replaceAll("+", " ");

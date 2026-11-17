@@ -130,4 +130,38 @@ describe("book this look", () => {
     const droppedBody = await dropped.json();
     expect(droppedBody.text).not.toContain("evil.example");
   });
+
+  it("keeps the name and phone the guest typed", async () => {
+    const slug = `lead-salon-who-${Date.now()}`;
+    await prisma.tenant.create({ data: { slug, name: "Has WhatsApp", whatsapp: "9800011122" } });
+    const res = await createLead(new Request("http://localhost/api/v1/leads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        slug,
+        sessionId: "session-lead-4",
+        styleId: "soft-arch",
+        tool: "brows",
+        name: "Eeshaan",
+        phone: "9876543210",
+      }),
+    }));
+    expect(res.status).toBe(200);
+    const lead = await prisma.lead.findFirstOrThrow({ where: { tenant: { slug } }, orderBy: { createdAt: "desc" } });
+    expect(lead.name).toBe("Eeshaan");
+    expect(lead.phone).toBe("919876543210");
+    const bad = await createLead(new Request("http://localhost/api/v1/leads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        slug,
+        sessionId: "session-lead-5",
+        styleId: "soft-arch",
+        tool: "brows",
+        name: "Eeshaan",
+        phone: "12345",
+      }),
+    }));
+    expect(bad.status).toBe(400);
+  });
 });

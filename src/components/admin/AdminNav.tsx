@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SignOutButton } from "@/components/admin/SignOutButton";
+import { isPlatformLogo, LookuviMark } from "@/components/brand/LookuviMark";
 import { LegalFooter } from "@/components/legal/LegalFooter";
 import { ownerNav, type OwnerFeatures } from "@/lib/features";
 
@@ -18,6 +19,7 @@ export function AdminNav({
   features,
   salons = [],
   currentTenantId = "",
+  logoUrl = null,
 }: {
   role: string;
   name: string;
@@ -29,6 +31,7 @@ export function AdminNav({
   features: OwnerFeatures;
   salons?: { id: string; name: string }[];
   currentTenantId?: string;
+  logoUrl?: string | null;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -54,6 +57,7 @@ export function AdminNav({
   return (
     <div className="print:hidden">
       <div className="owner-mobile-bar sticky top-0 z-40 -mx-3 -mt-6 mb-3 flex h-14 items-center gap-2 border-b border-line bg-[var(--bg)] px-3 md:hidden">
+        <SalonMark logoUrl={logoUrl} />
         <p className="min-w-0 max-w-[38%] truncate text-sm font-semibold">{name}</p>
         <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{pageTitle}</h1>
         <button className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-line bg-white text-[#3e304b]" type="button" data-ready={ready ? "yes" : "no"} aria-expanded={open} aria-controls="salon-nav" aria-label={open ? "Close menu" : "Menu"} onClick={() => setOpen((value) => !value)}>
@@ -69,7 +73,10 @@ export function AdminNav({
         </button>
       </div>
       <aside id="salon-nav" data-ready={ready ? "yes" : "no"} className={`${open ? "block" : "hidden"} nav-side h-fit rounded-[14px] p-4 md:block`}>
-        <p className="text-sm uppercase tracking-[0.14em] text-[#d8cbe4]">{role}</p>
+        <div className="mb-2 flex items-center gap-2">
+          <SalonMark logoUrl={logoUrl} />
+          <p className="text-sm uppercase tracking-[0.14em] text-[#d8cbe4]">{role}</p>
+        </div>
         <p className="font-serif text-2xl leading-tight">{name}</p>
         <p className="text-sm text-[#d8cbe4]">{left.toLocaleString("en-IN")} try-ons left</p>
         {salons.length > 1 && (
@@ -110,5 +117,14 @@ export function AdminNav({
         <LegalFooter className="mt-4 border-t border-white/10 pt-3 text-[#d8cbe4]" />
       </aside>
     </div>
+  );
+}
+
+function SalonMark({ logoUrl }: { logoUrl?: string | null }) {
+  const own = !isPlatformLogo(logoUrl);
+  return (
+    <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-white">
+      {own ? <img src={logoUrl || ""} alt="" className="h-7 w-7 object-contain" data-salon-logo="yes" /> : <LookuviMark className="h-7 w-7" />}
+    </span>
   );
 }
