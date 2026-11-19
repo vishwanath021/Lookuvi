@@ -40,15 +40,13 @@ Regression viewports are projects `regression-iphone` (WebKit, 390×844) and `re
 
 ## Known failing E2E
 
-Baseline 2026-11-18 cleanup subset (edited specs + `guest-regression` + `queue`, not full suite): **79 passed, 47 failed, 8 did not run** (134 tests). Owner full-suite baseline 2026-11-14 was 115 passed / 59 failed / 59 skipped. See `docs/E2E_CLEANUP_2026-11-18.md`.
+Behavioural-only baseline 2026-11-19: **180 tests in 23 files** (was 200 / 27 before dropping fake-AI try-on specs). See `docs/E2E_USEFUL_TESTS_2026-11-18.md`.
 
-Removed one-off specs: `ux-r4`, `ux-r5`, `qa-bridal-five`, `qa-feedback`, `align-slider`, `bridal-slider`, `generation-ux` (covered by `guest-regression`).
+Removed in 2026-11-19 PR: `five-tools`, `studio`, `makeup-studio`, `bridal` (mock try-on / pixel / screenshot specs). Earlier one-offs: `ux-r4`, `ux-r5`, `qa-bridal-five`, `qa-feedback`, `align-slider`, `bridal-slider`, `generation-ux`.
 
-Still noisy after cleanup:
+Still noisy (behavioural suite):
 
 - `guest-regression` queue join (ticket DOM / navigation).
-- `responsive` horizontal overflow on some WebKit iPad and `desk-1440` (6px on `webkit-ipad-pro` — likely real layout; not fixed in cleanup PR).
-- `smoke` / `five-tools` / `phone-matrix` generate timing on some chromium projects (mock AI, `before-after` visibility).
-- `studio` live-look canvas deltas and consent copy on some viewports.
-- `launch-readiness` only runs on desktop; requires `launch-qa.db` (`beforeAll` now runs `prisma db push`).
-- Full-suite-only: `queue-stabilize`, `launch-copy`, `qr-logo`, `request-label`, `operating-hours` (unchanged this round).
+- `responsive` horizontal overflow on some WebKit iPad and `desk-1440` (6px on `webkit-ipad-pro` — layout follow-up).
+- `launch-readiness` desktop-only; needs `launch-qa.db` (`beforeAll` runs `prisma db push`).
+- `queue-stabilize`, `launch-copy`, `qr-logo`, `request-label`, `operating-hours` — unchanged; run in core behavioural command below.

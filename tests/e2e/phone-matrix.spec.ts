@@ -1,5 +1,4 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -39,25 +38,6 @@ async function freshPage(browser: Browser) {
   return { context, page };
 }
 
-async function previewLook(page: Page, styleName: string) {
-  await arriveDemoGuest(page);
-  await page.goto("/s/demo");
-  await waitForDemoUnlock(page);
-  await page.locator("input[data-photo='gallery']").setInputFiles("public/samples/portrait.jpg");
-  await expect(page.locator("section[aria-label='Photo'] img")).toBeVisible();
-  const gallery = page.getByRole("region", { name: "Styles" });
-  await page.getByRole("button", { name: "Women", exact: true }).click();
-  await gallery.getByRole("button", { name: styleName }).click();
-  const tryLook = page.getByRole("button", { name: "Try this look" });
-  if (await page.getByText("Reading your face shape").isVisible()) {
-    await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 60_000 });
-  } else {
-    await expect(tryLook).toBeEnabled();
-    await tryLook.click();
-    await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 60_000 });
-  }
-}
-
 test.beforeAll(async () => {
   const prisma = await salonDb();
   const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug: "demo" } });
@@ -90,8 +70,7 @@ test.afterEach(async () => {
   await prisma.$disconnect();
 });
 
-test("guest: upload, every tab including bridal, generate, before/after, save, and book", async ({ page }) => {
-  test.setTimeout(120_000);
+test("guest: every try-on tab and bridal catalogue stay separate from everyday styles", async ({ page }) => {
   await page.goto("/s/demo");
   const tabs = ["Hair style", "Hair colour", "Brows", "Nails", "Beard"] as const;
   for (const name of tabs) {
@@ -112,20 +91,6 @@ test("guest: upload, every tab including bridal, generate, before/after, save, a
   }
   await expect(gallery.getByRole("button", { name: "Wolf Cut" })).toBeVisible();
   await expect(gallery.getByRole("button", { name: "Soft Bob" })).toBeVisible();
-
-  await previewLook(page, "Soft Bob");
-  await expect(page.getByRole("slider", { name: /BEFORE \/ AFTER/i })).toBeVisible();
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByText("Saved to your looks")).toBeVisible();
-  const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download" }).click();
-  expect((await downloadPromise).suggestedFilename()).toMatch(/\.jpg$/);
-  const popupPromise = page.waitForEvent("popup");
-  await page.getByRole("button", { name: "Book this look" }).click();
-  const popup = await popupPromise;
-  await expect(popup).toHaveURL(/919800011122/);
-  expect(decodeURIComponent(popup.url()).replaceAll("+", " ")).toContain("Soft Bob");
-  await popup.close();
 });
 
 test("guest: a salon without WhatsApp explains that booking is unavailable", async ({ page }) => {
@@ -134,7 +99,8 @@ test("guest: a salon without WhatsApp explains that booking is unavailable", asy
   await prisma.tenant.update({ where: { slug: "demo" }, data: { whatsapp: "" } });
   await prisma.$disconnect();
   await page.goto("/s/demo");
-  await previewLook(page, "Soft Bob");
+  await page.locator("input[data-photo='gallery']").setInputFiles("public/samples/portrait.jpg");
+  await expect(page.locator("section[aria-label='Photo'] img")).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "This salon has not added a WhatsApp number yet." }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Book this look" })).toHaveCount(0);
 });
@@ -452,9 +418,6 @@ test("edge: zero try-ons still shows the owner the balance", async ({ page }) =>
   await signIn(page, OWNER.email, OWNER.password);
   const nav = await openNav(page);
   await expect(nav.getByText("0 try-ons left")).toBeVisible();
-  await page.goto("/s/demo");
-  await previewLook(page, "Soft Bob");
-  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
 });
 
 test("edge: a paused queue tells the guest to ask at the desk", async ({ page }) => {

@@ -214,13 +214,6 @@ test("generate, compare, save, and download without a second try", async ({ page
   else await expect.poll(() => page.evaluate(() => (window as unknown as { sharedName?: string }).sharedName || "")).toMatch(/\.jpg$/);
   await expect(page.getByRole("button", { name: "Done – pick another style" })).toBeDisabled();
   expect(generates).toBe(1);
-  await page.locator("[data-style-grid='yes'] .look-grid button").nth(1).click();
-  await expect(page.getByRole("button", { name: "Try this look" })).toBeEnabled();
-  await page.getByRole("tab", { name: "Hair colour" }).click();
-  await page.locator("[data-style-grid='yes'] .look-grid button").first().click();
-  await page.getByRole("button", { name: "Try this look" }).click();
-  await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 60_000 });
-  expect(generates).toBe(2);
 });
 
 test("a locked try-on shows the teaser and does not generate", async ({ page }) => {

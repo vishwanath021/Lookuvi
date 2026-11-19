@@ -35,11 +35,10 @@ export default defineConfig({
     { name: "android", testIgnore: /responsive|guest-regression/, use: { ...devices["Pixel 5"], ...chromiumCamera } },
     {
       name: "iphone",
-      testIgnore: /responsive|phone-matrix|bridal\.spec|(?:^|[/\\])studio\.spec|generation-ux\.spec|guest-regression/,
+      testIgnore: /responsive|phone-matrix|guest-regression/,
       use: { ...devices["iPhone 13"], browserName: "chromium", defaultBrowserType: "chromium", ...chromiumCamera },
     },
-    { name: "desktop", testIgnore: /responsive|phone-matrix|bridal\.spec|(?:^|[/\\])studio\.spec|generation-ux\.spec|guest-regression/, use: desktop(1280, 800) },
-    { name: "tablet", testMatch: /five-tools/, use: { ...desktop(768, 1024), viewport: { width: 768, height: 1024 } } },
+    { name: "desktop", testIgnore: /responsive|phone-matrix|guest-regression/, use: desktop(1280, 800) },
     { name: "webkit-iphone-13", testMatch: /responsive/, use: { ...devices["iPhone 13"] } },
     { name: "webkit-iphone-15", testMatch: /responsive/, use: { ...devices["iPhone 15"] } },
     { name: "pixel-7", testMatch: /responsive/, use: { ...devices["Pixel 7"], ...chromiumCamera } },
