@@ -42,7 +42,7 @@ test("photo notice, countdown, live makeup, and metallic buttons", async ({ page
 
   await openLive(page);
   await expect(page.getByRole("button", { name: "Take photo" })).toBeEnabled();
-  await expect(page.locator(".cam-guide-face")).toBeVisible();
+  await expect(page.locator(".cam-guide-face").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Zoom in" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Zoom out" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Compare" })).toBeVisible();

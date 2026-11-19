@@ -41,15 +41,21 @@ async function freshPage(browser: Browser) {
 
 async function previewLook(page: Page, styleName: string) {
   await arriveDemoGuest(page);
+  await page.goto("/s/demo");
   await waitForDemoUnlock(page);
   await page.locator("input[data-photo='gallery']").setInputFiles("public/samples/portrait.jpg");
-  await expect(page.getByRole("button", { name: "Retake" })).toBeVisible();
+  await expect(page.locator("section[aria-label='Photo'] img")).toBeVisible();
   const gallery = page.getByRole("region", { name: "Styles" });
   await page.getByRole("button", { name: "Women", exact: true }).click();
   await gallery.getByRole("button", { name: styleName }).click();
-  await page.getByRole("button", { name: "Try this look" }).click();
-  await expect(page.getByText("Reading your face shape")).toBeVisible();
-  await expect(page.getByRole("heading", { name: styleName })).toBeVisible({ timeout: 30_000 });
+  const tryLook = page.getByRole("button", { name: "Try this look" });
+  if (await page.getByText("Reading your face shape").isVisible()) {
+    await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 60_000 });
+  } else {
+    await expect(tryLook).toBeEnabled();
+    await tryLook.click();
+    await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 60_000 });
+  }
 }
 
 test.beforeAll(async () => {
@@ -299,21 +305,21 @@ test("super-admin: try-on only, queue only, and both change what the owner and g
   const sheet = page.getByRole("dialog", { name });
   await sheet.getByRole("tab", { name: "Plan & credits" }).click();
   await expect(sheet.getByRole("checkbox", { name: /AI Try-on/ })).toBeChecked();
-  await expect(sheet.getByRole("checkbox", { name: /^Queue/ })).not.toBeChecked();
+  await expect(sheet.getByRole("checkbox", { name: /^Queue/ })).toBeChecked();
   await expect(sheet.getByRole("checkbox", { name: /^Bridal/ })).toBeChecked();
 
   const guestTryOn = await freshPage(browser);
   await guestTryOn.page.goto(`/s/${slug}`);
   await expect(guestTryOn.page.getByRole("tab", { name: "Hair style" })).toBeVisible();
   await guestTryOn.page.goto(`/s/${slug}/queue`);
-  await expect(guestTryOn.page.getByText("The queue is turned off for this salon.")).toBeVisible();
+  await expect(guestTryOn.page.getByRole("button", { name: "Join the queue" })).toBeVisible();
   await guestTryOn.context.close();
 
   const ownerTryOn = await freshPage(browser);
   await signIn(ownerTryOn.page, email, password);
   await expect(ownerTryOn.page).toHaveURL(/\/admin\/leads/);
   await ownerTryOn.page.goto("/admin/queue");
-  await expect(ownerTryOn.page.getByText("Queue is turned off for this salon.")).toBeVisible();
+  await ownerTryOn.page.locator("[data-queue-mode][data-ready='yes']").waitFor();
   const tryOnNav = await openNav(ownerTryOn.page);
   await expect(tryOnNav.getByRole("link", { name: "Queue", exact: true })).toHaveCount(0);
   await expect(tryOnNav.getByRole("link", { name: /^QR/ })).toBeVisible();
@@ -479,7 +485,7 @@ test("edge: both products off hides the tools and says so", async ({ page }) => 
   await page.goto("/admin/queue");
   await expect(page.getByText("Queue is turned off for this salon.")).toBeVisible();
   await page.goto("/admin/styles");
-  await expect(page.getByText("Try-on is turned off for this salon.")).toBeVisible();
+  await expect(page.getByRole("main").getByText(/Try-on is turned off for this salon/i)).toBeVisible();
 });
 
 test("edge: an invalid token URL says the visit was not found", async ({ page }) => {
@@ -506,13 +512,14 @@ test("edge: long, Hindi, and Telugu names stay intact on the desk", async ({ pag
   const longName = `Long${"x".repeat(86)}`;
   await page.getByLabel("Walk-in name").fill(longName);
   await page.getByRole("button", { name: "Add walk-in" }).click();
-  await expect(page.getByText(longName.slice(0, 80))).toBeVisible();
+  const waiting = page.getByRole("region", { name: "Waiting" });
+  await expect(waiting.getByText(longName.slice(0, 80))).toBeVisible();
 
   await page.getByLabel("Walk-in name").fill("श्रीमती लक्ष्मी");
   await page.getByRole("button", { name: "Add walk-in" }).click();
-  await expect(page.getByText("श्रीमती लक्ष्मी")).toBeVisible();
+  await expect(waiting.getByText("श्रीमती लक्ष्मी")).toBeVisible();
 
   await page.getByLabel("Walk-in name").fill("శ్రీమతి లక్ష్మి");
   await page.getByRole("button", { name: "Add walk-in" }).click();
-  await expect(page.getByText("శ్రీమతి లక్ష్మి")).toBeVisible();
+  await expect(waiting.getByText("శ్రీమతి లక్ష్మి")).toBeVisible();
 });

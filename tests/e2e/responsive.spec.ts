@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { safeScreenshot } from "./safe-shot";
 
 const shots: Record<string, string> = {
   "webkit-iphone-13": "iphone",
@@ -41,10 +42,10 @@ async function fits(page: Page) {
   expect(Math.abs(report.minHeight - report.inner), "100dvh").toBeLessThan(2);
 }
 
-async function shot(page: Page, project: string, name: string) {
+async function shot(page: Page, testInfo: TestInfo, project: string, name: string) {
   const device = shots[project];
   if (!device) return;
-  await page.screenshot({ path: `/opt/cursor/artifacts/after-${name}-${device}.png`, fullPage: true });
+  await safeScreenshot(page, testInfo, `after-${name}-${device}.png`, { fullPage: true });
 }
 
 async function go(page: Page, path: string) {
@@ -94,7 +95,7 @@ test("guest, owner, and super layouts fit the device", async ({ page }, testInfo
   }).toPass({ timeout: 30_000 });
   await expect(gallery.getByRole("button", { name: "Soft Bob" }).locator(".check")).toBeVisible();
   await fits(page);
-  await shot(page, testInfo.project.name, "guest");
+  await shot(page, testInfo, testInfo.project.name, "guest");
 
   await signIn(page, "owner@demo.agenticbuildworks.com", "DemoSalon#2026");
   await expect(page.getByRole("heading", { name: "Leads" })).toBeVisible();
@@ -106,7 +107,7 @@ test("guest, owner, and super layouts fit the device", async ({ page }, testInfo
   await expect(page.getByRole("link", { name: "Leads", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Overview", exact: true })).toHaveCount(0);
   await fits(page);
-  await shot(page, testInfo.project.name, "owner");
+  await shot(page, testInfo, testInfo.project.name, "owner");
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await page.waitForURL(/\/login/);
 
@@ -141,7 +142,7 @@ test("guest, owner, and super layouts fit the device", async ({ page }, testInfo
     await page.getByRole("button", { name: "Previous", exact: true }).click();
     await expect(page.getByText("Page 1 of 2")).toBeVisible();
     await fits(page);
-    await shot(page, testInfo.project.name, "super");
+    await shot(page, testInfo, testInfo.project.name, "super");
   } finally {
     await prisma.aiCall.deleteMany({ where: { costNote: "layout-fixture" } });
     await prisma.$disconnect();

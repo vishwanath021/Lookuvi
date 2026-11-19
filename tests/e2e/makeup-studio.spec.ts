@@ -1,8 +1,7 @@
-import { mkdir } from "node:fs/promises";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
+import { safeScreenshot } from "./safe-shot";
 
-const SHOTS = "/opt/cursor/artifacts/makeup-studio";
 const PORTRAIT = "tests/fixtures/portraits/woman-pink.jpg";
 const NO_FACE = "tests/fixtures/faces/no-face.jpg";
 
@@ -12,9 +11,8 @@ async function salonDb() {
   return new PrismaClient();
 }
 
-async function shot(page: Page, name: string) {
-  await mkdir(SHOTS, { recursive: true });
-  await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
+async function shot(page: Page, testInfo: TestInfo, name: string) {
+  await safeScreenshot(page, testInfo, `${name}.png`, { fullPage: true });
 }
 
 test.afterEach(async () => {
@@ -26,14 +24,14 @@ test.afterEach(async () => {
   await prisma.$disconnect();
 });
 
-test("makeup section stays hidden until the salon switch is on", async ({ page }) => {
+test("makeup section stays hidden until the salon switch is on", async ({ page }, testInfo) => {
   const prisma = await salonDb();
   await prisma.tenant.update({ where: { slug: "demo" }, data: { productMakeupStudio: false, productTryOn: true, productBridal: true } });
   await prisma.$disconnect();
   await page.goto("/s/demo");
   await expect(page.getByRole("button", { name: "Everyday", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Makeup", exact: true })).toHaveCount(0);
-  if (test.info().project.name === "android") await shot(page, "01-switch-off");
+  if (testInfo.project.name === "android") await shot(page, testInfo, "01-switch-off");
 
   const on = await salonDb();
   await on.tenant.update({ where: { slug: "demo" }, data: { productMakeupStudio: true } });
@@ -43,12 +41,12 @@ test("makeup section stays hidden until the salon switch is on", async ({ page }
   await page.getByRole("button", { name: "Makeup", exact: true }).click();
   await expect(page.locator("[data-makeup-studio='on']")).toBeVisible();
   await expect(page.getByRole("button", { name: "Take photo" }).first()).toBeVisible();
-  if (test.info().project.name === "android") await shot(page, "02-switch-on-empty");
+  if (testInfo.project.name === "android") await shot(page, testInfo, "02-switch-on-empty");
   await page.getByRole("button", { name: "Everyday", exact: true }).click();
   await expect(page.getByRole("tab", { name: "Hair style" })).toBeVisible();
 });
 
-test("a photo is painted on the device and photoreal stays a sample", async ({ page }) => {
+test("a photo is painted on the device and photoreal stays a sample", async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   const prisma = await salonDb();
   await prisma.tenant.update({ where: { slug: "demo" }, data: { productMakeupStudio: true, productTryOn: true, creditBalance: 0 } });
@@ -81,16 +79,16 @@ test("a photo is painted on the device and photoreal stays a sample", async ({ p
   const project = test.info().project.name;
   if (project === "android" || project === "desktop") {
     const prefix = project === "desktop" ? "desktop" : "mobile";
-    await shot(page, `${prefix}-glam`);
-    await canvas.screenshot({ path: `${SHOTS}/${prefix}-glam-face.png` });
+    await shot(page, testInfo, `${prefix}-glam`);
+    await safeScreenshot(page, testInfo, `${prefix}-glam-face.png`);
     for (const name of ["Bridal", "Reception", "Party", "Natural", "Editorial", "Telugu bridal"]) {
       const id = name.toLowerCase().replace(/\s+/g, "-");
       const seen = await canvas.getAttribute("data-render-id");
       await page.getByRole("button", { name: `Look: ${name}` }).click();
       await expect.poll(async () => canvas.getAttribute("data-render-id"), { timeout: 10_000 }).not.toBe(seen);
       if (project === "android") {
-        await shot(page, `look-${id}`);
-        await canvas.screenshot({ path: `${SHOTS}/face-${id}.png` });
+        await shot(page, testInfo, `look-${id}`);
+        await safeScreenshot(page, testInfo, `face-${id}.png`);
       }
     }
     if (project === "android") {
@@ -102,13 +100,13 @@ test("a photo is painted on the device and photoreal stays a sample", async ({ p
         await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2);
         await page.mouse.up();
       }
-      await shot(page, "split");
+      await shot(page, testInfo, "split");
       await page.getByRole("slider", { name: "Foundation" }).fill("90");
       await page.getByRole("slider", { name: "Blush" }).fill("80");
       await page.getByRole("button", { name: "Finish Matte" }).click();
       await page.getByRole("button", { name: "Quality High" }).click();
       await page.waitForTimeout(200);
-      await shot(page, "controls-high");
+      await shot(page, testInfo, "controls-high");
     }
   }
 
@@ -119,9 +117,9 @@ test("a photo is painted on the device and photoreal stays a sample", async ({ p
     await page.getByRole("button", { name: /I agree/ }).click();
   }
   await expect(page.locator("[data-makeup-result='sample']")).toBeVisible({ timeout: 60_000 });
-  if (project === "android") await shot(page, "photoreal-sample");
+  if (project === "android") await shot(page, testInfo, "photoreal-sample");
 
   await page.locator("[data-makeup-upload]").setInputFiles(NO_FACE);
   await expect(page.locator("[data-makeup-note]").filter({ visible: true })).toHaveText("No face in that photo.", { timeout: 90_000 });
-  if (project === "android") await shot(page, "no-face");
+  if (project === "android") await shot(page, testInfo, "no-face");
 });

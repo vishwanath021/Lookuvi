@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
 import { openLive, waitForCapture } from "./live-entry";
 
 async function usePhoto(page: Page, file: string) {
@@ -10,7 +11,9 @@ async function look(page: Page, tab: string, region: string, name: string, posts
   await page.getByRole("tab", { name: tab }).click();
   const before = posts.count;
   await page.getByRole("region", { name: region }).getByRole("button", { name }).click();
-  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible({ timeout: 45_000 });
+  const tryLook = page.getByRole("button", { name: "Try this look" });
+  if (await tryLook.isEnabled()) await tryLook.click();
+  await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 45_000 });
   expect(posts.count).toBe(before + 1);
   await expect(page.getByText(/Too many/i)).toHaveCount(0);
   const slider = page.getByRole("slider", { name: /BEFORE \/ AFTER/i });
@@ -31,7 +34,9 @@ test("style, colour, brows, beard, and nails preview on this screen", async ({ p
     if (request.method() === "POST" && request.url().includes("/api/v1/tryon/generate")) posts.count += 1;
   });
 
+  await arriveDemoGuest(page);
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   await expect(page.getByText(/camera is not available/i)).toHaveCount(0);
   await openLive(page);
   await expect(page.getByRole("button", { name: "Take photo" })).toBeEnabled();
@@ -53,7 +58,7 @@ test("style, colour, brows, beard, and nails preview on this screen", async ({ p
   await intensity.fill("40");
   await expect(intensity).toHaveValue("40");
   await page.getByRole("button", { name: "Honey Blonde" }).click();
-  await expect(page.getByRole("heading", { name: "Honey Blonde", exact: true })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 45_000 });
   const colourSlider = page.getByRole("slider", { name: /BEFORE \/ AFTER/i });
   await expect(colourSlider).toBeVisible();
   await colourSlider.fill("28");

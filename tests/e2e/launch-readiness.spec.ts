@@ -1,9 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { hash } from "bcryptjs";
 import sharp from "sharp";
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { mkdir } from "node:fs/promises";
-
-const OUT = "/opt/cursor/artifacts/launch-qa";
+import { expect, test, type APIRequestContext, type Page, type TestInfo } from "@playwright/test";
+import { kolkataDayKey } from "../../src/lib/queue/day";
+import { safeScreenshot } from "./safe-shot";
 const PASSWORD = "LaunchOwner#2026";
 const SUPER_EMAIL = "launch-super@lookuvi.test";
 const SALONS = [
@@ -15,9 +15,28 @@ const SALONS = [
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
 
-async function shot(page: Page, name: string) {
-  await mkdir(OUT, { recursive: true });
-  await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
+async function shot(page: Page, testInfo: TestInfo, name: string) {
+  await safeScreenshot(page, testInfo, `${name}.png`, { fullPage: true });
+}
+
+async function unlockTryOn(slug: string, sessionId: string, deviceId: string) {
+  const prisma = await db();
+  try {
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug }, select: { id: true } });
+    const dayKey = kolkataDayKey();
+    for (const pair of [
+      { kind: "session" as const, value: sessionId },
+      { kind: "device" as const, value: deviceId },
+    ]) {
+      await prisma.salonDayUnlock.upsert({
+        where: { tenantId_dayKey_kind_value: { tenantId: tenant.id, dayKey, kind: pair.kind, value: pair.value } },
+        create: { tenantId: tenant.id, dayKey, kind: pair.kind, value: pair.value, source: "arrived" },
+        update: {},
+      });
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 async function signIn(page: Page, email: string) {
@@ -36,6 +55,12 @@ async function db() {
 }
 
 test.beforeAll(async () => {
+  const { execFileSync } = await import("node:child_process");
+  process.env.DATABASE_URL = "file:./launch-qa.db";
+  execFileSync("npx", ["prisma", "db", "push", "--skip-generate"], {
+    stdio: "pipe",
+    env: { ...process.env, DATABASE_URL: "file:./launch-qa.db" },
+  });
   const prisma = await db();
   const passwordHash = await hash(PASSWORD, 10);
   await prisma.user.upsert({
@@ -51,6 +76,7 @@ test.beforeAll(async () => {
         productQueue: true,
         productTryOn: true,
         productBridal: true,
+        tryOnsAtSalon: true,
         onboardingDone: salon.onboardingDone,
         whatsapp: "919800011199",
         address: "12 Church Street, Bengaluru",
@@ -68,6 +94,7 @@ test.beforeAll(async () => {
         productQueue: true,
         productTryOn: true,
         productBridal: true,
+        tryOnsAtSalon: true,
         onboardingDone: salon.onboardingDone,
         whatsapp: "919800011199",
         address: "12 Church Street, Bengaluru",
@@ -153,12 +180,16 @@ test("Sunday rush across three salons", async ({ page, browser, request }, testI
     ["rao-family", "crew-cut"],
     ["north-star", "kids-soft-bob"],
   ] as const) {
+    const sessionId = randomUUID();
+    const deviceId = randomUUID();
+    await unlockTryOn(slug, sessionId, deviceId);
     const preview = await request.post("/api/v1/tryon/generate", {
       multipart: {
         photo: { name: "selfie.jpg", mimeType: "image/jpeg", buffer: jpeg },
         slug,
         styleId,
-        sessionId: `launch-${slug}`,
+        sessionId,
+        deviceId,
         tool: "style",
         requestId: `launch-${slug}-${styleId}`,
       },
@@ -179,12 +210,12 @@ test("Sunday rush across three salons", async ({ page, browser, request }, testI
   await guest.goto("/s/meera-beauty/queue");
   await guest.locator("form[data-ready='yes']").waitFor();
   await expect(guest.getByRole("heading", { name: "Meera Beauty Parlour" })).toBeVisible();
-  await shot(guest, "customer_queue_phone");
+  await shot(guest, testInfo, "customer_queue_phone");
   await guest.goto(`/s/meera-beauty/q/${parlour.ref}`);
   await guest.locator("[data-status='WAITING'][data-ready='yes']").waitFor();
   await expect(guest.getByText("You have joined, token 01, about 0 min.")).toBeVisible();
   await expect(guest.getByText("Token 1", { exact: true })).toBeVisible();
-  await shot(guest, "customer_ticket_phone");
+  await shot(guest, testInfo, "customer_ticket_phone");
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await signIn(page, "meera@lookuvi.test");
@@ -192,15 +223,15 @@ test("Sunday rush across three salons", async ({ page, browser, request }, testI
   await page.locator("[data-queue-mode][data-ready='yes']").waitFor();
   await expect(page.getByText("Aarav")).toBeVisible();
   await expect(page.getByText("North Star")).toHaveCount(0);
-  await shot(page, "owner_desk_desktop");
+  await shot(page, testInfo, "owner_desk_desktop");
   await page.locator("[data-call-next='yes']:visible").click();
   await expect(page.getByRole("button", { name: "Seated", exact: true })).toBeVisible();
-  await shot(page, "owner_called_desktop");
+  await shot(page, testInfo, "owner_called_desktop");
   await expect(guest.getByText("Your turn")).toBeVisible({ timeout: 20_000 });
-  await shot(guest, "customer_turn_phone");
+  await shot(guest, testInfo, "customer_turn_phone");
   await page.getByRole("button", { name: "Seated", exact: true }).click();
   await expect(page.getByRole("button", { name: "Seated", exact: true })).toHaveCount(0);
-  await shot(page, "owner_in_service_desktop");
+  await shot(page, testInfo, "owner_in_service_desktop");
   await expect(guest.getByText("You are being served.")).toBeVisible({ timeout: 20_000 });
 
   await page.getByRole("region", { name: "Waiting" }).getByRole("button", { name: "More actions" }).first().click();
@@ -226,33 +257,33 @@ test("Sunday rush across three salons", async ({ page, browser, request }, testI
   await page.reload();
   await page.locator("[data-queue-mode][data-ready='yes']").waitFor();
   await expect(page.getByText("No one is waiting")).toBeVisible();
-  await shot(page, "owner_desk_clear_desktop");
+  await shot(page, testInfo, "owner_desk_clear_desktop");
 
   await page.goto("/s/meera-beauty/welcome");
   await expect(page.getByRole("link", { name: "Join queue" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Try a look" })).toBeVisible();
-  await shot(page, "salon_welcome_desktop");
+  await shot(page, testInfo, "salon_welcome_desktop");
   await page.goto("/s/meera-beauty/qr");
   await expect(page.getByRole("heading", { name: "Meera Beauty Parlour" })).toBeVisible();
   await expect(page.locator("[data-qr-warning]")).toHaveCount(0);
   await expect(page.locator("[data-qr-url]")).toContainText("meera-beauty.try.lookuvi.test/welcome");
   await expect(page.locator("[data-qr-url]")).not.toContainText("localhost");
   await expect(page.locator("img[alt*='QR']")).toBeVisible();
-  await shot(page, "qr_poster_desktop");
+  await shot(page, testInfo, "qr_poster_desktop");
 
   await page.goto("/s/meera-beauty");
   await expect(page.getByRole("heading", { name: "Meera Beauty Parlour" })).toBeVisible();
-  await shot(page, "customer_tryon_desktop");
+  await shot(page, testInfo, "customer_tryon_desktop");
   await guest.goto("/s/rao-family");
   await expect(guest.getByRole("heading", { name: "Rao Family Salon" })).toBeVisible();
-  await shot(guest, "customer_tryon_phone");
+  await shot(guest, testInfo, "customer_tryon_phone");
 
   await page.context().clearCookies();
   await signIn(page, "rao@lookuvi.test");
   await page.goto("/admin/onboarding");
   await expect(page.getByText("Step 1 of 6")).toBeVisible();
   await expect(page.getByText("తెలుగు")).toHaveCount(0);
-  await shot(page, "onboarding_desktop");
+  await shot(page, testInfo, "onboarding_desktop");
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Step 2 of 6")).toBeVisible();
   await page.goto("/admin/queue");
@@ -303,14 +334,14 @@ test("Sunday rush across three salons", async ({ page, browser, request }, testI
   await expect(page.getByText("Meera Beauty Parlour")).toBeVisible();
   await expect(page.getByText("Rao Family Salon")).toBeVisible();
   await expect(page.getByText("North Star Family Salon")).toBeVisible();
-  await shot(page, "super_salons_desktop");
+  await shot(page, testInfo, "super_salons_desktop");
   await page.goto("/super/ai");
   await expect(page.getByRole("heading", { name: "Spend cap" })).toBeVisible();
   await expect(page.getByRole("radio", { name: /sunburst/i })).toBeChecked();
-  await shot(page, "super_spend_cap_desktop");
+  await shot(page, testInfo, "super_spend_cap_desktop");
   await page.goto("/super/costs");
   await expect(page.getByRole("heading", { name: "Spend & costs" })).toBeVisible();
-  await shot(page, "super_costs_desktop");
+  await shot(page, testInfo, "super_costs_desktop");
 
   await phone.close();
 });
