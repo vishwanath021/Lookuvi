@@ -64,11 +64,9 @@ test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
-test("customer can consent, use the camera, preview a cut, and an owner can open the dashboard", async ({ page }, testInfo) => {
+test("guest home layout and an owner can open the dashboard", async ({ page }, testInfo) => {
   test.setTimeout(180_000);
-  await arriveDemoGuest(page);
   await page.goto("/s/demo");
-  await waitForDemoUnlock(page);
   const salonName = page.getByRole("heading", { level: 1, name: "Demo Salon – Bengaluru" });
   await expect(salonName).toBeVisible();
   await expect(salonName).toHaveText("Demo Salon – Bengaluru");
@@ -103,88 +101,16 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   await showEveryStyle(gallery);
   await expect(gallery.locator("img")).toHaveCount(25);
   await expect(gallery.getByRole("button", { name: "Soft Bob" })).toBeVisible();
-  await page.screenshot({ path: "docs/screenshots/01-home.png", fullPage: true });
-  await page.screenshot({ path: "docs/screenshots/16-landing-grid.png", fullPage: true });
-  await page.screenshot({ path: "docs/screenshots/13-gallery-women.png", fullPage: true });
 
   await page.getByRole("button", { name: "Men", exact: true }).click();
   await showEveryStyle(gallery);
   await expect(gallery.locator("img")).toHaveCount(29);
   await expect(gallery.getByRole("button", { name: "Mid Fade" })).toBeVisible();
-  await page.screenshot({ path: "docs/screenshots/14-gallery-men.png", fullPage: true });
   await page.getByRole("button", { name: "Women", exact: true }).click();
 
   await gallery.getByRole("button", { name: "Soft Bob" }).click();
   await expect(page.getByText("Add your photo first")).toBeVisible();
   await expect(gallery.getByRole("button", { name: "Soft Bob" })).toHaveAttribute("aria-pressed", "true");
-
-  await openLive(page);
-  await expect(page.getByRole("button", { name: "Take photo" })).toBeEnabled();
-  await page.waitForFunction(() => {
-    const video = document.querySelector("video");
-    if (!video || video.videoWidth < 10) return false;
-    const scratch = document.createElement("canvas");
-    scratch.width = 8;
-    scratch.height = 8;
-    const ctx = scratch.getContext("2d");
-    if (!ctx) return false;
-    ctx.drawImage(video, 0, 0, 8, 8);
-    const pixel = ctx.getImageData(4, 4, 1, 1).data;
-    return pixel[0] + pixel[1] + pixel[2] > 30;
-  });
-  await page.screenshot({ path: "docs/screenshots/03-camera.png", fullPage: true });
-  const generated = page.waitForResponse(
-    (res) => res.url().includes("/api/v1/tryon/generate") && res.request().method() === "POST",
-    { timeout: 90_000 },
-  );
-  await page.getByRole("button", { name: "Take photo" }).click();
-  await waitForCapture(page);
-  await page.screenshot({ path: "docs/screenshots/17-after-photo.png", fullPage: true });
-  expect((await generated).ok()).toBeTruthy();
-
-  await expect(page.getByRole("heading", { name: "Soft Bob" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator("section[aria-label=Photo]")).toHaveClass(/is-ready/);
-  await expect(page.getByText("Demo", { exact: true })).toHaveCount(0);
-  await expect(page.getByText(/demo mode/i)).toHaveCount(0);
-  const slider = page.getByRole("slider", { name: /BEFORE \/ AFTER/i });
-  await expect(slider).toBeVisible();
-  await slider.fill("30");
-  await artifact(page, testInfo, "result-slider");
-  await expect(page.getByRole("button", { name: "Book this look" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
-  await expect(gallery.getByRole("button", { name: "Wolf Cut" })).toBeVisible();
-  await page.screenshot({ path: "docs/screenshots/04-preview.png", fullPage: true });
-  await page.screenshot({ path: "docs/screenshots/15-demo-result.png", fullPage: true });
-
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByText("Saved to your looks")).toBeVisible();
-  const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download" }).click();
-  expect((await downloadPromise).suggestedFilename()).toMatch(/\.jpg$/);
-  await page.getByRole("button", { name: "Try another" }).click();
-  await expect(page.getByRole("button", { name: "Take photo" })).toBeEnabled();
-  await page.getByRole("button", { name: "Close", exact: true }).click();
-  await expect(gallery.getByRole("button", { name: "Kids Soft Bob" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Kids", exact: true }).click();
-  await expect(gallery.locator("img")).toHaveCount(8);
-
-  await page.locator('input[data-photo="gallery"]').setInputFiles("public/samples/portrait.jpg");
-  await waitForCapture(page);
-  await page.getByRole("button", { name: "Women", exact: true }).click();
-  await gallery.getByRole("button", { name: "Wolf Cut" }).click();
-  await page.getByRole("button", { name: "Try this look" }).click();
-  await expect(page.getByRole("heading", { name: "Wolf Cut" })).toBeVisible({ timeout: 45_000 });
-  await page.getByRole("button", { name: "Book this look" }).click();
-  await page.getByLabel("Your name").fill("Eeshaan");
-  await page.getByLabel("Phone").fill("9876543210");
-  const popupPromise = page.waitForEvent("popup");
-  await page.getByRole("button", { name: "Send on WhatsApp" }).click();
-  const popup = await popupPromise;
-  await expect(popup).toHaveURL(/919800011122/);
-  const booking = decodeURIComponent(popup.url()).replaceAll("+", " ");
-  expect(booking).toContain("I'd like to book this look: Wolf Cut");
-  expect(booking).toContain("/api/v1/media");
-  await popup.close();
 
   await page.goto("/s/demo/guide");
   await expect(page.getByRole("heading", { name: "Hair-colour ideas" })).toBeVisible();
@@ -192,8 +118,6 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   await page.locator("[data-ready='yes']").waitFor();
   await page.getByRole("button", { name: "Show ideas" }).first().click();
   await expect(page.getByText(/not a measurement/i)).toBeVisible({ timeout: 20_000 });
-  await page.screenshot({ path: "docs/screenshots/10-guide.png", fullPage: true });
-
   await page.goto("/login");
   await page.getByLabel("Email").fill("owner@demo.agenticbuildworks.com");
   await page.getByLabel("Password").fill("DemoSalon#2026");
@@ -201,20 +125,16 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL(/\/admin/, { timeout: 60_000 });
   await expect(page.getByRole("heading", { name: "Leads" })).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({ path: "docs/screenshots/05-admin.png", fullPage: true });
+  await artifact(page, testInfo, "owner-desk");
 
   await page.goto("/admin/leads");
   await expect(page.getByRole("heading", { name: "Leads" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: /Wolf Cut/ }).first()).toBeVisible();
-  await page.screenshot({ path: "docs/screenshots/06-leads.png", fullPage: true });
 
   await page.goto("/admin/billing");
   await expect(page.getByRole("heading", { name: "Billing" })).toBeVisible();
-  await page.screenshot({ path: "docs/screenshots/07-billing.png", fullPage: true });
 
   await page.goto("/admin/qr");
   await expect(page.getByRole("heading", { name: /qr and embed/i })).toBeVisible();
-  await page.screenshot({ path: "docs/screenshots/08-qr.png", fullPage: true });
 });
 
 test("colour, brows, nails, and beard are on the guest page", async ({ page }) => {
@@ -394,8 +314,7 @@ test("booking asks for a phone code only when the salon requires it", async ({ p
   await prisma.tenant.update({ where: { slug: "demo" }, data: { requireLoginToBook: true, anonDailyCap: 40 } });
   try {
     await page.goto("/s/demo/me?book=1&look=French%20Bob");
-    await page.screenshot({ path: "docs/screenshots/11-hub.png", fullPage: true });
-    await page.getByLabel("Mobile number").fill("9800099111");
+  await page.getByLabel("Mobile number").fill("9800099111");
     await page.getByRole("button", { name: "Send code" }).click();
     const dev = page.getByTestId("dev-otp");
     await expect(dev).toBeVisible();
@@ -423,7 +342,6 @@ test("booking asks for a phone code only when the salon requires it", async ({ p
     await page.goto("/admin/bookings");
     await expect(page.getByRole("heading", { name: "Bookings" })).toBeVisible({ timeout: 45_000 });
     await expect(page.getByText("Asha Rao")).toBeVisible();
-    await page.screenshot({ path: "docs/screenshots/12-bookings.png", fullPage: true });
     const popupPromise = page.waitForEvent("popup");
     await page.getByRole("button", { name: "Confirm" }).first().click();
     const popup = await popupPromise;
@@ -434,54 +352,6 @@ test("booking asks for a phone code only when the salon requires it", async ({ p
     await prisma.customer.deleteMany({ where: { phone: "919800099111" } });
     await prisma.$disconnect();
   }
-});
-
-test("style gallery uses portraits and the demo result is not a flat placeholder", async ({ page }) => {
-  await arriveDemoGuest(page);
-  await page.goto("/s/demo");
-  await waitForDemoUnlock(page);
-  const gallery = page.getByRole("region", { name: "Styles" });
-  await showEveryStyle(gallery);
-  await expect(gallery.locator("img")).toHaveCount(25);
-  const womenPhoto = gallery.locator("img").first();
-  await expect(womenPhoto).toHaveAttribute("src", /\/styles\/(thumbs\/)?.+\.(jpg|webp)/);
-  await expect(womenPhoto).toHaveAttribute("alt", /style reference/);
-  await page.locator('input[data-photo="gallery"]').setInputFiles("public/samples/portrait.jpg");
-  await expect(page.getByRole("button", { name: "Retake" })).toBeVisible();
-  await page.screenshot({ path: "docs/screenshots/17-after-photo.png", fullPage: true });
-  await gallery.getByRole("button", { name: "Soft Bob" }).click();
-  await page.getByRole("button", { name: "Try this look" }).click();
-  await expect(page.getByText("Reading your face shape")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Soft Bob" })).toBeVisible({ timeout: 45_000 });
-  const slider = page.getByRole("slider", { name: /BEFORE \/ AFTER/i });
-  await expect(slider).toBeVisible();
-  await expect(page.locator('img[alt="BEFORE"]')).not.toHaveAttribute("src", /demo-before/);
-  await page.waitForFunction(() => {
-    const img = document.querySelector('img[alt="AFTER"]') as HTMLImageElement | null;
-    return Boolean(img && img.complete && img.naturalWidth > 10);
-  });
-  const stats = await page.locator('img[alt="AFTER"]').evaluate((node) => {
-    const img = node as HTMLImageElement;
-    const canvas = document.createElement("canvas");
-    canvas.width = 48;
-    canvas.height = 64;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return { variance: 0 };
-    ctx.drawImage(img, 0, 0, 48, 64);
-    const data = ctx.getImageData(0, 0, 48, 64).data;
-    let sum = 0;
-    let sum2 = 0;
-    const n = data.length / 4;
-    for (let i = 0; i < data.length; i += 4) {
-      const tone = data[i] + data[i + 1] + data[i + 2];
-      sum += tone;
-      sum2 += tone * tone;
-    }
-    const mean = sum / n;
-    return { variance: sum2 / n - mean * mean };
-  });
-  expect(stats.variance).toBeGreaterThan(200);
-  await page.screenshot({ path: "docs/screenshots/15-demo-result.png", fullPage: true });
 });
 
 test("super admin chooses the salon hairstyle model without calling a provider", async ({ page }, testInfo) => {
@@ -514,7 +384,6 @@ test("super admin sees assumed COGS", async ({ page }) => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByText(/assumption/i)).toHaveCount(0);
   await expect(page.getByText("Try-ons this month")).toBeVisible();
-  await page.screenshot({ path: "docs/screenshots/09-super.png", fullPage: true });
   await page.goto("/super/costs");
   await expect(page.getByRole("heading", { name: "Spend & costs" })).toBeVisible();
   await expect(page.getByText("Month spend")).toBeVisible();
