@@ -12,7 +12,10 @@ async function signIn(page: import("@playwright/test").Page) {
   await page.getByLabel("Email").fill("owner@demo.agenticbuildworks.com");
   await page.getByLabel("Password").fill("DemoSalon#2026");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Queue" })).toBeVisible();
+  await page.waitForURL(/\/admin/, { timeout: 30_000 });
+  await page.goto("/admin/queue");
+  await page.locator("[data-queue-mode][data-ready='yes']").waitFor();
+  await expect(page.getByRole("main").getByRole("heading", { name: "Queue" })).toBeVisible();
 }
 
 test.describe.configure({ mode: "serial" });
@@ -69,7 +72,7 @@ test("the desk calls the next guest, finishes the visit, and adds a walk-in", as
   await signIn(page);
   await page.goto("/admin/queue");
   await page.locator("[data-queue-mode][data-ready='yes']").waitFor();
-  await expect(page.getByRole("heading", { name: "Queue" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("heading", { name: "Queue" })).toBeVisible();
   await expect(page.getByText("Queue Guest", { exact: true })).toBeVisible();
   await expect(page.getByText("On the way")).toBeVisible();
   await expect(page.getByRole("button", { name: "Seated", exact: true })).toHaveCount(0);

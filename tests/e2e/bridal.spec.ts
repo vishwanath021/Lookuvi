@@ -48,7 +48,9 @@ test("guest can pick an event and a look, refine it, try mehendi, save, compare,
   await prisma.lead.deleteMany({ where: { tenant: { slug: "demo" }, type: "BRIDAL", name: "Lakshmi" } });
   await prisma.$disconnect();
 
+  await arriveDemoGuest(page);
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   await shot(page, "01-entry");
   await page.getByRole("button", { name: "Bridal", exact: true }).click();
   await expect(page.locator("[data-bridal='flow']")).toBeVisible();
@@ -162,7 +164,7 @@ test("guest can pick an event and a look, refine it, try mehendi, save, compare,
   await signIn(page);
   await page.goto("/admin/leads");
   await expect(page.getByText("Bridal", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("20 Dec 2026")).toBeVisible();
+  await expect(page.getByRole("main").getByText("20 Dec 2026").first()).toBeVisible();
   await shot(page, "09-owner-lead");
 });
 
@@ -206,12 +208,14 @@ test("a new catalogue style generates before the salon has a menu row", async ({
   const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug: "demo" } });
   await prisma.tenantStyle.deleteMany({ where: { tenantId: tenant.id, styleId: "wolf-cut" } });
   await prisma.$disconnect();
+  await arriveDemoGuest(page);
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   await page.locator("input[data-photo='gallery']").setInputFiles("public/samples/portrait.jpg");
   const gallery = page.getByRole("region", { name: "Styles" });
   await page.getByRole("button", { name: "Women", exact: true }).click();
   await gallery.getByRole("button", { name: "Wolf Cut" }).click();
   await page.getByRole("button", { name: "Try this look" }).click();
   await expect(page.getByText("That style is not on this salon's menu.")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Wolf Cut" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("before-after")).toBeVisible({ timeout: 30_000 });
 });

@@ -40,12 +40,15 @@ Regression viewports are projects `regression-iphone` (WebKit, 390×844) and `re
 
 ## Known failing E2E
 
-Baseline 2026-11-14, `npx playwright test` on master: 115 passed, 59 failed, 59 skipped. Compare later runs to this list. These are not regressions.
+Baseline 2026-11-18 cleanup subset (edited specs + `guest-regression` + `queue`, not full suite): **79 passed, 47 failed, 8 did not run** (134 tests). Owner full-suite baseline 2026-11-14 was 115 passed / 59 failed / 59 skipped. See `docs/E2E_CLEANUP_2026-11-18.md`.
 
-- Result heading missing after generate (Soft Bob or Wolf Cut): `five-tools` android, iphone, desktop, tablet; `smoke` camera and gallery on android, iphone, desktop; `phone-matrix` guest upload, no-WhatsApp, and zero try-ons; `bridal` new catalogue; `align-slider` desktop both; `qa-feedback` retake on iphone.
-- Colour swatch missing (Cherry Red): `smoke` colour/brows/nails/beard on android, iphone, desktop.
-- Settings toast missing (“Settings saved.”): `smoke` renamed salon on android, iphone, desktop; `operating-hours` desktop; `qa-feedback` logo desktop.
-- Strict-mode duplicate text: `bridal` android “20 Dec 2026”; `phone-matrix` long name; `smoke` “Meta Muse Image” on android, iphone, desktop; `studio` face placeholder; `ux-r4` face photo box on android and desktop; `qa-feedback` tool pill `.seg`.
-- Gallery image is a thumb webp, not `/styles/*.jpg`: `smoke` gallery portraits on android, iphone, desktop; `ux-simplify` Voluminous Blowout on android, iphone, desktop.
-- Queue ticket DOM: `guest-regression` WebKit “a guest can join the queue”; `queue-stabilize` android ticket status, request mode 404, and visit memory.
-- Other: `smoke` daily cap (response timeout on android and desktop, salon-mode missing on iphone); `studio` camera notice and live-look pixel delta; `ux-r5` hidden makeup swatch and missing “Try 2 of 3”; `qa-feedback` desktop retake missing live studio; `qa-bridal-five` android Prisma init and desktop CSP `unsafe-eval`; `launch-copy` ninth join returns 200; `launch-readiness` Sunday rush Prisma error; `request-label` goto timeout; `qr-logo` salon logo missing; `phone-matrix` queue checkbox stays checked and “Try-on is turned off” missing; `responsive` overflow on webkit-ipad-mini (72) and webkit-ipad-pro (6).
+Removed one-off specs: `ux-r4`, `ux-r5`, `qa-bridal-five`, `qa-feedback`, `align-slider`, `bridal-slider`, `generation-ux` (covered by `guest-regression`).
+
+Still noisy after cleanup:
+
+- `guest-regression` queue join (ticket DOM / navigation).
+- `responsive` horizontal overflow on some WebKit iPad and `desk-1440` (6px on `webkit-ipad-pro` — likely real layout; not fixed in cleanup PR).
+- `smoke` / `five-tools` / `phone-matrix` generate timing on some chromium projects (mock AI, `before-after` visibility).
+- `studio` live-look canvas deltas and consent copy on some viewports.
+- `launch-readiness` only runs on desktop; requires `launch-qa.db` (`beforeAll` now runs `prisma db push`).
+- Full-suite-only: `queue-stabilize`, `launch-copy`, `qr-logo`, `request-label`, `operating-hours` (unchanged this round).

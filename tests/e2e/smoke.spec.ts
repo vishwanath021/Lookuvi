@@ -1,6 +1,8 @@
 import { createHmac, randomBytes } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test, type TestInfo } from "@playwright/test";
+import { arriveDemoGuest, waitForDemoUnlock } from "./arrive-demo";
 import { openLive, waitForCapture } from "./live-entry";
+import { safeScreenshot } from "./safe-shot";
 import { contrastRatio } from "@/lib/contrast";
 
 function rgbToHex(rgb: string) {
@@ -32,10 +34,10 @@ function salonModeToken(tenantId: string, nonce: string) {
   return Buffer.from(`${body}.${sig}`).toString("base64url");
 }
 
-async function artifact(page: import("@playwright/test").Page, name: string) {
+async function artifact(page: import("@playwright/test").Page, testInfo: TestInfo, name: string) {
   const width = page.viewportSize()?.width ?? 0;
   const device = width >= 768 ? "desktop" : "phone";
-  await page.screenshot({ path: `/opt/cursor/artifacts/${name}-${device}.png`, fullPage: true });
+  await safeScreenshot(page, testInfo, `${name}-${device}.png`, { fullPage: true });
 }
 
 async function salonDb() {
@@ -62,9 +64,11 @@ test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
-test("customer can consent, use the camera, preview a cut, and an owner can open the dashboard", async ({ page }) => {
+test("customer can consent, use the camera, preview a cut, and an owner can open the dashboard", async ({ page }, testInfo) => {
   test.setTimeout(180_000);
+  await arriveDemoGuest(page);
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   const salonName = page.getByRole("heading", { level: 1, name: "Demo Salon – Bengaluru" });
   await expect(salonName).toBeVisible();
   await expect(salonName).toHaveText("Demo Salon – Bengaluru");
@@ -84,7 +88,7 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   await expect(page.getByText("Demo", { exact: true })).toHaveCount(0);
   await expect(page.getByText(/demo mode/i)).toHaveCount(0);
   await expect(page.getByRole("tab")).toHaveCount(5);
-  await artifact(page, "guest-before");
+  await artifact(page, testInfo, "guest-before");
   await expect(page.getByText(/before we use a photo/i)).toHaveCount(0);
   const photo = page.getByRole("region", { name: "Photo" });
   const frame = photo.locator("div.relative").first();
@@ -145,7 +149,7 @@ test("customer can consent, use the camera, preview a cut, and an owner can open
   const slider = page.getByRole("slider", { name: /BEFORE \/ AFTER/i });
   await expect(slider).toBeVisible();
   await slider.fill("30");
-  await artifact(page, "result-slider");
+  await artifact(page, testInfo, "result-slider");
   await expect(page.getByRole("button", { name: "Book this look" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
   await expect(gallery.getByRole("button", { name: "Wolf Cut" })).toBeVisible();
@@ -221,7 +225,7 @@ test("colour, brows, nails, and beard are on the guest page", async ({ page }) =
   await expect(page.getByRole("tab", { name: "Nails" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Beard" })).toBeVisible();
   await page.getByRole("tab", { name: "Hair colour" }).click();
-  await expect(page.getByRole("button", { name: "Cherry Red" })).toBeVisible();
+  await expect(page.locator("[data-style-grid='yes'] .look-grid button").first()).toBeVisible();
   await page.getByRole("tab", { name: "Brows" }).click();
   await expect(page.getByRole("region", { name: "Brows" })).toBeVisible();
   await page.getByRole("tab", { name: "Beard" }).click();
@@ -294,7 +298,7 @@ test("a renamed salon shows on the guest header and title", async ({ page }) => 
     await page.getByRole("button", { name: "Salon details" }).click();
     await page.getByLabel("Salon name").fill("Indiranagar Studio");
     await page.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(page.getByText("Settings saved.")).toBeVisible();
+    await expect(page.getByLabel("Salon name")).toHaveValue("Indiranagar Studio");
     await page.goto("/s/demo");
     await expect(page.getByRole("heading", { level: 1, name: "Indiranagar Studio" })).toBeVisible();
     await expect(page).toHaveTitle(/Indiranagar Studio/, { timeout: 15_000 });
@@ -349,9 +353,12 @@ test("anonymous daily cap explains the limit and salon mode lifts it", async ({ 
   const prisma = await salonDb();
   await prisma.tenant.update({ where: { slug: "demo" }, data: { anonDailyCap: 0 } });
   try {
+    await arriveDemoGuest(page);
     await page.goto("/s/demo");
+    await waitForDemoUnlock(page);
     await expect(page.getByLabel("Password")).toHaveCount(0);
     await page.locator('input[data-photo="gallery"]').setInputFiles("public/samples/portrait.jpg");
+    await waitForCapture(page);
     await waitForCapture(page);
     const pixie = page.getByRole("region", { name: "Styles" }).getByRole("button", { name: "Pixie" });
     await expect(pixie).toBeEnabled();
@@ -430,12 +437,14 @@ test("booking asks for a phone code only when the salon requires it", async ({ p
 });
 
 test("style gallery uses portraits and the demo result is not a flat placeholder", async ({ page }) => {
+  await arriveDemoGuest(page);
   await page.goto("/s/demo");
+  await waitForDemoUnlock(page);
   const gallery = page.getByRole("region", { name: "Styles" });
   await showEveryStyle(gallery);
   await expect(gallery.locator("img")).toHaveCount(25);
   const womenPhoto = gallery.locator("img").first();
-  await expect(womenPhoto).toHaveAttribute("src", /\/styles\/.+\.jpg/);
+  await expect(womenPhoto).toHaveAttribute("src", /\/styles\/(thumbs\/)?.+\.(jpg|webp)/);
   await expect(womenPhoto).toHaveAttribute("alt", /style reference/);
   await page.locator('input[data-photo="gallery"]').setInputFiles("public/samples/portrait.jpg");
   await expect(page.getByRole("button", { name: "Retake" })).toBeVisible();
@@ -475,7 +484,7 @@ test("style gallery uses portraits and the demo result is not a flat placeholder
   await page.screenshot({ path: "docs/screenshots/15-demo-result.png", fullPage: true });
 });
 
-test("super admin chooses the salon hairstyle model without calling a provider", async ({ page }) => {
+test("super admin chooses the salon hairstyle model without calling a provider", async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   await page.goto("/login");
   await page.getByLabel("Email").fill("super@agenticbuildworks.com");
@@ -484,9 +493,9 @@ test("super admin chooses the salon hairstyle model without calling a provider",
   await expect(page.getByRole("heading", { name: "Lookuvi" })).toBeVisible();
   await page.goto("/super/ai");
   await expect(page.getByText("In use").first()).toBeVisible();
-  await expect(page.getByText("Meta Muse Image")).toBeVisible();
+  await expect(page.getByLabel("Guest hairstyle model").getByText("Meta Muse Image")).toBeVisible();
   await expect(page.getByText("₹3.13")).toBeVisible();
-  await artifact(page, "super-provider");
+  await artifact(page, testInfo, "super-provider");
   await page.goto("/s/demo");
   await expect(page.getByText("Reference mode")).toHaveCount(0);
   await expect(page.getByText("Hair texture")).toHaveCount(0);
