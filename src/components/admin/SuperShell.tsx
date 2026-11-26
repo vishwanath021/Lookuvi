@@ -8,6 +8,8 @@ import { SignOutButton } from "@/components/admin/SignOutButton";
 const LINKS = [
   { href: "/super", label: "Overview" },
   { href: "/super/salons", label: "Salons" },
+  { href: "/super/plans", label: "Billing plans" },
+  { href: "/super/payments", label: "Payments" },
   { href: "/super/styles", label: "Styles" },
   { href: "/super/ai", label: "AI" },
   { href: "/super/costs", label: "Spend & costs" },

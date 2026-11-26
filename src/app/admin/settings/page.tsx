@@ -83,6 +83,7 @@ export default async function SettingsPage() {
           loyaltyOn: tenant.loyaltyOn,
           loyaltyPointsPerVisit: tenant.loyaltyPointsPerVisit,
           rewards: rewards.map((reward) => ({ name: reward.name, cost: reward.cost })),
+          bookingDepositPaise: tenant.bookingDepositPaise,
         }}
       />
       </>

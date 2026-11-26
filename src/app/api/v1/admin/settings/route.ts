@@ -53,6 +53,8 @@ const schema = z.object({
   reminderDays: z.number().int().optional(),
   reminderTemplate: z.string().max(2000).optional(),
   reminderMethod: z.enum(["MANUAL", "AUTO"]).optional(),
+  /** Paise; 0 turns guest booking deposit off. */
+  bookingDepositPaise: z.number().int().min(0).max(500_000).optional(),
 });
 
 export async function GET() {

@@ -39,6 +39,8 @@ export function GuestHub({
 }) {
   const [lang, setLang] = useState<Locale>(isLocale(config.defaultLang) ? config.defaultLang : "en");
   const [tab, setTab] = useState<Tab>(book ? "bookings" : "home");
+  const [depositBookingId, setDepositBookingId] = useState("");
+  const [depositPaise, setDepositPaise] = useState(0);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [ready, setReady] = useState(false);
   const [phone, setPhone] = useState("");
@@ -162,6 +164,48 @@ export function GuestHub({
       setError(data.message || t(lang, "hubError"));
       return;
     }
+    if (data.needsDeposit && config.depositPaymentsEnabled) {
+      setDepositBookingId(data.bookingId);
+      setDepositPaise(data.depositPaise);
+      setStatus("Pay the booking deposit to confirm.");
+      return;
+    }
+    setStatus(t(lang, "hubRequested"));
+    await refresh();
+  }
+
+  async function payBookingDeposit() {
+    if (!depositBookingId) return;
+    const res = await fetch("/api/v1/guest/bookings/deposit-checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug: config.slug, bookingId: depositBookingId }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.message || t(lang, "hubError"));
+      return;
+    }
+    const Razorpay = (window as Window & { Razorpay?: new (options: Record<string, unknown>) => { open: () => void } }).Razorpay;
+    if (!Razorpay) {
+      setError("Payment widget failed to load.");
+      return;
+    }
+    const checkout = new Razorpay({
+      key: data.keyId,
+      amount: data.amountPaise,
+      currency: data.currency,
+      name: config.name,
+      description: "Booking deposit",
+      order_id: data.orderId,
+      modal: {
+        ondismiss: () => {
+          setError("Payment not completed. You haven't been charged. You can try again.");
+        },
+      },
+    });
+    checkout.open();
+    setDepositBookingId("");
     setStatus(t(lang, "hubRequested"));
     await refresh();
   }
@@ -330,6 +374,11 @@ export function GuestHub({
               </label>
               <button className="btn" type="submit">{t(lang, "hubRequest")}</button>
               {status && <p role="status" className="text-sm">{status}</p>}
+              {depositBookingId ? (
+                <button className="btn mt-2" type="button" onClick={() => void payBookingDeposit()}>
+                  Pay deposit (₹{(depositPaise / 100).toLocaleString("en-IN")})
+                </button>
+              ) : null}
               <ul className="space-y-1 text-sm">
                 {customer.bookings.map((item) => (
                   <li key={item.id}>{item.preferredAt} · {item.lookName || t(lang, "hubVisit")} · {t(lang, `status_${item.status}`)}</li>

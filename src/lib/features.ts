@@ -64,7 +64,7 @@ export function ownerNav(input: {
     links.push({ href: "/admin/ai", label: "AI settings", section: "more" });
   }
   links.push({ href: "/admin/settings", label: "Settings", section: "more" });
-  links.push({ href: "/admin/billing", label: "Billing", section: "more" });
+  links.push({ href: "/admin/billing", label: "Plan & Billing", section: "more" });
   if (input.role === "OWNER") links.push({ href: "/admin/security", label: "Security", section: "more" });
   return links;
 }
