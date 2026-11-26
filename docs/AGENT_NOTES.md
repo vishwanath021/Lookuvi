@@ -11,9 +11,13 @@ Guest (`/s/[slug]`, `src/components/tryon/TryOnApp.tsx` plus panes):
 - Queue join `/s/[slug]/queue`, ticket `/s/[slug]/q/[token]`. Saved `/saved`. Services `/services`.
 - Shared chrome: `GuestNav`, `AtSalonProvider` (`AtSalonNote.tsx`), `AtSalonSheet`.
 
-Owner (`/admin`, `src/app/admin/layout.tsx`): queue `QueueDesk`, settings, onboarding `OnboardingWizard`, customers, bookings, services, styles, billing, QR, leads, reminders, security.
+Owner (`/admin`, `src/app/admin/layout.tsx`): queue `QueueDesk`, settings, onboarding `OnboardingWizard`, customers, bookings, services, styles, **Plan & Billing** (`/admin/billing`, Razorpay orders when keys set), legacy try-on billing/UPI on same page, QR, leads, reminders, security.
 
-Super (`/super`): salons `SalonsBoard` → `POST /api/v1/super/tenants/[id]`, AI, costs, audit, security, styles.
+Super (`/super`): salons `SalonsBoard` → `POST /api/v1/super/tenants/[id]`, **billing plans** `/super/plans`, **Razorpay payments** `/super/payments`, AI, costs, audit, security, styles.
+
+## Razorpay (test mode in repo)
+
+Read `docs/PAYMENTS_RAZORPAY.md`. Salon plan table `SalonBillingPlan`; payments `Payment`; webhook `/api/webhooks/razorpay`. No live keys in git. Mock Razorpay HTTP in unit tests. Guest `bookingDepositPaise` default 0 — booking API unchanged when off.
 
 ## Try-on lock and credits
 

@@ -45,5 +45,13 @@ export async function POST(req: Request) {
       data: { customerId: customer.id, tenantId: tenant.id, tool: parsed.data.tool || "style", lookId: parsed.data.lookId, lookName: parsed.data.lookName },
     });
   }
+  if (tenant.bookingDepositPaise > 0) {
+    return NextResponse.json({
+      bookingId: booking.id,
+      status: booking.status,
+      needsDeposit: true,
+      depositPaise: tenant.bookingDepositPaise,
+    });
+  }
   return NextResponse.json({ bookingId: booking.id, status: booking.status });
 }

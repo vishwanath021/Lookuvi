@@ -39,6 +39,7 @@ export function SettingsForm({
     memberDailyCap: number;
     monthlyTryAllowance: number;
     requireLoginToBook: boolean;
+    bookingDepositPaise?: number;
     productBridal: boolean;
     productGroom: boolean;
     productMakeupStudio?: boolean;
@@ -75,6 +76,7 @@ export function SettingsForm({
     loyaltyOn: initial.loyaltyOn ?? true,
     loyaltyPointsPerVisit: initial.loyaltyPointsPerVisit ?? 1,
     rewards: initial.rewards ?? [],
+    bookingDepositPaise: initial.bookingDepositPaise ?? 0,
   });
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"success" | "error">("success");
@@ -278,6 +280,19 @@ export function SettingsForm({
         {showGst ? <label className="text-sm">GSTIN<input className="field mt-1" value={form.gstin} onChange={(event) => set("gstin", event.target.value)} /></label> : null}
         {showTryOn ? (
         <Switch label="Phone login before a booking request" hint="When this is off, Book opens WhatsApp." checked={form.requireLoginToBook} onChange={(next) => set("requireLoginToBook", next)} />
+        ) : null}
+        {showTryOn ? (
+          <label className="text-sm">
+            Guest booking deposit (₹, 0 = off)
+            <input
+              className="field mt-1"
+              type="number"
+              min={0}
+              step={1}
+              value={Math.round((form.bookingDepositPaise || 0) / 100)}
+              onChange={(event) => set("bookingDepositPaise", Math.max(0, Math.round(Number(event.target.value) || 0) * 100))}
+            />
+          </label>
         ) : null}
         <Switch label="Remove Powered by Lookuvi" hint={canRemoveBranding ? "" : "Pro or Chain"} checked={form.removeBranding} disabled={!canRemoveBranding} onChange={(next) => set("removeBranding", next)} />
         {showDomain ? (

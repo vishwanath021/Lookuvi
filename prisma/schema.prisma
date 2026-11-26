@@ -134,6 +134,13 @@ model Tenant {
   loyaltyRewards      LoyaltyReward[]
   loyaltyEntries      LoyaltyLedger[]
   visitReminders      VisitReminder[]
+  /** Platform plan paid through. Paying extends paidUntil. */
+  paidUntil           DateTime?
+  salonBillingPlanId  String?
+  /** Guest booking deposit in paise. 0 means off; booking flow stays unchanged. */
+  bookingDepositPaise Int       @default(0)
+  salonBillingPlan    SalonBillingPlan? @relation(fields: [salonBillingPlanId], references: [id], onDelete: SetNull)
+  payments            Payment[]
 }
 
 model LoyaltyReward {
@@ -637,12 +644,74 @@ model Booking {
   preferredAt String   @default("")
   note        String   @default("")
   status      String   @default("PENDING")
+  depositStatus String @default("")
   createdAt   DateTime @default(now())
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  payments    Payment[]
 
   @@index([tenantId, createdAt])
   @@index([customerId])
+}
+
+/// Sellable salon subscription plans (super-admin CRUD). One-time Razorpay orders per period today; subscriptions later.
+model SalonBillingPlan {
+  id             String   @id @default(cuid())
+  name           String
+  pricePaise     Int
+  intervalMonths Int      @default(1)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenants        Tenant[]
+  payments       Payment[]
+}
+
+/// Razorpay order checkout row. Webhook is source of truth for paid status.
+model Payment {
+  id                String    @id @default(cuid())
+  tenantId          String
+  kind              String
+  status            String    @default("created")
+  amountPaise       Int
+  currency          String    @default("INR")
+  orderId           String    @unique
+  receiptNumber     String    @default("")
+  salonPlanId       String?
+  bookingId         String?
+  expiresAt         DateTime
+  paidAt            DateTime?
+  failedAt          DateTime?
+  refundedAt        DateTime?
+  flagged           Boolean   @default(false)
+  flagReason        String    @default("")
+  razorpayPaymentId String    @default("")
+  razorpayInvoiceId String    @default("")
+  refundId          String    @default("")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  salonPlan         SalonBillingPlan? @relation(fields: [salonPlanId], references: [id], onDelete: SetNull)
+  booking           Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([status, expiresAt])
+  @@index([salonPlanId])
+  @@index([bookingId])
+}
+
+/// Idempotent Razorpay webhook processing.
+model RazorpayWebhookEvent {
+  eventId   String   @id
+  event     String   @default("")
+  createdAt DateTime @default(now())
+}
+
+/// Sequential LKV receipts for Payment rows (separate from Invoice ReceiptSeq).
+model PaymentReceiptSeq {
+  id   Int @id
+  next Int @default(1)
 }
 
 model SavedLook {

@@ -165,6 +165,18 @@ async function main() {
     create: { userId: staff.id, tenantId: tenant.id, role: "STAFF" },
   });
 
+  await prisma.salonBillingPlan.upsert({
+    where: { id: "lookuvi-salon-plan" },
+    update: { name: "Lookuvi Salon", pricePaise: 79900, intervalMonths: 1, active: true },
+    create: {
+      id: "lookuvi-salon-plan",
+      name: "Lookuvi Salon",
+      pricePaise: 79900,
+      intervalMonths: 1,
+      active: true,
+    },
+  });
+
   const grant = await prisma.creditLedger.findFirst({ where: { tenantId: tenant.id, reason: "PLAN_GRANT" } });
   if (!grant) {
     await prisma.creditLedger.create({

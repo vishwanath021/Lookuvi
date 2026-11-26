@@ -1,6 +1,8 @@
 import { BillingPanel } from "@/components/admin/BillingPanel";
+import { PlanBillingPanel } from "@/components/admin/PlanBillingPanel";
 import { upiAccount, upiPayLink } from "@/lib/billing/upi";
 import { billingProviderName, legalName } from "@/lib/env";
+import { paymentsUnavailableMessage, priceInclGstLabel, razorpayConfigured } from "@/lib/payments/config";
 import { prisma } from "@/lib/prisma";
 import { pageTenant } from "@/lib/session";
 import QRCode from "qrcode";
@@ -31,9 +33,24 @@ export default async function BillingPage() {
       qrDataUrl: await QRCode.toDataURL(upiUri, { margin: 1, width: 280 }),
     };
   }
+  const salonPlans = await prisma.salonBillingPlan.findMany({ where: { active: true }, orderBy: { createdAt: "asc" } });
+  const currentSalonPlan = tenant.salonBillingPlanId
+    ? await prisma.salonBillingPlan.findUnique({ where: { id: tenant.salonBillingPlanId } })
+    : salonPlans[0] || null;
+  const paymentsEnabled = razorpayConfigured();
   return (
     <main>
-      <h1 className="mb-4 page-title">Billing</h1>
+      <h1 className="mb-4 page-title">Plan &amp; Billing</h1>
+      <PlanBillingPanel
+        paidUntil={tenant.paidUntil?.toISOString() || null}
+        currentPlan={currentSalonPlan}
+        plans={salonPlans}
+        paymentsEnabled={paymentsEnabled}
+        gstin={tenant.gstin || ""}
+        unavailableMessage={paymentsUnavailableMessage()}
+        gstLabel={priceInclGstLabel()}
+      />
+      <h2 className="mb-2 mt-8 text-base font-semibold">Try-on plans &amp; packs</h2>
       <BillingPanel plan={tenant.plan} status={tenant.status} credits={tenant.creditBalance} provider={billingProviderName()} pending={pending} />
       <h2 className="mb-2 mt-6 text-base font-semibold">Receipts</h2>
       <p className="mb-2 text-sm text-muted">{legalName()}</p>

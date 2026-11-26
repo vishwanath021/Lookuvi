@@ -10,6 +10,7 @@ import { applySuitability } from "@/lib/hair-suitability";
 import { parseJson } from "@/lib/json";
 import { prisma } from "@/lib/prisma";
 import { isSoftDeleted } from "@/lib/salon-status";
+import { razorpayConfigured } from "@/lib/payments/config";
 import { maskToolFlags } from "@/lib/tools";
 
 export type SalonService = {
@@ -66,6 +67,8 @@ export type SalonConfig = {
   shades: { id: string; name: string; hex: string; lift: number; serviceKeys: string[] }[];
   outlets: { id: string; name: string; whatsapp: string; address: string; mapsUrl: string; isPrimary: boolean }[];
   poweredBy: boolean;
+  bookingDepositPaise: number;
+  depositPaymentsEnabled: boolean;
 };
 
 type TenantWithRelations = NonNullable<Awaited<ReturnType<typeof tenantQuery>>>;
@@ -179,6 +182,8 @@ export async function toSalonConfig(tenant: TenantWithRelations): Promise<SalonC
       mapsUrl: outlet.mapsUrl,
       isPrimary: outlet.isPrimary,
     })),
+    bookingDepositPaise: tenant.bookingDepositPaise,
+    depositPaymentsEnabled: tenant.bookingDepositPaise > 0 && razorpayConfigured(),
     poweredBy: !(tenant.removeBranding && plan.removeBranding),
   };
 }

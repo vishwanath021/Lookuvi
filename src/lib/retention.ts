@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { sweepDueReminders } from "@/lib/reminders";
 import { expireDueVisits, purgeOldQueueEntries, sweepAllQueues } from "@/lib/queue/service";
 import { deleteObject } from "@/lib/storage";
+import { expireStalePayments } from "@/lib/payments/expiry";
 import { expireTrials } from "@/lib/trial";
 
 /** Deletes expired preview objects and benchmark selfies. Safe to run on every instance. */
@@ -34,8 +35,19 @@ export async function runRetention() {
   const alerts = await sweepAllQueues().catch(() => ({ sent: 0, salons: 0 }));
   const reminders = await sweepDueReminders().catch(() => ({ sent: 0, reason: "FAIL", salons: 0 }));
   const expired = await expireTrials().catch(() => 0);
+  const paymentsExpired = await expireStalePayments().catch(() => 0);
   const costSync = await syncFalBillingCosts().then((row) => (row.ok ? row.updated : 0)).catch(() => 0);
-  return { jobs: staleJobs.length, benchmarks: staleRuns.length, queue, queueExpired, alerts: alerts.sent, reminders: reminders.sent, expired, costSync };
+  return {
+    jobs: staleJobs.length,
+    benchmarks: staleRuns.length,
+    queue,
+    queueExpired,
+    alerts: alerts.sent,
+    reminders: reminders.sent,
+    expired,
+    paymentsExpired,
+    costSync,
+  };
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
