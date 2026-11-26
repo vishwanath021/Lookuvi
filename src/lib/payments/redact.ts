@@ -1,4 +1,4 @@
-const SENSITIVE = /(key_secret|webhook_secret|razorpay_signature|card|cvv|vpa|upi)/i;
+const SENSITIVE = /(key_secret|razorpay_key_secret|webhook_secret|razorpay_signature|signature|card|cvv|vpa|upi)/i;
 
 /** Strip secrets and card/UPI fields from log payloads. */
 export function redactForLog(value: unknown): unknown {

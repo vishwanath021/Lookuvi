@@ -131,7 +131,8 @@ test("guest home layout and an owner can open the dashboard", async ({ page }, t
   await expect(page.getByRole("heading", { name: "Leads" })).toBeVisible();
 
   await page.goto("/admin/billing");
-  await expect(page.getByRole("heading", { name: "Billing" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Plan .* Billing/i })).toBeVisible();
+  await expect(page.locator("[data-plan-billing]")).toBeVisible();
 
   await page.goto("/admin/qr");
   await expect(page.getByRole("heading", { name: /qr and embed/i })).toBeVisible();
